@@ -28,6 +28,7 @@
     "*.js"
   ],
   "dependencies": {
+    "pull-stream": "^3.6.14",
     "ssb-box2": "^2.0.2",
     "ssb-db2": ">=5",
     "ssb-meta-feeds": "~0.30.0"
