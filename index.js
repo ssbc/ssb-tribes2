@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: LGPL-3.0-only
 
+const { promisify } = require('util')
 const pull = require('pull-stream')
 const {
   where,
@@ -17,16 +18,20 @@ module.exports = {
   manifest: {
     create: 'async',
     list: 'source',
-    invite: 'async',
+    addMembers: 'async',
     start: 'async',
   },
   init(ssb, config) {
-    function create(cb) {
+    function create(opts = {}, cb) {
+      if (cb === undefined) return promisify(create)(opts)
+
       // TODO: use ssb-private-group-keys to create the group keys
       // TODO: use ssb-meta-feeds findOrCreate to create a group feed
       // TODO: use ssb-box2 APIs to register the new group
       // TODO: publish a new group/init message on the group feed
       // TODO: consider what happens if the app crashes between any step
+
+      cb(null, {}) // junk
     }
 
     function list() {
@@ -36,7 +41,7 @@ module.exports = {
       // TODO: return a pull-stream source
     }
 
-    function invite(feedId, groupId, cb) {
+    function addMembers(groupId, feedIds, cb) {
       // TODO
     }
 
@@ -60,7 +65,7 @@ module.exports = {
     return {
       create,
       list,
-      invite,
+      addMembers,
       start,
     }
   },
