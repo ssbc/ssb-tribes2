@@ -50,7 +50,7 @@ ssb.tribes2.create({}, (err, group) => {
 ### `ssb.tribes2.create(opts, cb)`
 
 Creates a new private group.
-This creates an encruption key, sets up a sub-feed for the group, and initializes the
+This creates an encryption key, sets up a sub-feed for the group, and initializes the
 group with a `group/init` message, and `group/add-member` to signal you were added.
 Calls back with important info about the group
 
