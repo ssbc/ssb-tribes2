@@ -55,7 +55,7 @@ group with a `group/init` message, and `group/add-member` to signal you were add
 Calls back with important info about the group
 
 - `opts` *Object* - currently empty, but will be used to specifiy details like whether the group has an admin subgroup etc. in future
-- `cb` *Function* - callback function of signature `(err, group)` where `group` in object containing:
+- `cb` *Function* - callback function of signature `(err, group)` where `group` is an object containing:
     - `id` *CloakedId* - a cipherlink that's safe to use publicly to name the group, and is used in `recps` to trigger encrypting messages to that group, encoded as an ssb-uri
     - `subfeed` *Keys* - the keys of the subfeed you should publish group data to
     - `secret` *Buffer*  - the symmetric key used for encryption by the group
