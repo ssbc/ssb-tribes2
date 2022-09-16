@@ -58,7 +58,7 @@ Calls back with important info about the group
 - `cb` *Function* - callback function of signature `(err, group)` where `group` is an object containing:
     - `id` *CloakedId* - a cipherlink that's safe to use publicly to name the group, and is used in `recps` to trigger encrypting messages to that group, encoded as an ssb-uri
     - `subfeed` *Keys* - the keys of the subfeed you should publish group data to
-    - `secret` *Buffer*  - the symmetric key used for encryption by the group
+    - `secret` *Buffer* - the symmetric key used by the group for encryption
     - `root` *MessagedId* - the MessageId of the `group/init` message of the group, encoded as an ssb-uri.
 
 
