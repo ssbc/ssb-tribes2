@@ -5,6 +5,7 @@ module.exports = function Testbot (opts = {}) {
     // NOTE: these already already in scuttlebot
     // .use(require('ssb-db2'))
     // .use(require('ssb-box2'))
+    .use(require('ssb-db2/compat/feedstate'))
     .use(require('../'))
 
   return stack({
