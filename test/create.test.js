@@ -10,7 +10,6 @@ test('create', async t => {
   const ssb = Testbot()
 
   const { id, subfeed, secret, root } = await ssb.tribes2.create()
-    .catch(err => t.error(err))
 
   t.true(ref.isCloakedMsgId(id), 'has groupId')
   t.true(subfeed && ref.isFeed(subfeed.id), 'has keys')
@@ -19,5 +18,6 @@ test('create', async t => {
 
   // ...
 
-  ssb.close(t.end)
+  ssb.close()
+  t.end()
 })
