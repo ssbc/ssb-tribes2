@@ -1,6 +1,10 @@
+// SPDX-FileCopyrightText: 2022 Andre 'Staltz' Medeiros <contact@staltz.com>
+//
+// SPDX-License-Identifier: CC0-1.0
+
 const Bot = require('scuttle-testbot')
 
-module.exports = function Testbot (opts = {}) {
+module.exports = function Testbot(opts = {}) {
   const stack = Bot
     // NOTE: these already already in scuttlebot
     // .use(require('ssb-db2'))
@@ -13,6 +17,6 @@ module.exports = function Testbot (opts = {}) {
     // keys,                (see ssb-keys)
     // startUnclean: false, (clean = rimraf path)
     db2: true,
-    ...opts
+    ...opts,
   })
 }
