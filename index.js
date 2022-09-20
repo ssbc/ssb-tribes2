@@ -4,6 +4,8 @@
 
 const { promisify } = require('util')
 const pull = require('pull-stream')
+const paraMap = require('pull-paramap')
+const pullAsync = require('pull-async')
 const {
   where,
   and,
@@ -98,11 +100,30 @@ module.exports = {
       })
     }
 
+    function get(id, cb) {
+      if (cb === undefined) return promisify(get)(id)
+
+      ssb.box2.getGroupKeyInfo(id, (err, info) => {
+        if (err) cb(err)
+
+        cb(null, {
+          id,
+          secret: info.key,
+        })
+      })
+    }
+
     function list() {
       // TODO: PR on ssb-box2 to have an API to list all group keys
       // TODO: traverse all group keys, "hydrate" each one with details (name,
       // description, etc) about the group
       // TODO: return a pull-stream source
+      return pull(
+        pullAsync((cb) => ssb.box2.listGroupIds(cb)),
+        pull.map((ids) => pull.values(ids)),
+        pull.flatten(),
+        paraMap(get, 4)
+      )
     }
 
     function addMembers(groupId, feedIds, cb) {
@@ -129,6 +150,7 @@ module.exports = {
 
     return {
       create,
+      get,
       list,
       addMembers,
       start,

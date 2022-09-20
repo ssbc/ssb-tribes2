@@ -46,42 +46,45 @@ ssb.tribes2.create({}, (err, group) => {
 
 ## API
 
-
 ### `ssb.tribes2.create(opts, cb)`
 
 Creates a new private group.
 This creates an encryption key, sets up a sub-feed for the group, and initializes the
 group with a `group/init` message, and `group/add-member` to signal you were added.
-Calls back with important info about the group
+Calls back with important info about the group. Returns a promise if a callback isn't provided
 
-- `opts` *Object* - currently empty, but will be used to specifiy details like whether the group has an admin subgroup etc. in future
-- `cb` *Function* - callback function of signature `(err, group)` where `group` is an object containing:
-    - `id` *CloakedId* - a cipherlink that's safe to use publicly to name the group, and is used in `recps` to trigger encrypting messages to that group, encoded as an ssb-uri
-    - `subfeed` *Keys* - the keys of the subfeed you should publish group data to
-    - `secret` *Buffer* - the symmetric key used by the group for encryption
-    - `root` *MessagedId* - the MessageId of the `group/init` message of the group, encoded as an ssb-uri.
+- `opts` _Object_ - currently empty, but will be used to specifiy details like whether the group has an admin subgroup etc. in future
+- `cb` _Function_ - callback function of signature `(err, group)` where `group` is an object containing:
+  - `id` _CloakedId_ - a cipherlink that's safe to use publicly to name the group, and is used in `recps` to trigger encrypting messages to that group, encoded as an ssb-uri
+  - `subfeed` _Keys_ - the keys of the subfeed you should publish group data to
+  - `secret` _Buffer_ - the symmetric key used by the group for encryption
+  - `root` _MessagedId_ - the MessageId of the `group/init` message of the group, encoded as an ssb-uri.
 
+### `ssb.tribes2.get(groupId, cb)`
+
+Gets information about a specific group.
+
+- `groupId` _CloakedId_ - the public-safe cipherlink which identifies the group
+- `cb` _Function_ - callback function of signature `(err, group)` where `group` is an object on the same format as the `group` object returned by #create
 
 ### `ssb.tribes2.list() => source`
 
 Creates a pull-stream source which emits `group` data of each private group you're a part of.
-(Same format as `group` Object returned in by #create)
+(Same format as `group` object returned by #create)
 
 ### `ssb.tribes2.addMembers(groupId, feedIds, cb)`
 
 Publish `group/add-member` messages to a group of peers, which gives them all the details they need
 to join the group.
 
-- `groupId` *CloakedId* - the public-safe cipherlink which identifies the group (same as in #create)
-- `feedIds` *[FeedId]* - an Array of 1-16 different ids for peers (accepts ssb-uri or sigil feed ids)
-- `cb` *Function* - a callback of signature `(err)`
-
+- `groupId` _CloakedId_ - the public-safe cipherlink which identifies the group (same as in #create)
+- `feedIds` _[FeedId]_ - an Array of 1-16 different ids for peers (accepts ssb-uri or sigil feed ids)
+- `cb` _Function_ - a callback of signature `(err)`
 
 ### `ssb.tribes2.start()`
 
 Starts this module listening for `group/add-member` messages, which will then trigger replication
 changes and new encryption / indexing as required.
-
 
 ## License
 
