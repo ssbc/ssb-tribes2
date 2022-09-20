@@ -114,10 +114,6 @@ module.exports = {
     }
 
     function list() {
-      // TODO: PR on ssb-box2 to have an API to list all group keys
-      // TODO: traverse all group keys, "hydrate" each one with details (name,
-      // description, etc) about the group
-      // TODO: return a pull-stream source
       return pull(
         pullAsync((cb) => ssb.box2.listGroupIds(cb)),
         pull.map((ids) => pull.values(ids)),
