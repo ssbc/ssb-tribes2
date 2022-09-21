@@ -90,6 +90,7 @@ module.exports = {
               subfeed: '',
             }
 
+            // TODO: add root on new version of box2
             ssb.box2.addGroupKey(data.id, data.secret)
 
             // TODO later: add myself for recovery reasons
@@ -109,6 +110,7 @@ module.exports = {
         cb(null, {
           id,
           secret: info.key,
+          //TODO: add root
         })
       })
     }
@@ -122,9 +124,44 @@ module.exports = {
       )
     }
 
-    function addMembers(groupId, feedIds, cb) {
+    function addMembers(groupId, feedIds, opts = {}, cb) {
+      if (cb === undefined) return promisify(addMembers)(groupId, feedIds, opts)
+
       // TODO
       // copy a lot from ssb-tribes but don't use the keystore from there
+      const { key, root } = get(groupId)
+
+      const content = {
+        type: 'group/add-member',
+        version: 'v1',
+        groupKey: key.toString('base64'),
+        root,
+        tangles: {
+          members: {
+            root,
+            previous: [root], // TODO calculate previous for members tangle
+          },
+
+          //TODO: this is weird remove it?
+          group: { root, previous: [root] },
+          // NOTE: this is a dummy entry which is over-written in publish hook
+        },
+        recps: [groupId, ...feedIds],
+      }
+
+      if (opts.text) content.text = opts.text
+
+      if (!addMemberSpec.isValid(content))
+        return cb(new Error(addMemberSpec.isValid.errorsString))
+
+      ssb.publish(content, (err) => {
+        if (err) return cb(err)
+
+        keystore.group.registerAuthors(groupId, feedIds, (err) => {
+          if (err) return cb(err)
+          cb()
+        })
+      })
     }
 
     // Listeners for joining groups
