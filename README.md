@@ -43,7 +43,12 @@ ssb.tribes2.create({}, (err, group) => {
   const keys = group.mySubfeedKeys
   const recps = [group.id]
   const content = { type: 'post', text: 'welcome, friends!' }
-  ssb.db.create({ keys, recps, content }, cb)
+  ssb.db.create({
+    keys,
+    recps,
+    content,
+    encryptionFormat: 'box2'
+  }, cb)
 })
 ```
 
