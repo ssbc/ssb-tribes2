@@ -61,7 +61,7 @@ This creates an encryption key, sets up a sub-feed for the group, and initialize
 group with a `group/init` message, and `group/add-member` to signal you were added.
 Calls back with important info about the group. Returns a promise if a callback isn't provided
 
-- `opts` _Object_ - currently empty, but will be used to specifiy details like whether the group has an admin subgroup etc. in future
+- `opts` _Object_ - currently empty, but will be used in the future to specify details like whether the group has an admin subgroup, etc.
 - `cb` _Function_ - callback function of signature `(err, group)` where `group` is an object containing:
   - `id` _CloakedId_ - a cipherlink that's safe to use publicly to name the group, and is used in `recps` to trigger encrypting messages to that group, encoded as an ssb-uri
   - `subfeed` _Keys_ - the keys of the subfeed you should publish group data to
