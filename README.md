@@ -40,7 +40,10 @@ ssb.tribes2.create({}, (err, group) => {
     text: 'welcome to the group',
     recps: [group.id]
   }
-  ssb.db.publishAs(group.subfeed, content, cb)
+  const keys = group.mySubfeedKeys
+  const recps = [group.id]
+  const content = { type: 'post', text: 'welcome, friends!' }
+  ssb.db.create({ keys, recps, content }, cb)
 })
 ```
 
