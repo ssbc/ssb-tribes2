@@ -1,22 +1,37 @@
-// SPDX-FileCopyrightText: 2022 Andre 'Staltz' Medeiros <contact@staltz.com>
+// SPDX-FileCopyrightText: 2022 Mix Irving
 //
-// SPDX-License-Identifier: CC0-1.0
+// SPDX-License-Identifier: Unlicense
 
-const Bot = require('scuttle-testbot')
+const SecretStack = require('secret-stack')
+const ssbKeys = require('ssb-keys')
+const path = require('path')
+const rimraf = require('rimraf')
+const caps = require('ssb-caps')
 
-module.exports = function Testbot(opts = {}) {
-  const stack = Bot
-    // NOTE: these already already in scuttlebot
-    // .use(require('ssb-db2'))
-    // .use(require('ssb-box2'))
+let count = 0
+
+// opts.path      (optional)
+//   opts.name    (optional) - convenience method for deterministic opts.path
+// opts.keys      (optional)
+// opts.rimraf    (optional) - clear the directory before start (default: true)
+
+module.exports = function createSbot(opts = {}) {
+  const dir = opts.path || `/tmp/ssb-tribes2-tests-${opts.name || count++}`
+  if (opts.rimraf !== false) rimraf.sync(dir)
+
+  const keys = opts.keys || ssbKeys.loadOrCreateSync(path.join(dir, 'secret'))
+
+  const stack = SecretStack({ appKey: caps.shs })
+    .use(require('ssb-db2/core'))
+    .use(require('ssb-classic'))
+    // TODO: why do we need box1??
+    .use(require('ssb-box'))
+    .use(require('ssb-box2'))
     .use(require('ssb-db2/compat/feedstate'))
     .use(require('../'))
 
   return stack({
-    // path,                (app data location)
-    // keys,                (see ssb-keys)
-    // startUnclean: false, (clean = rimraf path)
-    db2: true,
-    ...opts,
+    path: dir,
+    keys,
   })
 }
