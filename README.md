@@ -31,22 +31,21 @@ npm install ssb-tribes2
 +  .use(require('ssb-tribes2'))
    .use(require('ssb-blobs'))
    .call(null, config)
+```
 
+Then
+
+```js
 ssb.tribes2.start()
 
 ssb.tribes2.create({}, (err, group) => {
-  const content = {
-    type: 'post',
-    text: 'welcome to the group',
-    recps: [group.id]
-  }
-  const keys = group.mySubfeedKeys
-  const recps = [group.id]
-  const content = { type: 'post', text: 'welcome, friends!' }
   ssb.db.create({
-    keys,
-    recps,
-    content,
+    keys: group.mySubfeedKeys,
+    content: {
+      type: 'post',
+      text: 'welcome to the group',
+      recps: [group.id]
+    },
     encryptionFormat: 'box2'
   }, cb)
 })
