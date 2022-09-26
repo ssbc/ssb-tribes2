@@ -24,8 +24,6 @@ module.exports = function createSbot(opts = {}) {
   const stack = SecretStack({ appKey: caps.shs })
     .use(require('ssb-db2/core'))
     .use(require('ssb-classic'))
-    // TODO: why do we need box1??
-    .use(require('ssb-box'))
     .use(require('ssb-box2'))
     .use(require('ssb-db2/compat/feedstate'))
     .use(require('../'))
