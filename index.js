@@ -33,10 +33,8 @@ module.exports = {
     function create(opts = {}, cb) {
       if (cb === undefined) return promisify(create)(opts)
 
-      // TODO: use ssb-private-group-keys to create the group keys
       // TODO: use ssb-meta-feeds findOrCreate to create a group feed
-      // TODO: use ssb-box2 APIs to register the new group
-      // TODO: publish a new group/init message on the group feed
+      // TODO: publish the message on the group feed
       // TODO: consider what happens if the app crashes between any step
 
       const groupKey = new SecretKey()
@@ -48,56 +46,34 @@ module.exports = {
       }
       //if (!initSpec.isValid(content)) return cb(new Error(initSpec.isValid.errorsString))
 
-      /* enveloping */
-      // we have to do it manually this one time, because the auto-boxing checks for a known groupId
-      // but the groupId is derived from the messageId of this message (which does not exist yet
-      const plain = Buffer.from(JSON.stringify(content), 'utf8')
-
       const msgKey = new SecretKey().toBuffer()
       const recipientKeys = [
         { key: groupKey.toBuffer(), scheme: keySchemes.private_group },
       ]
 
-      ssb.getFeedState(ssb.id, (err, previousFeedState) => {
-        if (err) return cb(err)
+      ssb.db.create(
+        {
+          content,
+          recps: recipientKeys, //TODO: do we wanna use msgKey here as well?
+          encryptionFormat: 'box2',
+        },
+        (err, groupInitMsg) => {
+          if (err) return cb(err)
 
-        const feedId = bfe.encode(ssb.id)
-
-        const previousMessageId = bfe.encode(previousFeedState.id)
-
-        const envelope = box(
-          plain,
-          feedId,
-          previousMessageId,
-          msgKey,
-          recipientKeys
-        )
-        const ciphertext = envelope.toString('base64') + '.box2'
-
-        ssb.db.create(
-          {
-            content: ciphertext,
-            // TODO
-            //keys: subfeed.keys
-          },
-          (err, groupInitMsg) => {
-            if (err) return cb(err)
-
-            const data = {
-              id: buildGroupId({ groupInitMsg, msgKey }),
-              secret: groupKey.toBuffer(),
-              root: groupInitMsg.key,
-              subfeed: '',
-            }
-
-            ssb.box2.addGroupKey(data.id, data.secret)
-
-            // TODO later: add myself for recovery reasons
-
-            cb(null, data)
+          const data = {
+            id: buildGroupId({ groupInitMsg, msgKey }),
+            secret: groupKey.toBuffer(),
+            root: groupInitMsg.key,
+            subfeed: '',
           }
-        )
-      })
+
+          ssb.box2.addGroupKey(data.id, data.secret)
+
+          // TODO later: add myself for recovery reasons
+
+          cb(null, data)
+        }
+      )
     }
 
     function get(id, cb) {
