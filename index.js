@@ -18,6 +18,7 @@ const { keySchemes } = require('private-group-spec')
 const { SecretKey } = require('ssb-private-group-keys')
 //const Crut = require('ssb-crut')
 const buildGroupId = require('./lib/build-group-id')
+const addGroupTangle = require('./lib/add-group-tangle')
 
 module.exports = {
   name: 'tribes2',
@@ -101,37 +102,42 @@ module.exports = {
 
       // TODO
       // copy a lot from ssb-tribes but don't use the keystore from there
-      const { key, root } = get(groupId)
-
-      const content = {
-        type: 'group/add-member',
-        version: 'v1',
-        groupKey: key.toString('base64'),
-        root,
-        tangles: {
-          members: {
-            root,
-            previous: [root], // TODO calculate previous for members tangle
-          },
-
-          //TODO: this is weird remove it?
-          group: { root, previous: [root] },
-          // NOTE: this is a dummy entry which is over-written in publish hook
-        },
-        recps: [groupId, ...feedIds],
-      }
-
-      if (opts.text) content.text = opts.text
-
-      if (!addMemberSpec.isValid(content))
-        return cb(new Error(addMemberSpec.isValid.errorsString))
-
-      ssb.publish(content, (err) => {
+      get(groupId, (err, { secret, root }) => {
         if (err) return cb(err)
 
-        keystore.group.registerAuthors(groupId, feedIds, (err) => {
+        const recps = [groupId, ...feedIds]
+
+        const content = {
+          type: 'group/add-member',
+          version: 'v1',
+          groupKey: secret.toString('base64'),
+          root,
+          tangles: {
+            members: {
+              root,
+              previous: [root], // TODO calculate previous for members tangle
+            },
+          },
+          recps,
+        }
+
+        if (opts.text) content.text = opts.text
+
+        addGroupTangle(content, (err, content) => {
           if (err) return cb(err)
-          cb()
+
+          //if (!addMemberSpec.isValid(content))
+          //  return cb(new Error(addMemberSpec.isValid.errorsString))
+
+          ssb.db.create({ content, recps, encryptionFormat: 'box2' }, (err) => {
+            if (err) return cb(err)
+
+            //TODO: this is an optimization, use the db query instead for now
+            //keystore.group.registerAuthors(groupId, feedIds, (err) => {
+            //  if (err) return cb(err)
+            //  cb()
+            //})
+          })
         })
       })
     }
