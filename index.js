@@ -64,8 +64,7 @@ module.exports = {
             subfeed: '',
           }
 
-          // TODO: add root on new version of box2
-          ssb.box2.addGroupKey(data.id, data.secret)
+          ssb.box2.addGroupInfo(data.id, { key: data.secret, root: data.root })
 
           // TODO later: add myself for recovery reasons
 
@@ -83,7 +82,7 @@ module.exports = {
         cb(null, {
           id,
           secret: info.key,
-          //TODO: add root
+          root: info.root,
         })
       })
     }

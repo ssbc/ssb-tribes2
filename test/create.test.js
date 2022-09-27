@@ -51,14 +51,13 @@ test('get', async (t) => {
   const group = await ssb.tribes2.get(id)
 
   //- `subfeed` *Keys* - the keys of the subfeed you should publish group data to
-  //- `root` *MessagedId* - the MessageId of the `group/init` message of the group, encoded as an ssb-uri.
-
   t.equal(id, group.id)
   t.true(ref.isCloakedMsg(group.id))
   //TODO: subfeed
   t.true(Buffer.isBuffer(group.secret))
   t.equal(secret, group.secret)
-  //TODO: root
+  t.true(ref.isMsg(group.root), 'has root')
+  t.equal(root, group.root)
 
   ssb.close(true)
 })
