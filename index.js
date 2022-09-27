@@ -60,7 +60,7 @@ module.exports = {
           if (err) return cb(err)
 
           const data = {
-            id: buildGroupId({ groupInitMsg, groupKey }),
+            id: buildGroupId({ groupInitMsg, groupKey: groupKey.toBuffer() }),
             secret: groupKey.toBuffer(),
             root: groupInitMsg.key,
             subfeed: '',
