@@ -46,7 +46,6 @@ module.exports = {
       }
       //if (!initSpec.isValid(content)) return cb(new Error(initSpec.isValid.errorsString))
 
-      const msgKey = new SecretKey().toBuffer()
       const recipientKeys = [
         { key: groupKey.toBuffer(), scheme: keySchemes.private_group },
       ]
@@ -61,7 +60,7 @@ module.exports = {
           if (err) return cb(err)
 
           const data = {
-            id: buildGroupId({ groupInitMsg, msgKey }),
+            id: buildGroupId({ groupInitMsg, groupKey }),
             secret: groupKey.toBuffer(),
             root: groupInitMsg.key,
             subfeed: '',
