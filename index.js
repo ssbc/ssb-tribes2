@@ -2,7 +2,10 @@
 //
 // SPDX-License-Identifier: LGPL-3.0-only
 
+const { promisify } = require('util')
 const pull = require('pull-stream')
+const paraMap = require('pull-paramap')
+const pullAsync = require('pull-async')
 const {
   where,
   and,
@@ -11,33 +14,92 @@ const {
   live,
   toPullStream,
 } = require('ssb-db2/operators')
+const { box } = require('envelope-js')
+const { keySchemes } = require('private-group-spec')
+const { SecretKey } = require('ssb-private-group-keys')
+const bfe = require('ssb-bfe')
+//const Crut = require('ssb-crut')
+const buildGroupId = require('./lib/build-group-id')
 
 module.exports = {
   name: 'tribes2',
   manifest: {
     create: 'async',
     list: 'source',
-    invite: 'async',
+    addMembers: 'async',
     start: 'async',
   },
   init(ssb, config) {
-    function create(cb) {
-      // TODO: use ssb-private-group-keys to create the group keys
+    function create(opts = {}, cb) {
+      if (cb === undefined) return promisify(create)(opts)
+
       // TODO: use ssb-meta-feeds findOrCreate to create a group feed
-      // TODO: use ssb-box2 APIs to register the new group
-      // TODO: publish a new group/init message on the group feed
+      // TODO: publish the message on the group feed
       // TODO: consider what happens if the app crashes between any step
+
+      const groupKey = new SecretKey()
+      const content = {
+        type: 'group/init',
+        tangles: {
+          group: { root: null, previous: null },
+        },
+      }
+      //if (!initSpec.isValid(content)) return cb(new Error(initSpec.isValid.errorsString))
+
+      const recipientKeys = [
+        { key: groupKey.toBuffer(), scheme: keySchemes.private_group },
+      ]
+
+      ssb.db.create(
+        {
+          content,
+          recps: recipientKeys, //TODO: do we wanna use msgKey here as well?
+          encryptionFormat: 'box2',
+        },
+        (err, groupInitMsg) => {
+          if (err) return cb(err)
+
+          const data = {
+            id: buildGroupId({ groupInitMsg, groupKey: groupKey.toBuffer() }),
+            secret: groupKey.toBuffer(),
+            root: groupInitMsg.key,
+            subfeed: '',
+          }
+
+          ssb.box2.addGroupKey(data.id, data.secret)
+
+          // TODO later: add myself for recovery reasons
+
+          cb(null, data)
+        }
+      )
+    }
+
+    function get(id, cb) {
+      if (cb === undefined) return promisify(get)(id)
+
+      ssb.box2.getGroupKeyInfo(id, (err, info) => {
+        if (err) cb(err)
+
+        cb(null, {
+          id,
+          secret: info.key,
+        })
+      })
     }
 
     function list() {
-      // TODO: PR on ssb-box2 to have an API to list all group keys
-      // TODO: traverse all group keys, "hydrate" each one with details (name,
-      // description, etc) about the group
-      // TODO: return a pull-stream source
+      return pull(
+        pullAsync((cb) => ssb.box2.listGroupIds(cb)),
+        pull.map((ids) => pull.values(ids)),
+        pull.flatten(),
+        paraMap(get, 4)
+      )
     }
 
-    function invite(feedId, groupId, cb) {
+    function addMembers(groupId, feedIds, cb) {
       // TODO
+      // copy a lot from ssb-tribes but don't use the keystore from there
     }
 
     // Listeners for joining groups
@@ -59,8 +121,9 @@ module.exports = {
 
     return {
       create,
+      get,
       list,
-      invite,
+      addMembers,
       start,
     }
   },
