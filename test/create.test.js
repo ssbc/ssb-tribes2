@@ -4,7 +4,7 @@
 
 const test = require('tape')
 const ref = require('ssb-ref')
-const Testbot = require('./testbot')
+const Testbot = require('./helpers/testbot')
 const { promisify: p } = require('util')
 const pull = require('pull-stream')
 
