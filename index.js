@@ -101,6 +101,11 @@ module.exports = {
     function addMembers(groupId, feedIds, opts = {}, cb) {
       if (cb === undefined) return promisify(addMembers)(groupId, feedIds, opts)
 
+      if (!feedIds || feedIds.length === 0)
+        return cb(new Error('No feedIds provided to addMembers'))
+      if (feedIds.length > 16)
+        return cb(new Error(`${feedIds.length} is more than 16 recipients`))
+
       // TODO
       // copy a lot from ssb-tribes but don't use the keystore from there
       get(groupId, (err, { secret, root }) => {
