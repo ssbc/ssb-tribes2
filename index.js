@@ -6,6 +6,7 @@ const { promisify } = require('util')
 const pull = require('pull-stream')
 const paraMap = require('pull-paramap')
 const pullAsync = require('pull-async')
+const lodashGet = require('lodash.get')
 const {
   where,
   and,
@@ -135,7 +136,7 @@ module.exports = {
             //TODO: this is an optimization, use the db query instead for now
             //keystore.group.registerAuthors(groupId, feedIds, (err) => {
             //  if (err) return cb(err)
-            //  cb()
+            cb()
             //})
           })
         })
@@ -155,8 +156,27 @@ module.exports = {
           // TODO: if we do, ignore this msg
           // TODO: else, register the group key in ssb-box2
           // TODO: call ssb-db2 reindexEncrypted
+
+          if (lodashGet(msg, 'value.content.recps', []).includes(ssb.id)) {
+            const groupRoot = lodashGet(msg, 'value.content.root')
+            const groupKey = lodashGet(msg, 'value.content.groupKey')
+            const groupId = lodashGet(msg, 'value.content.recps[0]')
+
+            ssb.box2.addGroupInfo(groupId, { key: groupKey, root: groupRoot })
+          }
         })
       )
+
+      //pull(
+      //  ssb.db.query(live({ old: true }), toPullStream()),
+      //  pull.drain((msg) => {
+      //    console.log('i got any kind of message', {
+      //      author: msg.value.author,
+      //      seq: msg.value.sequence,
+      //      myId: ssb.id,
+      //    })
+      //  })
+      //)
     }
 
     return {

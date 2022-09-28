@@ -37,8 +37,7 @@ test('create', async (t) => {
   //t.equal(msg.value.author, subfeed.id)
   t.equal(msg.value.sequence, 2)
 
-  ssb.close()
-  t.end()
+  await p(ssb.close)(true)
 })
 
 test('get', async (t) => {
@@ -59,7 +58,7 @@ test('get', async (t) => {
   t.true(ref.isMsg(group.root), 'has root')
   t.equal(root, group.root)
 
-  ssb.close(true)
+  await p(ssb.close)(true)
 })
 
 test('list', (t) => {
