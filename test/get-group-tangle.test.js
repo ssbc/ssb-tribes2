@@ -1,6 +1,22 @@
+// SPDX-FileCopyrightText: 2022 Mix Irving
+//
+// SPDX-License-Identifier: LGPL-3.0-only
+
 const test = require('tape')
 const pull = require('pull-stream')
 const paraMap = require('pull-paramap')
+const {
+  and,
+  type,
+  author,
+  paginate,
+  descending,
+  toCallback,
+  toPullStream,
+  where,
+} = require('ssb-db2/operators')
+
+const AddGroupTangle = require('../lib/add-group-tangle')
 const GetGroupTangle = require('../lib/get-group-tangle')
 const Testbot = require('./helpers/testbot')
 const replicate = require('./helpers/replicate')
@@ -8,9 +24,10 @@ const replicate = require('./helpers/replicate')
 test('get-group-tangle unit test', (t) => {
   const name = `get-group-tangle-${Date.now()}`
   const server = Testbot({ name })
+  const addGroupTangle = AddGroupTangle(server)
 
   //    - creating a group and publishing messages (ssb-tribes)
-  server.tribes2.create(null, (err, data) => {
+  server.tribes2.create(null, (err, group) => {
     if (err) throw err
 
     // NOTE: Publishing has a queue which means if you publish many things in a row there is a delay before those values are in indexes to be queried.
@@ -19,14 +36,15 @@ test('get-group-tangle unit test', (t) => {
       setTimeout(() => _getGroupTangle(id, cb), 300)
     }
 
-    getGroupTangle(data.id, (err, groupTangle) => {
+    getGroupTangle(group.id, (err, groupTangle) => {
       if (err) throw err
 
       const { root, previous } = groupTangle
-      const rootKey = data.groupInitMsg.key
+      const rootKey = group.root
 
       pull(
-        server.createUserStream({ id: server.id, reverse: true }),
+        //server.createUserStream({ id: server.id, reverse: true }),
+        server.db.query(where(author(server.id)), descending(), toPullStream()),
         pull.map((m) => m.key),
         pull.take(1),
         pull.collect((err, keys) => {
@@ -41,36 +59,49 @@ test('get-group-tangle unit test', (t) => {
           //  publishing to the group:
           const content = {
             type: 'memo',
-            root: data.groupId,
+            root: rootKey,
             message: 'unneccessary',
-            recps: [data.groupId],
+            recps: [group.id],
           }
 
-          server.publish(content, (err, msg) => {
+          addGroupTangle(content, (err, content) => {
             if (err) throw err
 
-            getGroupTangle(data.groupId, (err, { root, previous }) => {
-              if (err) throw err
-              t.deepEqual(
-                { root, previous },
-                { root: data.groupInitMsg.key, previous: [msg.key] },
-                'adding message to root'
-              )
-
-              server.publish(content, (err, msg) => {
+            server.db.create(
+              { content, recps: [group.id], encryptionFormat: 'box2' },
+              (err, msg) => {
                 if (err) throw err
-                getGroupTangle(data.groupId, (err, { root, previous }) => {
+
+                getGroupTangle(group.id, (err, { root, previous }) => {
                   if (err) throw err
                   t.deepEqual(
                     { root, previous },
-                    { root: data.groupInitMsg.key, previous: [msg.key] },
-                    'adding message to tip'
+                    { root: rootKey, previous: [msg.key] },
+                    'adding message to root'
                   )
-                  server.close()
-                  t.end()
+
+                  addGroupTangle(content, (err, content) => {
+                    if (err) throw err
+
+                    server.db.create(
+                      { content, recps: [group.id], encryptionFormat: 'box2' },
+                      (err, msg) => {
+                        if (err) throw err
+                        getGroupTangle(group.id, (err, { root, previous }) => {
+                          if (err) throw err
+                          t.deepEqual(
+                            { root, previous },
+                            { root: rootKey, previous: [msg.key] },
+                            'adding message to tip'
+                          )
+                          server.close(true, t.end)
+                        })
+                      }
+                    )
+                  })
                 })
-              })
-            })
+              }
+            )
           })
         })
       )

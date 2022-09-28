@@ -19,7 +19,7 @@ const { keySchemes } = require('private-group-spec')
 const { SecretKey } = require('ssb-private-group-keys')
 //const Crut = require('ssb-crut')
 const buildGroupId = require('./lib/build-group-id')
-const addGroupTangle = require('./lib/add-group-tangle')
+const AddGroupTangle = require('./lib/add-group-tangle')
 
 module.exports = {
   name: 'tribes2',
@@ -30,6 +30,8 @@ module.exports = {
     start: 'async',
   },
   init(ssb, config) {
+    const addGroupTangle = AddGroupTangle(ssb)
+
     function create(opts = {}, cb) {
       if (cb === undefined) return promisify(create)(opts)
 

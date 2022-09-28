@@ -38,7 +38,7 @@
     "pull-stream": "^3.6.14",
     "ssb-bfe": "^3.6.0",
     "ssb-box2": "^3.0.0",
-    "ssb-crut": "^4.6.0",
+    "ssb-crut": "^4.6.1",
     "ssb-meta-feeds": "~0.30.0",
     "ssb-private-group-keys": "^1.0.0"
   },
