@@ -6,6 +6,7 @@ const { promisify } = require('util')
 const pull = require('pull-stream')
 const paraMap = require('pull-paramap')
 const pullAsync = require('pull-async')
+const lodashGet = require('lodash.get')
 const {
   where,
   and,
@@ -14,12 +15,11 @@ const {
   live,
   toPullStream,
 } = require('ssb-db2/operators')
-const { box } = require('envelope-js')
 const { keySchemes } = require('private-group-spec')
 const { SecretKey } = require('ssb-private-group-keys')
-const bfe = require('ssb-bfe')
 //const Crut = require('ssb-crut')
 const buildGroupId = require('./lib/build-group-id')
+const addGroupTangle = require('./lib/add-group-tangle')
 
 module.exports = {
   name: 'tribes2',
@@ -53,7 +53,7 @@ module.exports = {
       ssb.db.create(
         {
           content,
-          recps: recipientKeys, //TODO: do we wanna use msgKey here as well?
+          recps: recipientKeys,
           encryptionFormat: 'box2',
         },
         (err, groupInitMsg) => {
@@ -66,7 +66,7 @@ module.exports = {
             subfeed: '',
           }
 
-          ssb.box2.addGroupKey(data.id, data.secret)
+          ssb.box2.addGroupInfo(data.id, { key: data.secret, root: data.root })
 
           // TODO later: add myself for recovery reasons
 
@@ -84,6 +84,7 @@ module.exports = {
         cb(null, {
           id,
           secret: info.key,
+          root: info.root,
         })
       })
     }
@@ -97,9 +98,54 @@ module.exports = {
       )
     }
 
-    function addMembers(groupId, feedIds, cb) {
+    function addMembers(groupId, feedIds, opts = {}, cb) {
+      if (cb === undefined) return promisify(addMembers)(groupId, feedIds, opts)
+
+      if (!feedIds || feedIds.length === 0)
+        return cb(new Error('No feedIds provided to addMembers'))
+      if (feedIds.length > 16)
+        return cb(new Error(`${feedIds.length} is more than 16 recipients`))
+
       // TODO
       // copy a lot from ssb-tribes but don't use the keystore from there
+      get(groupId, (err, { secret, root }) => {
+        if (err) return cb(err)
+
+        const recps = [groupId, ...feedIds]
+
+        const content = {
+          type: 'group/add-member',
+          version: 'v1',
+          groupKey: secret.toString('base64'),
+          root,
+          tangles: {
+            members: {
+              root,
+              previous: [root], // TODO calculate previous for members tangle
+            },
+          },
+          recps,
+        }
+
+        if (opts.text) content.text = opts.text
+
+        addGroupTangle(content, (err, content) => {
+          if (err) return cb(err)
+
+          //if (!addMemberSpec.isValid(content))
+          //  return cb(new Error(addMemberSpec.isValid.errorsString))
+
+          ssb.db.create({ content, recps, encryptionFormat: 'box2' }, (err) => {
+            if (err) return cb(err)
+
+            //TODO: this is an optimization, use the db query instead for now
+            //keystore.group.registerAuthors(groupId, feedIds, (err) => {
+            //  if (err) return cb(err)
+            cb()
+            //})
+          })
+        })
+      })
     }
 
     // Listeners for joining groups
@@ -115,8 +161,27 @@ module.exports = {
           // TODO: if we do, ignore this msg
           // TODO: else, register the group key in ssb-box2
           // TODO: call ssb-db2 reindexEncrypted
+
+          if (lodashGet(msg, 'value.content.recps', []).includes(ssb.id)) {
+            const groupRoot = lodashGet(msg, 'value.content.root')
+            const groupKey = lodashGet(msg, 'value.content.groupKey')
+            const groupId = lodashGet(msg, 'value.content.recps[0]')
+
+            ssb.box2.addGroupInfo(groupId, { key: groupKey, root: groupRoot })
+          }
         })
       )
+
+      //pull(
+      //  ssb.db.query(live({ old: true }), toPullStream()),
+      //  pull.drain((msg) => {
+      //    console.log('i got any kind of message', {
+      //      author: msg.value.author,
+      //      seq: msg.value.sequence,
+      //      myId: ssb.id,
+      //    })
+      //  })
+      //)
     }
 
     return {
