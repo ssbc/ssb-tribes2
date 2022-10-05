@@ -39,15 +39,18 @@ Then
 ssb.tribes2.start()
 
 ssb.tribes2.create({}, (err, group) => {
-  ssb.db.create({
-    keys: group.mySubfeedKeys,
-    content: {
-      type: 'post',
-      text: 'welcome to the group',
-      recps: [group.id]
+  ssb.db.create(
+    {
+      keys: group.mySubfeedKeys,
+      content: {
+        type: 'post',
+        text: 'welcome to the group',
+        recps: [group.id],
+      },
+      encryptionFormat: 'box2',
     },
-    encryptionFormat: 'box2'
-  }, cb)
+    cb
+  )
 })
 ```
 
@@ -87,6 +90,12 @@ to join the group.
 - `groupId` _CloakedId_ - the public-safe cipherlink which identifies the group (same as in #create)
 - `feedIds` _[FeedId]_ - an Array of 1-16 different ids for peers (accepts ssb-uri or sigil feed ids)
 - `cb` _Function_ - a callback of signature `(err)`
+
+### `ssb.tribes2.publish(content, cb)`
+
+Publishes any kind of message encrypted to the group. The function wraps `ssb.db.create()` but handles adding tangles and using the correct encryption for the `content.recps` that you've provided. Mutates `content`.
+
+- `cb` _Function_ - a callback of signature `(err, msg)`
 
 ### `ssb.tribes2.start()`
 

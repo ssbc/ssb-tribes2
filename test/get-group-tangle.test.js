@@ -16,7 +16,6 @@ const {
   where,
 } = require('ssb-db2/operators')
 
-const AddGroupTangle = require('../lib/add-group-tangle')
 const GetGroupTangle = require('../lib/get-group-tangle')
 const Testbot = require('./helpers/testbot')
 const replicate = require('./helpers/replicate')
@@ -24,9 +23,7 @@ const replicate = require('./helpers/replicate')
 test('get-group-tangle unit test', (t) => {
   const name = `get-group-tangle-${Date.now()}`
   const server = Testbot({ name })
-  const addGroupTangle = AddGroupTangle(server)
 
-  //    - creating a group and publishing messages (ssb-tribes)
   server.tribes2.create(null, (err, group) => {
     if (err) throw err
 
@@ -43,7 +40,6 @@ test('get-group-tangle unit test', (t) => {
       const rootKey = group.root
 
       pull(
-        //server.createUserStream({ id: server.id, reverse: true }),
         server.db.query(where(author(server.id)), descending(), toPullStream()),
         pull.map((m) => m.key),
         pull.take(1),
@@ -64,44 +60,30 @@ test('get-group-tangle unit test', (t) => {
             recps: [group.id],
           }
 
-          addGroupTangle(content, (err, content) => {
+          server.tribes2.publish(content, (err, msg) => {
             if (err) throw err
 
-            server.db.create(
-              { content, recps: [group.id], encryptionFormat: 'box2' },
-              (err, msg) => {
-                if (err) throw err
+            getGroupTangle(group.id, (err, { root, previous }) => {
+              if (err) throw err
+              t.deepEqual(
+                { root, previous },
+                { root: rootKey, previous: [msg.key] },
+                'adding message to root'
+              )
 
+              server.tribes2.publish(content, (err, msg) => {
+                if (err) throw err
                 getGroupTangle(group.id, (err, { root, previous }) => {
                   if (err) throw err
                   t.deepEqual(
                     { root, previous },
                     { root: rootKey, previous: [msg.key] },
-                    'adding message to root'
+                    'adding message to tip'
                   )
-
-                  addGroupTangle(content, (err, content) => {
-                    if (err) throw err
-
-                    server.db.create(
-                      { content, recps: [group.id], encryptionFormat: 'box2' },
-                      (err, msg) => {
-                        if (err) throw err
-                        getGroupTangle(group.id, (err, { root, previous }) => {
-                          if (err) throw err
-                          t.deepEqual(
-                            { root, previous },
-                            { root: rootKey, previous: [msg.key] },
-                            'adding message to tip'
-                          )
-                          server.close(true, t.end)
-                        })
-                      }
-                    )
-                  })
+                  server.close(true, t.end)
                 })
-              }
-            )
+              })
+            })
           })
         })
       )

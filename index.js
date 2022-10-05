@@ -131,22 +131,41 @@ module.exports = {
 
         if (opts.text) content.text = opts.text
 
-        addGroupTangle(content, (err, content) => {
+        //if (!addMemberSpec.isValid(content))
+        //  return cb(new Error(addMemberSpec.isValid.errorsString))
+
+        publish(content, (err) => {
           if (err) return cb(err)
 
-          //if (!addMemberSpec.isValid(content))
-          //  return cb(new Error(addMemberSpec.isValid.errorsString))
+          //TODO: this is an optimization, use the db query instead for now
+          //keystore.group.registerAuthors(groupId, feedIds, (err) => {
+          //  if (err) return cb(err)
+          cb()
+          //})
+        })
+      })
+    }
 
-          ssb.db.create({ content, recps, encryptionFormat: 'box2' }, (err) => {
+    function publish(content, cb) {
+      if (cb === undefined) return promisify(publish)(content)
+
+      if (!content) return cb(new Error('Missing content'))
+
+      const recps = content.recps
+      if (!recps || !Array.isArray(recps) || recps.length < 1)
+        return cb(new Error('Missing recps'))
+
+      addGroupTangle(content, (err, content) => {
+        if (err) return cb(err)
+
+        ssb.db.create(
+          { content, recps, encryptionFormat: 'box2' },
+          (err, msg) => {
             if (err) return cb(err)
 
-            //TODO: this is an optimization, use the db query instead for now
-            //keystore.group.registerAuthors(groupId, feedIds, (err) => {
-            //  if (err) return cb(err)
-            cb()
-            //})
-          })
-        })
+            cb(null, msg)
+          }
+        )
       })
     }
 
@@ -191,6 +210,7 @@ module.exports = {
       get,
       list,
       addMembers,
+      publish,
       start,
     }
   },
