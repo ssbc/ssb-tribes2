@@ -73,22 +73,14 @@ test('get-group-tangle unit test', (t) => {
 
               server.tribes2.publish(content, (err, msg) => {
                 if (err) throw err
-                console.log('published msg')
+
                 getGroupTangle(group.id, (err, { root, previous }) => {
                   if (err) throw err
-                  console.log('got group tangle')
-                  console.log('logs', {
-                    root,
-                    previous,
-                    rootKey,
-                    msgKey: msg.key,
-                  })
                   t.deepEqual(
                     { root, previous },
                     { root: rootKey, previous: [msg.key] },
                     'adding message to tip'
                   )
-                  console.log('about to close server')
                   server.close(true, t.end)
                 })
               })
@@ -96,48 +88,6 @@ test('get-group-tangle unit test', (t) => {
           })
         })
       )
-    })
-  })
-})
-
-test('get-group-tangle (cache)', (t) => {
-  const name = `get-group-tangle-cache-${Date.now()}`
-  const server = Testbot({ name })
-  console.log('in test')
-
-  let queryCalls = 0
-  //server.backlinks.read.hook(function (read, args) {
-  server.db.query.hook((read, args) => {
-    queryCalls += 1
-    console.log('in hook')
-
-    return read(...args)
-  })
-
-  //TODO: we'll need to adapt this test once tribes2.create adds yourself to the group as well
-  server.tribes2.create(null, (err, data) => {
-    if (err) throw err
-
-    console.log('before addMembers')
-    server.tribes2.addMembers(data.id, [server.id], (err) => {
-      if (err) throw err
-
-      t.equal(
-        queryCalls,
-        1,
-        'no cache for publishing of group/add-member, a backlink query was run'
-      )
-
-      const content = { type: 'memo', recps: [data.id] }
-
-      console.log('before publish')
-      server.tribes2.publish(content, (err, msg) => {
-        if (err) throw err
-
-        t.equal(queryCalls, 1, 'cache used for publishing next message')
-
-        server.close(true, t.end)
-      })
     })
   })
 })
