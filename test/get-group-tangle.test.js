@@ -100,7 +100,7 @@ test(`get-group-tangle-${n}-publishes`, (t) => {
   server.tribes2.create(null, (err, data) => {
     if (err) throw err
 
-    const groupId = data.groupId
+    const groupId = data.id
     pull(
       pull.values(publishArray),
       paraMap(
@@ -108,23 +108,21 @@ test(`get-group-tangle-${n}-publishes`, (t) => {
           server.tribes2.publish({ type: 'memo', value, recps: [groupId] }, cb),
         4
       ),
-      paraMap(
-        (msg, cb) => server.get({ id: msg.key, private: true, meta: true }, cb),
-        10
-      ),
+      paraMap((msg, cb) => server.db.getMsg(msg.key, cb), 10),
       pull.drain(
         (m) => {
           count += m.value.content.tangles.group.previous.length
         },
-        () => {
+        (err) => {
+          t.error(err, 'no error')
+
           // t.equal(count, n, 'We expect there to be no branches in our groupTangle')
           t.true(
             count < n * 8,
             'We expect bounded branching with fast publishing'
           )
 
-          server.close()
-          t.end()
+          server.close(true, t.end)
         }
       )
     )
@@ -137,21 +135,21 @@ test('get-group-tangle', (t) => {
       plan: 4,
       test: (t) => {
         const DESCRIPTION = 'auto adds group tangle'
-        // this is an integration test, as we've hooked get-group-tangle into ssb.publish
-        const ssb = Server()
+        // this is an integration test, as get-group-tangle is used in ssb.tribes2.publish
+        const ssb = Testbot()
 
-        ssb.tribes.create(null, (err, data) => {
+        ssb.tribes2.create(null, (err, data) => {
           t.error(err, 'create group')
 
-          const groupRoot = data.groupInitMsg.key
-          const groupId = data.groupId
+          const groupRoot = data.root
+          const groupId = data.id
 
           const content = {
             type: 'yep',
             recps: [groupId],
           }
 
-          ssb.publish(content, (err, msg) => {
+          ssb.tribes2.publish(content, (err, msg) => {
             t.error(err, 'publish a message')
 
             ssb.get({ id: msg.key, private: true }, (err, A) => {
