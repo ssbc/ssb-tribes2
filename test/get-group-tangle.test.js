@@ -180,59 +180,49 @@ test('get-group-tangle', (t) => {
 })
 
 test('get-group-tangle with branch', (t) => {
-  const alice = Server()
-  const bob = Server()
-  const name = (id) => {
-    switch (id) {
-      case alice.id:
-        return 'alice'
-      case bob.id:
-        return 'bob'
-    }
-  }
+  const alice = Testbot()
+  alice.tribes2.start()
+  const bob = Testbot()
+  bob.tribes2.start()
+
   // Alice creates a group
-  alice.tribes.create(null, (err, data) => {
+  alice.tribes2.create(null, (err, group) => {
     if (err) throw err
-    // Prepare to get Alice's group tangle from both servers
-    const keystore = {
-      group: {
-        get(groupId) {
-          return { ...data, root: data.groupInitMsg.key } // rootMsgId
-        },
-      },
-    }
+
     const DELAY = 200
-    const _getAliceGroupTangle = GetGroupTangle(alice, keystore)
+    const _getAliceGroupTangle = GetGroupTangle(alice)
     const getAliceGroupTangle = (id, cb) => {
       setTimeout(() => _getAliceGroupTangle(id, cb), DELAY)
     }
-    const _getBobGroupTangle = GetGroupTangle(bob, keystore)
+    const _getBobGroupTangle = GetGroupTangle(bob)
     const getBobGroupTangle = (id, cb) => {
       setTimeout(() => _getBobGroupTangle(id, cb), DELAY)
     }
+
     // Alice invites Bob to the group
-    const aliceInvite = (...args) => {
+    const aliceAddMembers = (...args) => {
       // slow this step down so the group tangle cache has time to be update
       // and be linear
-      setTimeout(() => alice.tribes.invite(...args), DELAY)
+      setTimeout(() => alice.tribes2.addMembers(...args), DELAY)
     }
-    aliceInvite(data.groupId, [bob.id], { text: 'ahoy' }, (err, invite) => {
-      t.error(err, 'alice adds bob to group') // Not actually an error?
 
-      // Alice shares the group creation and invite with Bob.
-      replicate({ from: alice, to: bob, name }, (err) => {
-        if (err) throw err
+    aliceAddMembers(
+      group.id,
+      [bob.id],
+      { text: 'ahoy' },
+      async (err, invite) => {
+        t.error(err, 'alice adds bob to group') // Not actually an error?
+
+        // Alice shares the group creation and invite with Bob.
+        await replicate(alice, bob)
+
         // Both servers should see the same group tangle
-        getAliceGroupTangle(data.groupId, (err, aliceTangle) => {
+        getAliceGroupTangle(group.id, (err, aliceTangle) => {
           if (err) throw err
-          getBobGroupTangle(data.groupId, (err, bobTangle) => {
+          getBobGroupTangle(group.id, (err, bobTangle) => {
             if (err) throw err
             t.deepEqual(aliceTangle, bobTangle, 'tangles should match')
-            t.deepEqual(
-              aliceTangle.root,
-              data.groupInitMsg.key,
-              'the root is the groupId'
-            )
+            t.deepEqual(aliceTangle.root, group.root, 'the root is the groupId')
             t.deepEqual(
               aliceTangle.previous,
               [invite.key],
@@ -243,45 +233,41 @@ test('get-group-tangle with branch', (t) => {
             const content = () => ({
               type: 'memo',
               message: 'branch',
-              recps: [data.groupId],
+              recps: [group.id],
             })
 
-            alice.publish(content(), (err, msg) => {
+            alice.tribes2.publish(content(), (err, msg) => {
               t.error(err, 'alice publishes a new message')
 
-              // NOTE With the content.recps we are adding we are asking Bob to know about a group before he's
+              // NOTE With the content.recps we are adding we might be asking Bob to know about a group before he's
               // found out about it for himself
-              whenBobHasGroup(data.groupId, () => {
-                bob.publish(content(), (err, msg) => {
+              whenBobHasGroup(group.id, () => {
+                bob.tribes2.publish(content(), async (err, msg) => {
                   if (err) throw err
                   // Then Bob shares his message with Alice
-                  replicate({ from: bob, to: alice, name }, (err) => {
+                  await replicate(bob, alice)
+                  // There should now be a branch in Alice's group tangle
+                  getAliceGroupTangle(group.id, (err, aliceTangle) => {
                     if (err) throw err
-                    // There should now be a branch in Alice's group tangle
-                    getAliceGroupTangle(data.groupId, (err, aliceTangle) => {
-                      if (err) throw err
 
-                      t.deepEqual(
-                        aliceTangle.previous.length,
-                        2,
-                        'There should be two tips'
-                      )
-                      alice.close()
-                      bob.close()
-                      t.end()
-                    })
+                    t.deepEqual(
+                      aliceTangle.previous.length,
+                      2,
+                      'There should be two tips'
+                    )
+                    alice.close(true, () => bob.close(true, t.end))
                   })
                 })
               })
             })
           })
         })
-      })
-    })
+      }
+    )
   })
 
   function whenBobHasGroup(groupId, fn) {
-    bob.tribes.get(groupId, (err, data) => {
+    bob.tribes2.get(groupId, (err, data) => {
       if (err) {
         setTimeout(() => {
           console.log('waiting for bob...')

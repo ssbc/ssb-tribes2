@@ -134,13 +134,13 @@ module.exports = {
         //if (!addMemberSpec.isValid(content))
         //  return cb(new Error(addMemberSpec.isValid.errorsString))
 
-        publish(content, (err) => {
+        publish(content, (err, msg) => {
           if (err) return cb(err)
 
           //TODO: this is an optimization, use the db query instead for now
           //keystore.group.registerAuthors(groupId, feedIds, (err) => {
           //  if (err) return cb(err)
-          cb()
+          return cb(null, msg)
           //})
         })
       })
