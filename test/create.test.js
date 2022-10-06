@@ -78,11 +78,6 @@ test('create more', (t) => {
 
       // check I published a group/add-member to myself
       pull(
-        //server.createUserStream({
-        //  id: server.id,
-        //  private: true,
-        //  reverse: true,
-        //}),
         server.db.query(where(author(server.id)), descending(), toPullStream()),
         pull.map((msg) => msg.value.content),
         pull.collect((err, msgContents) => {
