@@ -95,9 +95,9 @@ test('get-group-tangle unit test', (t) => {
 const n = 100
 test(`get-group-tangle-${n}-publishes`, (t) => {
   const publishArray = new Array(n).fill().map((item, i) => i)
-  const server = Server()
+  const server = Testbot()
   let count = 0
-  server.tribes.create(null, (err, data) => {
+  server.tribes2.create(null, (err, data) => {
     if (err) throw err
 
     const groupId = data.groupId
@@ -105,7 +105,7 @@ test(`get-group-tangle-${n}-publishes`, (t) => {
       pull.values(publishArray),
       paraMap(
         (value, cb) =>
-          server.publish({ type: 'memo', value, recps: [groupId] }, cb),
+          server.tribes2.publish({ type: 'memo', value, recps: [groupId] }, cb),
         4
       ),
       paraMap(
