@@ -70,9 +70,12 @@ module.exports = {
 
           ssb.box2.addGroupInfo(data.id, { key: data.secret, root: data.root })
 
-          // TODO later: add myself for recovery reasons
+          // adding myself for recovery reasons
+          addMembers(data.id, [ssb.id], {}, (err) => {
+            if (err) return cb(err)
 
-          cb(null, data)
+            return cb(null, data)
+          })
         }
       )
     }
@@ -81,7 +84,9 @@ module.exports = {
       if (cb === undefined) return promisify(get)(id)
 
       ssb.box2.getGroupKeyInfo(id, (err, info) => {
-        if (err) cb(err)
+        if (err) return cb(err)
+
+        if (!info) return cb(new Error(`Couldn't find group with id ${id}`))
 
         cb(null, {
           id,
@@ -188,7 +193,17 @@ module.exports = {
             const groupKey = lodashGet(msg, 'value.content.groupKey')
             const groupId = lodashGet(msg, 'value.content.recps[0]')
 
-            ssb.box2.addGroupInfo(groupId, { key: groupKey, root: groupRoot })
+            ssb.box2.getGroupKeyInfo(groupId, (err, info) => {
+              if (err) throw err
+
+              if (!info) {
+                // we're not already in the group
+                ssb.box2.addGroupInfo(groupId, {
+                  key: groupKey,
+                  root: groupRoot,
+                })
+              }
+            })
           }
         })
       )

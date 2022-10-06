@@ -4,9 +4,10 @@
 
 const test = require('tape')
 const ref = require('ssb-ref')
-const Testbot = require('./helpers/testbot')
 const { promisify: p } = require('util')
 const pull = require('pull-stream')
+const { author, descending, toPullStream, where } = require('ssb-db2/operators')
+const Testbot = require('./helpers/testbot')
 
 test('create', async (t) => {
   const ssb = Testbot()
@@ -33,33 +34,35 @@ test('create', async (t) => {
     encryptionFormat: 'box2',
   }).catch(t.error)
 
-  t.equal(typeof msg.value.content, 'string')
+  t.equal(typeof msg.value.content, 'string', 'content is a string')
   //t.equal(msg.value.author, subfeed.id)
-  t.equal(msg.value.sequence, 2)
+  // create, add self, post
+  t.equal(msg.value.sequence, 3, 'this is the 3rd msg')
 
   await p(ssb.close)(true)
 })
 
 test('create more', (t) => {
-  const server = Server()
+  const server = Testbot()
 
   // this is more of an integration test over the api
   server.tribes2.create({}, (err, data) => {
     if (err) throw err
 
-    const { groupId, groupKey, groupInitMsg } = data
-    t.true(isGroup(groupId), 'returns group identifier - groupId')
+    const { id, secret, root } = data
+    t.true(ref.isCloakedMsg(id), 'returns group identifier - groupId')
     t.true(
-      Buffer.isBuffer(groupKey) && groupKey.length === 32,
+      Buffer.isBuffer(secret) && secret.length === 32,
       'returns group symmetric key - groupKey'
     )
-    t.match(
-      groupInitMsg.value.content,
-      /^[a-zA-Z0-9/+]+=*\.box2$/,
-      'encrypted init msg'
-    )
+    //TODO: can we get the root msg unencrypted?
+    //t.match(
+    //  groupInitMsg.value.content,
+    //  /^[a-zA-Z0-9/+]+=*\.box2$/,
+    //  'encrypted init msg'
+    //)
 
-    server.get({ id: groupInitMsg.key, private: true }, (err, value) => {
+    server.db.get(root, (err, value) => {
       if (err) throw err
 
       t.deepEqual(
@@ -75,11 +78,12 @@ test('create more', (t) => {
 
       // check I published a group/add-member to myself
       pull(
-        server.createUserStream({
-          id: server.id,
-          private: true,
-          reverse: true,
-        }),
+        //server.createUserStream({
+        //  id: server.id,
+        //  private: true,
+        //  reverse: true,
+        //}),
+        server.db.query(where(author(server.id)), descending(), toPullStream()),
         pull.map((msg) => msg.value.content),
         pull.collect((err, msgContents) => {
           if (err) throw err
@@ -89,17 +93,17 @@ test('create more', (t) => {
             {
               type: 'group/add-member',
               version: 'v1',
-              groupKey: groupKey.toString('base64'),
-              root: groupInitMsg.key,
-              recps: [groupId, server.id], // me being added to the group
+              groupKey: secret.toString('base64'),
+              root: root,
+              recps: [id, server.id], // me being added to the group
               tangles: {
                 members: {
-                  root: groupInitMsg.key,
-                  previous: [groupInitMsg.key],
+                  root: root,
+                  previous: [root],
                 },
                 group: {
-                  root: groupInitMsg.key,
-                  previous: [groupInitMsg.key],
+                  root: root,
+                  previous: [root],
                 },
               },
             },
