@@ -5,16 +5,7 @@
 const test = require('tape')
 const pull = require('pull-stream')
 const paraMap = require('pull-paramap')
-const {
-  and,
-  type,
-  author,
-  paginate,
-  descending,
-  toCallback,
-  toPullStream,
-  where,
-} = require('ssb-db2/operators')
+const { author, descending, toPullStream, where } = require('ssb-db2/operators')
 
 const GetGroupTangle = require('../lib/get-group-tangle')
 const Testbot = require('./helpers/testbot')
@@ -27,11 +18,7 @@ test('get-group-tangle unit test', (t) => {
   server.tribes2.create(null, (err, group) => {
     if (err) throw err
 
-    // NOTE: Publishing has a queue which means if you publish many things in a row there is a delay before those values are in indexes to be queried.
-    const _getGroupTangle = GetGroupTangle(server)
-    const getGroupTangle = (id, cb) => {
-      setTimeout(() => _getGroupTangle(id, cb), 300)
-    }
+    const getGroupTangle = GetGroupTangle(server)
 
     getGroupTangle(group.id, (err, groupTangle) => {
       if (err) throw err
@@ -189,15 +176,8 @@ test('get-group-tangle with branch', (t) => {
   alice.tribes2.create(null, (err, group) => {
     if (err) throw err
 
-    const DELAY = 200
-    const _getAliceGroupTangle = GetGroupTangle(alice)
-    const getAliceGroupTangle = (id, cb) => {
-      setTimeout(() => _getAliceGroupTangle(id, cb), DELAY)
-    }
-    const _getBobGroupTangle = GetGroupTangle(bob)
-    const getBobGroupTangle = (id, cb) => {
-      setTimeout(() => _getBobGroupTangle(id, cb), DELAY)
-    }
+    const getAliceGroupTangle = GetGroupTangle(alice)
+    const getBobGroupTangle = GetGroupTangle(bob)
 
     alice.tribes2.addMembers(
       group.id,
@@ -229,10 +209,10 @@ test('get-group-tangle with branch', (t) => {
               recps: [group.id],
             })
 
-            alice.tribes2.publish(content(), (err, msg) => {
+            alice.tribes2.publish(content(), (err) => {
               t.error(err, 'alice publishes a new message')
 
-              bob.tribes2.publish(content(), async (err, msg) => {
+              bob.tribes2.publish(content(), async (err) => {
                 if (err) throw err
                 // Then Bob shares his message with Alice
                 await replicate(bob, alice)

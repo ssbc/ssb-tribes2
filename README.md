@@ -89,7 +89,7 @@ to join the group.
 
 - `groupId` _CloakedId_ - the public-safe cipherlink which identifies the group (same as in #create)
 - `feedIds` _[FeedId]_ - an Array of 1-16 different ids for peers (accepts ssb-uri or sigil feed ids)
-- `cb` _Function_ - a callback of signature `(err)`
+- `cb` _Function_ - a callback of signature `(err, msg)`
 
 ### `ssb.tribes2.publish(content, cb)`
 
