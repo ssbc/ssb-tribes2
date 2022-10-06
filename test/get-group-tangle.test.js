@@ -152,7 +152,7 @@ test('get-group-tangle', (t) => {
           ssb.tribes2.publish(content, (err, msg) => {
             t.error(err, 'publish a message')
 
-            ssb.get({ id: msg.key, private: true }, (err, A) => {
+            ssb.db.get(msg.key, (err, A) => {
               t.error(err, 'get that message back')
 
               t.deepEqual(
