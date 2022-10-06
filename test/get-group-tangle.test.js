@@ -199,14 +199,7 @@ test('get-group-tangle with branch', (t) => {
       setTimeout(() => _getBobGroupTangle(id, cb), DELAY)
     }
 
-    // Alice invites Bob to the group
-    const aliceAddMembers = (...args) => {
-      // slow this step down so the group tangle cache has time to be update
-      // and be linear
-      setTimeout(() => alice.tribes2.addMembers(...args), DELAY)
-    }
-
-    aliceAddMembers(
+    alice.tribes2.addMembers(
       group.id,
       [bob.id],
       { text: 'ahoy' },
