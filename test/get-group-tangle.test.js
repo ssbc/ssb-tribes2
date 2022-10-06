@@ -239,24 +239,20 @@ test('get-group-tangle with branch', (t) => {
             alice.tribes2.publish(content(), (err, msg) => {
               t.error(err, 'alice publishes a new message')
 
-              // NOTE With the content.recps we are adding we might be asking Bob to know about a group before he's
-              // found out about it for himself
-              whenBobHasGroup(group.id, () => {
-                bob.tribes2.publish(content(), async (err, msg) => {
+              bob.tribes2.publish(content(), async (err, msg) => {
+                if (err) throw err
+                // Then Bob shares his message with Alice
+                await replicate(bob, alice)
+                // There should now be a branch in Alice's group tangle
+                getAliceGroupTangle(group.id, (err, aliceTangle) => {
                   if (err) throw err
-                  // Then Bob shares his message with Alice
-                  await replicate(bob, alice)
-                  // There should now be a branch in Alice's group tangle
-                  getAliceGroupTangle(group.id, (err, aliceTangle) => {
-                    if (err) throw err
 
-                    t.deepEqual(
-                      aliceTangle.previous.length,
-                      2,
-                      'There should be two tips'
-                    )
-                    alice.close(true, () => bob.close(true, t.end))
-                  })
+                  t.deepEqual(
+                    aliceTangle.previous.length,
+                    2,
+                    'There should be two tips'
+                  )
+                  alice.close(true, () => bob.close(true, t.end))
                 })
               })
             })
@@ -265,15 +261,4 @@ test('get-group-tangle with branch', (t) => {
       }
     )
   })
-
-  function whenBobHasGroup(groupId, fn) {
-    bob.tribes2.get(groupId, (err, data) => {
-      if (err) {
-        setTimeout(() => {
-          console.log('waiting for bob...')
-          whenBobHasGroup(groupId, fn)
-        }, 100)
-      } else fn()
-    })
-  }
 })
