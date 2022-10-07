@@ -10,48 +10,55 @@ const Testbot = require('./helpers/testbot')
 
 test('tribes.list + tribes.get', (t) => {
   const name = `list-and-get-groups-${Date.now()}`
-  let server = Server({ name })
+  let server = Testbot({ name })
   const keys = server.keys
 
-  server.tribes.create(null, (err, data) => {
+  server.tribes2.create(null, (err, group) => {
     t.error(err, 'create group')
 
-    server.tribes.list((err, list) => {
-      if (err) throw err
-      t.deepEqual(list, [data.groupId], 'lists group ids')
-
-      server.tribes.get(data.groupId, (err, actualGroup) => {
-        if (err) throw err
+    pull(
+      server.tribes2.list(),
+      pull.collect(async (err, list) => {
+        if (err) return t.error(err)
 
         const expectedGroup = {
-          key: data.groupKey,
-          root: data.groupInitMsg.key,
-          scheme: 'envelope-large-symmetric-group',
-          groupId: data.groupId,
+          secret: group.secret,
+          root: group.root,
+          id: group.id,
         }
-        t.deepEqual(actualGroup, expectedGroup, 'gets group data')
 
-        server.close((err) => {
-          t.error(err, 'closes server')
+        t.deepEqual(list, [expectedGroup], 'lists group ids')
 
-          server = Server({ name, startUnclean: true, keys })
-          server.tribes.list((err, newList) => {
-            if (err) throw err
+        server.tribes2.get(group.id, (err, actualGroup) => {
+          if (err) throw err
 
-            t.deepEqual(
-              newList,
-              list,
-              'list returns save results after restart'
+          t.deepEqual(actualGroup, expectedGroup, 'gets group data')
+
+          server.close((err) => {
+            t.error(err, 'closes server')
+
+            server = Testbot({ name, rimraf: false, keys })
+            pull(
+              server.tribes2.list(),
+              pull.collect((err, newList) => {
+                if (err) throw err
+
+                t.deepEqual(
+                  newList,
+                  list,
+                  'list returns save results after restart'
+                )
+                server.close(true, t.end)
+              })
             )
-            server.close(t.end)
           })
         })
       })
-    })
+    )
   })
 })
 
-test('tribes.list (subtribes)', async (t) => {
+test.skip('tribes.list (subtribes)', async (t) => {
   const server = Server()
 
   const { groupId } = await p(server.tribes.create)({})

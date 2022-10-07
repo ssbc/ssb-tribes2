@@ -10,11 +10,11 @@ const caps = require('ssb-caps')
 
 let count = 0
 
-// opts.path      (optional)
-//   opts.name    (optional) - convenience method for deterministic opts.path
-// opts.keys      (optional)
-// opts.rimraf    (optional) - clear the directory before start (default: true)
-
+/** opts.path      (optional)
+ *  opts.name      (optional) - convenience method for deterministic opts.path
+ *  opts.keys      (optional)
+ *  opts.rimraf    (optional) - clear the directory before start (default: true)
+ */
 module.exports = function createSbot(opts = {}) {
   const dir = opts.path || `/tmp/ssb-tribes2-tests-${opts.name || count++}`
   if (opts.rimraf !== false) rimraf.sync(dir)
