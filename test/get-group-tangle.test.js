@@ -103,7 +103,6 @@ test(`get-group-tangle-${n}-publishes`, (t) => {
         (err) => {
           t.error(err, 'no error')
 
-          // t.equal(count, n, 'We expect there to be no branches in our groupTangle')
           t.true(
             count < n * 8,
             'We expect bounded branching with fast publishing'
