@@ -116,53 +116,38 @@ test(`get-group-tangle-${n}-publishes`, (t) => {
 })
 
 test('get-group-tangle', (t) => {
-  const tests = [
-    {
-      plan: 4,
-      test: (t) => {
-        const DESCRIPTION = 'auto adds group tangle'
-        // this is an integration test, as get-group-tangle is used in ssb.tribes2.publish
-        const ssb = Testbot()
+  t.plan(4)
 
-        ssb.tribes2.create(null, (err, data) => {
-          t.error(err, 'create group')
+  // this is an integration test, as get-group-tangle is used in ssb.tribes2.publish
+  const ssb = Testbot()
 
-          const groupRoot = data.root
-          const groupId = data.id
+  ssb.tribes2.create(null, (err, data) => {
+    t.error(err, 'create group')
 
-          const content = {
-            type: 'yep',
-            recps: [groupId],
-          }
+    const groupRoot = data.root
+    const groupId = data.id
 
-          ssb.tribes2.publish(content, (err, msg) => {
-            t.error(err, 'publish a message')
+    const content = {
+      type: 'yep',
+      recps: [groupId],
+    }
 
-            ssb.db.get(msg.key, (err, A) => {
-              t.error(err, 'get that message back')
+    ssb.tribes2.publish(content, (err, msg) => {
+      t.error(err, 'publish a message')
 
-              t.deepEqual(
-                A.content.tangles.group, // actual
-                { root: groupRoot, previous: [groupRoot] }, // expected
-                DESCRIPTION + ' (auto added tangles.group)'
-              )
+      ssb.db.get(msg.key, (err, A) => {
+        t.error(err, 'get that message back')
 
-              ssb.close()
-            })
-          })
-        })
-      },
-    },
-  ]
+        t.deepEqual(
+          A.content.tangles.group, // actual
+          { root: groupRoot, previous: [groupRoot] }, // expected
+          'auto adds group tangle (auto added tangles.group)'
+        )
 
-  const toRun = tests.reduce((acc, round) => {
-    acc += round.plan || 1
-    return acc
-  }, 0)
-
-  t.plan(toRun)
-
-  tests.forEach((round) => round.test(t))
+        ssb.close(true)
+      })
+    })
+  })
 })
 
 test('get-group-tangle with branch', (t) => {
