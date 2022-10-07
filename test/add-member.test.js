@@ -113,5 +113,7 @@ test('add member', async (t) => {
     t.fail(err)
   }
 
-  kaitiaki.close(true, () => newPerson.close(true))
+  await new Promise((resolve) => {
+    kaitiaki.close(true, () => newPerson.close(true, resolve))
+  })
 })
