@@ -72,12 +72,14 @@ test('add member', async (t) => {
       recps: [group.id, ...authorIds],
 
       tangles: {
-        group: { root: group.root },
+        group: {
+          root: group.root,
+          // we don't know the key of the last message, that was the admin adding themselves
+          previous: invite.content.tangles.group.previous,
+        },
         members: { root: group.root, previous: [group.root] },
       },
     }
-    // we don't know the key of the last message, that was the admin adding themselves
-    expected.tangles.group.previous = invite.content.tangles.group.previous
     t.deepEqual(invite.content, expected, 'kaitiaki sent invite')
 
     /* kaitiaki posts to group, new person can read */
