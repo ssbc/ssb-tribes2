@@ -44,7 +44,7 @@ test('get added to a group', async (t) => {
   )
 })
 
-test('add member', async (t) => {
+test.only('add member', async (t) => {
   const kaitiaki = Testbot()
   const newPerson = Testbot()
   kaitiaki.tribes2.start()
@@ -56,11 +56,15 @@ test('add member', async (t) => {
 
     const authorIds = [newPerson.id, ssbKeys.generate().id]
 
-    let invite = await kaitiaki.tribes2.addMembers(group.id, authorIds, {
-      text: 'welcome friends',
-    })
+    const encryptedInvite = await kaitiaki.tribes2.addMembers(
+      group.id,
+      authorIds,
+      {
+        text: 'welcome friends',
+      }
+    )
 
-    invite = await p(kaitiaki.db.get)(invite.key)
+    const invite = await p(kaitiaki.db.get)(encryptedInvite.key)
 
     const expected = {
       type: 'group/add-member',
