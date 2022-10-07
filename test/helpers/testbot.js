@@ -25,8 +25,6 @@ module.exports = function createSbot(opts = {}) {
     .use(require('ssb-db2/core'))
     .use(require('ssb-classic'))
     .use(require('ssb-box2'))
-    //.use(require('ssb-db2/compat/db'))
-    //.use(require('ssb-db2/compat/history-stream'))
     .use(require('ssb-db2/compat/feedstate'))
     .use(require('ssb-db2/compat/ebt'))
     .use(require('ssb-ebt'))

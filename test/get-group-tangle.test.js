@@ -16,12 +16,12 @@ test('get-group-tangle unit test', (t) => {
   const server = Testbot({ name })
 
   server.tribes2.create(null, (err, group) => {
-    if (err) throw err
+    t.error(err, 'no error')
 
     const getGroupTangle = GetGroupTangle(server)
 
     getGroupTangle(group.id, (err, groupTangle) => {
-      if (err) throw err
+      t.error(err, 'no error')
 
       const { root, previous } = groupTangle
       const rootKey = group.root
@@ -31,7 +31,7 @@ test('get-group-tangle unit test', (t) => {
         pull.map((m) => m.key),
         pull.take(1),
         pull.collect((err, keys) => {
-          if (err) throw err
+          t.error(err, 'no error')
 
           t.deepEqual(
             { root, previous },
@@ -48,10 +48,10 @@ test('get-group-tangle unit test', (t) => {
           }
 
           server.tribes2.publish(content, (err, msg) => {
-            if (err) throw err
+            t.error(err, 'no error')
 
             getGroupTangle(group.id, (err, { root, previous }) => {
-              if (err) throw err
+              t.error(err, 'no error')
               t.deepEqual(
                 { root, previous },
                 { root: rootKey, previous: [msg.key] },
@@ -59,10 +59,10 @@ test('get-group-tangle unit test', (t) => {
               )
 
               server.tribes2.publish(content, (err, msg) => {
-                if (err) throw err
+                t.error(err, 'no error')
 
                 getGroupTangle(group.id, (err, { root, previous }) => {
-                  if (err) throw err
+                  t.error(err, 'no error')
                   t.deepEqual(
                     { root, previous },
                     { root: rootKey, previous: [msg.key] },
@@ -85,7 +85,7 @@ test(`get-group-tangle-${n}-publishes`, (t) => {
   const server = Testbot()
   let count = 0
   server.tribes2.create(null, (err, data) => {
-    if (err) throw err
+    t.error(err, 'no error')
 
     const groupId = data.id
     pull(
@@ -174,7 +174,7 @@ test('get-group-tangle with branch', (t) => {
 
   // Alice creates a group
   alice.tribes2.create(null, (err, group) => {
-    if (err) throw err
+    t.error(err, 'no error')
 
     const getAliceGroupTangle = GetGroupTangle(alice)
     const getBobGroupTangle = GetGroupTangle(bob)
@@ -191,9 +191,9 @@ test('get-group-tangle with branch', (t) => {
 
         // Both servers should see the same group tangle
         getAliceGroupTangle(group.id, (err, aliceTangle) => {
-          if (err) throw err
+          t.error(err, 'no error')
           getBobGroupTangle(group.id, (err, bobTangle) => {
-            if (err) throw err
+            t.error(err, 'no error')
             t.deepEqual(aliceTangle, bobTangle, 'tangles should match')
             t.deepEqual(aliceTangle.root, group.root, 'the root is the groupId')
             t.deepEqual(
@@ -213,12 +213,12 @@ test('get-group-tangle with branch', (t) => {
               t.error(err, 'alice publishes a new message')
 
               bob.tribes2.publish(content(), async (err) => {
-                if (err) throw err
+                t.error(err, 'no error')
                 // Then Bob shares his message with Alice
                 await replicate(bob, alice)
                 // There should now be a branch in Alice's group tangle
                 getAliceGroupTangle(group.id, (err, aliceTangle) => {
-                  if (err) throw err
+                  t.error(err, 'no error')
 
                   t.deepEqual(
                     aliceTangle.previous.length,

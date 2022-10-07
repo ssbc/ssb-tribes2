@@ -159,7 +159,7 @@ module.exports = {
         if (err) return cb(err)
 
         ssb.db.create(
-          { content, recps, encryptionFormat: 'box2' },
+          { content, encryptionFormat: 'box2' },
           (err, msg) => {
             if (err) return cb(err)
 
