@@ -44,7 +44,7 @@ test('get added to a group', async (t) => {
   )
 })
 
-test.only('add member', async (t) => {
+test('add member', async (t) => {
   const kaitiaki = Testbot()
   const newPerson = Testbot()
   kaitiaki.tribes2.start()

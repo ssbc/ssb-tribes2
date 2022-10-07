@@ -179,7 +179,7 @@ module.exports = {
           live({ old: true }),
           toPullStream()
         ),
-        pull.drain((msg) => {
+        pull.asyncMap((msg, cb) => {
           // TODO: check if we already have this msg' group key in ssb-box2
           // TODO: if we do, ignore this msg
           // TODO: else, register the group key in ssb-box2
@@ -191,8 +191,12 @@ module.exports = {
             const groupId = lodashGet(msg, 'value.content.recps[0]')
 
             ssb.box2.getGroupKeyInfo(groupId, (err, info) => {
-              if (err)
-                console.error('Error when finding group invite for me:', err)
+              if (err) {
+                return console.error(
+                  'Error when finding group invite for me:',
+                  err
+                )
+              }
 
               if (!info) {
                 // we're not already in the group
@@ -201,9 +205,13 @@ module.exports = {
                   root: groupRoot,
                 })
               }
+              return cb()
             })
+          } else {
+            return cb()
           }
-        })
+        }),
+        pull.drain(() => {})
       )
 
       //pull(
