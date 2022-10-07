@@ -1,7 +1,11 @@
+// SPDX-FileCopyrightText: 2022 Mix Irving
+//
+// SPDX-License-Identifier: LGPL-3.0-only
+
 const test = require('tape')
 const { promisify: p } = require('util')
-const { Server } = require('../helpers')
-const { tanglePrune } = require('../../lib')
+const Testbot = require('./helpers/testbot')
+const tanglePrune = require('../lib/tangle-prune')
 
 const chars = 'abcABC123=+? '.split('')
 const randomChar = () => chars.sort(() => (Math.random() < 0.5 ? -1 : +1))[0]
@@ -11,8 +15,8 @@ const randomText = (length) => {
   return output
 }
 
-test('lib/tangle-prune', async (t) => {
-  const ssb = Server()
+test.only('lib/tangle-prune', async (t) => {
+  const ssb = Testbot()
 
   const { groupId } = await p(ssb.tribes.create)({})
 
