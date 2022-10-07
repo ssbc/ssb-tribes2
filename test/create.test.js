@@ -55,12 +55,6 @@ test('create more', (t) => {
       Buffer.isBuffer(secret) && secret.length === 32,
       'returns group symmetric key - groupKey'
     )
-    //TODO: can we get the root msg unencrypted?
-    //t.match(
-    //  groupInitMsg.value.content,
-    //  /^[a-zA-Z0-9/+]+=*\.box2$/,
-    //  'encrypted init msg'
-    //)
 
     server.db.get(root, (err, value) => {
       t.error(err, 'no error')
