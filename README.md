@@ -56,12 +56,14 @@ ssb.tribes2.create({}, (err, group) => {
 
 ## API
 
+All methods with callbacks return a promise instead if a callback isn't provided.
+
 ### `ssb.tribes2.create(opts, cb)`
 
 Creates a new private group.
 This creates an encryption key, sets up a sub-feed for the group, and initializes the
 group with a `group/init` message, and `group/add-member` to signal you were added.
-Calls back with important info about the group. Returns a promise if a callback isn't provided
+Calls back with important info about the group.
 
 - `opts` _Object_ - currently empty, but will be used in the future to specify details like whether the group has an admin subgroup, etc.
 - `cb` _Function_ - callback function of signature `(err, group)` where `group` is an object containing:
@@ -96,6 +98,10 @@ to join the group.
 Publishes any kind of message encrypted to the group. The function wraps `ssb.db.create()` but handles adding tangles and using the correct encryption for the `content.recps` that you've provided. Mutates `content`.
 
 - `cb` _Function_ - a callback of signature `(err, msg)`
+
+### `ssb.tribes2.listMembers(groupId) => source`
+
+Returns a pull stream source listing every known member of the group with id `groupId`.
 
 ### `ssb.tribes2.start()`
 
