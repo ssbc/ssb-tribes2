@@ -3,20 +3,10 @@
 // SPDX-License-Identifier: CC0-1.0
 
 const test = require('tape')
-const ref = require('ssb-ref')
-const Testbot = require('./testbot')
-const { promisify: p } = require('util')
 const pull = require('pull-stream')
 const ssbKeys = require('ssb-keys')
-
-async function replicate(person1, person2) {
-  person1.ebt.request(person1.id, true)
-  person2.ebt.request(person2.id, true)
-  person1.ebt.request(person2.id, true)
-  person2.ebt.request(person1.id, true)
-  await p(person1.connect)(person2.getAddress())
-  await new Promise((res) => setTimeout(res, 3000))
-}
+const Testbot = require('./helpers/testbot')
+const replicate = require('./helpers/replicate')
 
 test('get added to a group', async (t) => {
   const alice = Testbot({ keys: ssbKeys.generate(null, 'alice') })

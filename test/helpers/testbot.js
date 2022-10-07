@@ -28,7 +28,7 @@ module.exports = function createSbot(opts = {}) {
     .use(require('ssb-db2/compat/feedstate'))
     .use(require('ssb-db2/compat/ebt'))
     .use(require('ssb-ebt'))
-    .use(require('../'))
+    .use(require('../..'))
 
   return stack({
     path: dir,
