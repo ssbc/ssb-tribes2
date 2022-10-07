@@ -4,6 +4,7 @@
 
 const test = require('tape')
 const pull = require('pull-stream')
+const { promisify: p } = require('util')
 const ssbKeys = require('ssb-keys')
 const Testbot = require('./helpers/testbot')
 const replicate = require('./helpers/replicate')
@@ -44,52 +45,50 @@ test('get added to a group', async (t) => {
 })
 
 test('add member', async (t) => {
-  const kaitiaki = Server()
-  const newPerson = Server()
-
-  const name = (id) => {
-    if (id === kaitiaki.id) return 'kaitiaki '
-    if (id === newPerson.id) return 'new person'
-  }
+  const kaitiaki = Testbot()
+  const newPerson = Testbot()
+  kaitiaki.tribes2.start()
+  newPerson.tribes2.start()
 
   try {
-    const { groupId, groupKey, groupInitMsg } = await p(kaitiaki.tribes.create)(
-      {}
-    )
-    t.true(groupId, 'creates group')
+    const group = await kaitiaki.tribes2.create()
+    t.true(group.id, 'creates group')
 
-    const authorIds = [newPerson.id, FeedId()]
+    const authorIds = [newPerson.id, ssbKeys.generate().id]
 
-    let invite = await p(kaitiaki.tribes.invite)(groupId, authorIds, {
+    let invite = await kaitiaki.tribes2.addMembers(group.id, authorIds, {
       text: 'welcome friends',
     })
 
-    invite = await p(kaitiaki.get)({ id: invite.key, private: true })
+    invite = await p(kaitiaki.db.get)(invite.key)
+
     const expected = {
       type: 'group/add-member',
       version: 'v1',
-      groupKey: groupKey.toString('base64'),
-      root: groupInitMsg.key,
+      groupKey: group.secret.toString('base64'),
+      root: group.root,
 
       text: 'welcome friends',
-      recps: [groupId, ...authorIds],
+      recps: [group.id, ...authorIds],
 
       tangles: {
-        group: { root: groupInitMsg.key, previous: [groupInitMsg.key] },
-        members: { root: groupInitMsg.key, previous: [groupInitMsg.key] },
+        group: { root: group.root },
+        members: { root: group.root, previous: [group.root] },
       },
     }
+    // we don't know the key of the last message, that was the admin adding themselves
+    expected.tangles.group.previous = invite.content.tangles.group.previous
     t.deepEqual(invite.content, expected, 'kaitiaki sent invite')
 
     /* kaitiaki posts to group, new person can read */
     const greetingContent = {
       type: 'post',
       text: 'Welcome new person!',
-      recps: [groupId],
+      recps: [group.id],
     }
-    const { key: greetingKey } = await p(kaitiaki.publish)(greetingContent)
-    await p(replicate)({ from: kaitiaki, to: newPerson, live: false, name })
-    const greetingMsg = await p(Getter(newPerson))(greetingKey)
+    const { key: greetingKey } = await kaitiaki.tribes2.publish(greetingContent)
+    await replicate(kaitiaki, newPerson)
+    const greetingMsg = await p(newPerson.db.getMsg)(greetingKey)
     t.deepEqual(
       greetingMsg.value.content,
       greetingContent,
@@ -100,11 +99,11 @@ test('add member', async (t) => {
     const replyContent = {
       type: 'post',
       text: 'Thank you kaitiaki',
-      recps: [groupId],
+      recps: [group.id],
     }
-    const { key: replyKey } = await p(newPerson.publish)(replyContent)
-    await p(replicate)({ from: newPerson, to: kaitiaki, live: false, name })
-    const replyMsg = await p(Getter(kaitiaki))(replyKey)
+    const { key: replyKey } = await newPerson.tribes2.publish(replyContent)
+    await replicate(newPerson, kaitiaki)
+    const replyMsg = await p(kaitiaki.db.getMsg)(replyKey)
     t.deepEqual(
       replyMsg.value.content,
       replyContent,
@@ -114,25 +113,5 @@ test('add member', async (t) => {
     t.fail(err)
   }
 
-  kaitiaki.close()
-  newPerson.close()
-  t.end()
+  kaitiaki.close(true, () => newPerson.close(true))
 })
-
-function Getter(ssb) {
-  let attempts = 0
-
-  return function get(id, cb) {
-    attempts++
-    ssb.get({ id, private: true, meta: true }, (err, m) => {
-      if (err) return cb(err)
-      if (typeof m.value.content === 'string') {
-        if (attempts === 5)
-          throw new Error(`failed to get decrypted msg: ${id}`)
-
-        return setTimeout(() => get(id, cb), 500)
-      }
-      cb(null, m)
-    })
-  }
-}
