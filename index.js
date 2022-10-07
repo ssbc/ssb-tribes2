@@ -163,14 +163,11 @@ module.exports = {
       addGroupTangle(content, (err, content) => {
         if (err) return cb(err)
 
-        ssb.db.create(
-          { content, recps, encryptionFormat: 'box2' },
-          (err, msg) => {
-            if (err) return cb(err)
+        ssb.db.create({ content, encryptionFormat: 'box2' }, (err, msg) => {
+          if (err) return cb(err)
 
-            cb(null, msg)
-          }
-        )
+          cb(null, msg)
+        })
       })
     }
 
