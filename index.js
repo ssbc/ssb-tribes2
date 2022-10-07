@@ -191,7 +191,8 @@ module.exports = {
             const groupId = lodashGet(msg, 'value.content.recps[0]')
 
             ssb.box2.getGroupKeyInfo(groupId, (err, info) => {
-              if (err) throw err
+              if (err)
+                console.error('Error when finding group invite for me:', err)
 
               if (!info) {
                 // we're not already in the group
