@@ -15,28 +15,35 @@ const randomText = (length) => {
   return output
 }
 
-test.only('lib/tangle-prune', async (t) => {
+test.only('tangle prune', async (t) => {
   const ssb = Testbot()
 
-  const { groupId } = await p(ssb.tribes.create)({})
+  const group = await ssb.tribes2.create()
 
   const publishSize = async (size, recpCount = 1) => {
     const content = {
       type: 'post',
       text: randomText(size),
-      recps: [groupId, ...new Array(recpCount - 1).fill(ssb.id)],
+      recps: [group.id, ...new Array(recpCount - 1).fill(ssb.id)],
     }
 
     return new Promise((resolve, reject) => {
-      ssb.publish(content, (err, msg) => {
-        if (err) return resolve(false)
+      try {
+        console.log('about to publish size', size)
+        ssb.tribes2.publish(content, (err, msg) => {
+          console.log('after publish')
+          if (err) return resolve(false)
 
-        ssb.get({ id: msg.key, private: true }, (err, msgVal) => {
-          if (err) return reject(err)
-          const plainLength = JSON.stringify(msgVal.content).length
-          resolve(plainLength)
+          ssb.db.get(msg.key, (err, msgVal) => {
+            if (err) return reject(err)
+            const plainLength = JSON.stringify(msgVal.content).length
+            resolve(plainLength)
+          })
         })
-      })
+      } catch {
+        console.log('caught crash')
+        return resolve(false)
+      }
     })
   }
 
@@ -45,13 +52,14 @@ test.only('lib/tangle-prune', async (t) => {
 
     let lower = 4000
     let mid
-    let upper = 8000
+    let upper = 10000 //8000
 
     const results = new Map([])
 
-    // let i = 0
+    let i = 0
     while (upper - lower > 1) {
       mid = Math.ceil((lower + upper) / 2)
+      console.log({ i, lower, upper })
 
       if (!results.has(lower)) {
         const res =
@@ -69,11 +77,11 @@ test.only('lib/tangle-prune', async (t) => {
         results.set(upper, res)
       }
 
-      // console.log(i++, {
-      //   [lower]: results.get(lower),
-      //   [mid]: results.get(mid),
-      //   [upper]: results.get(upper)
-      // })
+      console.log(i++, {
+        [lower]: results.get(lower),
+        [mid]: results.get(mid),
+        [upper]: results.get(upper),
+      })
 
       if (Boolean(results.get(lower)) !== Boolean(results.get(mid))) upper = mid
       else if (Boolean(results.get(mid)) !== Boolean(results.get(upper)))
@@ -84,11 +92,14 @@ test.only('lib/tangle-prune', async (t) => {
     const result = results.get(upper) || results.get(mid) || results.get(lower)
     t.pass(`max stringied content size for ${numberRecps} recps:  ${result}`)
   }
+  console.log('about to find max size')
   // 16 recps: 5318
   // 1 recps: 5799
-  await findMaxSize(16) // 5320
-  await findMaxSize(1) // 5800
+  await findMaxSize(16).catch(t.error) // 5320
+  await findMaxSize(1).catch(t.error) // 5800
   ssb.close()
+
+  console.log('found max size')
 
   const msgId = '%RDORgMCjmL6vs51nR4bn0LWNe6wkBfbRJulSdOJsmwg=.sha256'
   const content = (prevCount) => ({
