@@ -4,10 +4,13 @@
 
 const test = require('tape')
 const { promisify: p } = require('util')
+const bipf = require('bipf')
 const Testbot = require('./helpers/testbot')
 const tanglePrune = require('../lib/tangle-prune')
 
 const chars = 'abcABC123=+? '.split('')
+//const encodedLength = (obj) => JSON.stringify(msgVal.content).length
+const encodedLength = (obj) => bipf.encodingLength(obj)
 const randomChar = () => chars.sort(() => (Math.random() < 0.5 ? -1 : +1))[0]
 const randomText = (length) => {
   let output = ''
@@ -36,7 +39,7 @@ test.only('tangle prune', async (t) => {
 
           ssb.db.get(msg.key, (err, msgVal) => {
             if (err) return reject(err)
-            const plainLength = JSON.stringify(msgVal.content).length
+            const plainLength = encodedLength(msgVal.content)
             resolve(plainLength)
           })
         })
@@ -118,13 +121,13 @@ test.only('tangle prune', async (t) => {
   let result = tanglePrune(content(4000), 'group', 5320)
   // console.timeEnd('prune')
   t.true(
-    JSON.stringify(result).length <= 5320,
+    encodedLength(result) <= 5320,
     `pruned ${4000 - result.tangles.group.previous.length}`
   )
 
   result = tanglePrune(content(4000))
   t.true(
-    JSON.stringify(result).length <= 5800,
+    encodedLength(result) <= 5800,
     `pruned ${4000 - result.tangles.group.previous.length}`
   )
 
