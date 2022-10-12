@@ -3,13 +3,11 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 
 const test = require('tape')
-const { promisify: p } = require('util')
 const bipf = require('bipf')
 const Testbot = require('./helpers/testbot')
 const tanglePrune = require('../lib/tangle-prune')
 
 const chars = 'abcABC123=+? '.split('')
-//const encodedLength = (obj) => JSON.stringify(msgVal.content).length
 const encodedLength = (obj) => bipf.encodingLength(obj)
 const randomChar = () => chars.sort(() => (Math.random() < 0.5 ? -1 : +1))[0]
 const randomText = (length) => {
@@ -18,7 +16,7 @@ const randomText = (length) => {
   return output
 }
 
-test.only('tangle prune', async (t) => {
+test('tangle prune', async (t) => {
   const ssb = Testbot()
   const ssbId = ssb.id
 
@@ -87,6 +85,7 @@ test.only('tangle prune', async (t) => {
 
     const result = results.get(upper) || results.get(mid) || results.get(lower)
     t.pass(`max stringied content size for ${numberRecps} recps:  ${result}`)
+    return result
   }
   const max16recps = await findMaxSize(16).catch(t.error) // 5546
   const max1recp = await findMaxSize(1).catch(t.error) // 6041
@@ -96,7 +95,7 @@ test.only('tangle prune', async (t) => {
   const content = (prevCount, numRecps) => ({
     type: 'post',
     text: 'hello!',
-    recps: [...new Array(numRecps).fill(ssbId)],
+    recps: new Array(numRecps).fill(ssbId),
     tangles: {
       group: {
         root: msgId,
@@ -105,9 +104,9 @@ test.only('tangle prune', async (t) => {
     },
   })
 
-  // console.time('prune')
-  const result16 = tanglePrune(content(4000, 16), 'group')
-  // console.timeEnd('prune')
+  //console.time('prune')
+  const result16 = tanglePrune(content(4000, 16))
+  //console.timeEnd('prune')
   t.true(
     encodedLength(result16) <= max16recps,
     `pruned ${4000 - result16.tangles.group.previous.length}`
