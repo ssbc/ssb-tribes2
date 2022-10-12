@@ -116,8 +116,6 @@ test(`get-group-tangle-${n}-publishes`, (t) => {
 })
 
 test('get-group-tangle', (t) => {
-  t.plan(4)
-
   // this is an integration test, as get-group-tangle is used in ssb.tribes2.publish
   const ssb = Testbot()
 
@@ -132,22 +130,22 @@ test('get-group-tangle', (t) => {
       recps: [groupId],
     }
 
-    ssb.tribes2.publish(content, (err, msg) => {
-      t.error(err, 'publish a message')
+    ssb.db.onMsgAdded((lastMsgAfterCreate) => {
+      ssb.tribes2.publish(content, (err, msg) => {
+        t.error(err, 'publish a message')
 
-      ssb.db.get(msg.key, (err, A) => {
-        t.error(err, 'get that message back')
+        ssb.db.get(msg.key, (err, A) => {
+          t.error(err, 'get that message back')
 
-        //TODO: this is confusing, why is previous supposed to be groupRoot? because right after creating the group we add ourselves to the group, which creates another message, so that message should be the previous
-        //t.deepEqual(
-        //  A.content.tangles.group, // actual
-        //  { root: groupRoot, previous: [groupRoot] }, // expected
-        //  'auto adds group tangle (auto added tangles.group)'
-        //)
-        //TODO: remove
-        t.equal(1, 1)
+          t.deepEqual(
+            A.content.tangles.group, // actual
+            // last message is the admin adding themselves to the group they just created i.e. not the root msg
+            { root: groupRoot, previous: [lastMsgAfterCreate.kvt.key] }, // expected
+            'auto adds group tangle (auto added tangles.group)'
+          )
 
-        ssb.close(true)
+          ssb.close(true, t.end)
+        })
       })
     })
   })
