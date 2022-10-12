@@ -16,12 +16,12 @@ test('get-group-tangle unit test', (t) => {
   const server = Testbot({ name })
 
   server.tribes2.create(null, (err, group) => {
-    if (err) throw err
+    t.error(err, 'no error')
 
     const getGroupTangle = GetGroupTangle(server)
 
     getGroupTangle(group.id, (err, groupTangle) => {
-      if (err) throw err
+      t.error(err, 'no error')
 
       const { root, previous } = groupTangle
       const rootKey = group.root
@@ -31,7 +31,7 @@ test('get-group-tangle unit test', (t) => {
         pull.map((m) => m.key),
         pull.take(1),
         pull.collect((err, keys) => {
-          if (err) throw err
+          t.error(err, 'no error')
 
           t.deepEqual(
             { root, previous },
@@ -48,10 +48,10 @@ test('get-group-tangle unit test', (t) => {
           }
 
           server.tribes2.publish(content, (err, msg) => {
-            if (err) throw err
+            t.error(err, 'no error')
 
             getGroupTangle(group.id, (err, { root, previous }) => {
-              if (err) throw err
+              t.error(err, 'no error')
               t.deepEqual(
                 { root, previous },
                 { root: rootKey, previous: [msg.key] },
@@ -59,10 +59,10 @@ test('get-group-tangle unit test', (t) => {
               )
 
               server.tribes2.publish(content, (err, msg) => {
-                if (err) throw err
+                t.error(err, 'no error')
 
                 getGroupTangle(group.id, (err, { root, previous }) => {
-                  if (err) throw err
+                  t.error(err, 'no error')
                   t.deepEqual(
                     { root, previous },
                     { root: rootKey, previous: [msg.key] },
@@ -85,7 +85,7 @@ test(`get-group-tangle-${n}-publishes`, (t) => {
   const server = Testbot()
   let count = 0
   server.tribes2.create(null, (err, data) => {
-    if (err) throw err
+    t.error(err, 'no error creating group')
 
     const groupId = data.id
     pull(
@@ -101,9 +101,8 @@ test(`get-group-tangle-${n}-publishes`, (t) => {
           count += m.value.content.tangles.group.previous.length
         },
         (err) => {
-          t.error(err, 'no error')
+          t.error(err, 'no error publishing')
 
-          // t.equal(count, n, 'We expect there to be no branches in our groupTangle')
           t.true(
             count < n * 8,
             'We expect bounded branching with fast publishing'
@@ -117,56 +116,39 @@ test(`get-group-tangle-${n}-publishes`, (t) => {
 })
 
 test('get-group-tangle', (t) => {
-  const tests = [
-    {
-      plan: 4,
-      test: (t) => {
-        const DESCRIPTION = 'auto adds group tangle'
-        // this is an integration test, as get-group-tangle is used in ssb.tribes2.publish
-        const ssb = Testbot()
+  // this is an integration test, as get-group-tangle is used in ssb.tribes2.publish
+  const ssb = Testbot()
 
-        ssb.tribes2.create(null, (err, data) => {
-          t.error(err, 'create group')
+  ssb.tribes2.create(null, (err, data) => {
+    t.error(err, 'create group')
 
-          const groupRoot = data.root
-          const groupId = data.id
+    const groupRoot = data.root
+    const groupId = data.id
 
-          const content = {
-            type: 'yep',
-            recps: [groupId],
-          }
+    const content = {
+      type: 'yep',
+      recps: [groupId],
+    }
 
-          ssb.tribes2.publish(content, (err, msg) => {
-            t.error(err, 'publish a message')
+    ssb.db.onMsgAdded((lastMsgAfterCreate) => {
+      ssb.tribes2.publish(content, (err, msg) => {
+        t.error(err, 'publish a message')
 
-            ssb.db.get(msg.key, (err, A) => {
-              t.error(err, 'get that message back')
+        ssb.db.get(msg.key, (err, A) => {
+          t.error(err, 'get that message back')
 
-              //TODO: this is confusing, why is previous supposed to be groupRoot? because right after creating the group we add ourselves to the group, which creates another message, so that message should be the previous
-              //t.deepEqual(
-              //  A.content.tangles.group, // actual
-              //  { root: groupRoot, previous: [groupRoot] }, // expected
-              //  DESCRIPTION + ' (auto added tangles.group)'
-              //)
-              //TODO: remove
-              t.equal(1, 1)
+          t.deepEqual(
+            A.content.tangles.group, // actual
+            // last message is the admin adding themselves to the group they just created i.e. not the root msg
+            { root: groupRoot, previous: [lastMsgAfterCreate.kvt.key] }, // expected
+            'auto adds group tangle (auto added tangles.group)'
+          )
 
-              ssb.close()
-            })
-          })
+          ssb.close(true, t.end)
         })
-      },
-    },
-  ]
-
-  const toRun = tests.reduce((acc, round) => {
-    acc += round.plan || 1
-    return acc
-  }, 0)
-
-  t.plan(toRun)
-
-  tests.forEach((round) => round.test(t))
+      })
+    })
+  })
 })
 
 test('get-group-tangle with branch', (t) => {
@@ -177,7 +159,7 @@ test('get-group-tangle with branch', (t) => {
 
   // Alice creates a group
   alice.tribes2.create(null, (err, group) => {
-    if (err) throw err
+    t.error(err, 'no error')
 
     const getAliceGroupTangle = GetGroupTangle(alice)
     const getBobGroupTangle = GetGroupTangle(bob)
@@ -194,9 +176,9 @@ test('get-group-tangle with branch', (t) => {
 
         // Both servers should see the same group tangle
         getAliceGroupTangle(group.id, (err, aliceTangle) => {
-          if (err) throw err
+          t.error(err, 'no error')
           getBobGroupTangle(group.id, (err, bobTangle) => {
-            if (err) throw err
+            t.error(err, 'no error')
             t.deepEqual(aliceTangle, bobTangle, 'tangles should match')
             t.deepEqual(aliceTangle.root, group.root, 'the root is the groupId')
             t.deepEqual(
@@ -216,12 +198,12 @@ test('get-group-tangle with branch', (t) => {
               t.error(err, 'alice publishes a new message')
 
               bob.tribes2.publish(content(), async (err) => {
-                if (err) throw err
+                t.error(err, 'no error')
                 // Then Bob shares his message with Alice
                 await replicate(bob, alice)
                 // There should now be a branch in Alice's group tangle
                 getAliceGroupTangle(group.id, (err, aliceTangle) => {
-                  if (err) throw err
+                  t.error(err, 'no error')
 
                   t.deepEqual(
                     aliceTangle.previous.length,

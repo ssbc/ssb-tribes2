@@ -19,7 +19,7 @@ test('tribes.list + tribes.get', (t) => {
     pull(
       server.tribes2.list(),
       pull.collect(async (err, list) => {
-        if (err) return t.error(err)
+        t.error(err, 'no error')
 
         const expectedGroup = {
           secret: group.secret,
@@ -30,7 +30,7 @@ test('tribes.list + tribes.get', (t) => {
         t.deepEqual(list, [expectedGroup], 'lists group ids')
 
         server.tribes2.get(group.id, (err, actualGroup) => {
-          if (err) throw err
+          t.error(err, 'no error')
 
           t.deepEqual(actualGroup, expectedGroup, 'gets group data')
 
@@ -41,7 +41,7 @@ test('tribes.list + tribes.get', (t) => {
             pull(
               server.tribes2.list(),
               pull.collect((err, newList) => {
-                if (err) throw err
+                t.error(err, 'no error')
 
                 t.deepEqual(
                   newList,
@@ -115,7 +115,7 @@ test('list', (t) => {
       pull(
         ssb.tribes2.list(),
         pull.collect(async (err, groups1) => {
-          if (err) t.error(err)
+          t.error(err, 'no error')
 
           t.equal(groups1.length, 1, 'lists the 1 group')
 
@@ -124,7 +124,7 @@ test('list', (t) => {
           pull(
             ssb.tribes2.list(),
             pull.collect(async (err, groups2) => {
-              if (err) return t.error(err)
+              t.error(err, 'no error')
 
               t.equal(groups2.length, 2)
               t.equal(groups2[0].id, id1)

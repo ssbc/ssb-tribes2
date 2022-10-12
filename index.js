@@ -163,14 +163,11 @@ module.exports = {
       addGroupTangle(content, (err, content) => {
         if (err) return cb(err)
 
-        ssb.db.create(
-          { content, recps, encryptionFormat: 'box2' },
-          (err, msg) => {
-            if (err) return cb(err)
+        ssb.db.create({ content, encryptionFormat: 'box2' }, (err, msg) => {
+          if (err) return cb(err)
 
-            cb(null, msg)
-          }
-        )
+          cb(null, msg)
+        })
       })
     }
 
@@ -196,7 +193,7 @@ module.exports = {
           live({ old: true }),
           toPullStream()
         ),
-        pull.drain((msg) => {
+        pull.asyncMap((msg, cb) => {
           // TODO: call ssb-db2 reindexEncrypted
 
           if (lodashGet(msg, 'value.content.recps', []).includes(ssb.id)) {
@@ -205,7 +202,12 @@ module.exports = {
             const groupId = lodashGet(msg, 'value.content.recps[0]')
 
             ssb.box2.getGroupKeyInfo(groupId, (err, info) => {
-              if (err) throw err
+              if (err) {
+                return console.error(
+                  'Error when finding group invite for me:',
+                  err
+                )
+              }
 
               if (!info) {
                 // we're not already in the group
@@ -214,21 +216,14 @@ module.exports = {
                   root: groupRoot,
                 })
               }
+              return cb()
             })
+          } else {
+            return cb()
           }
-        })
+        }),
+        pull.drain(() => {})
       )
-
-      //pull(
-      //  ssb.db.query(live({ old: true }), toPullStream()),
-      //  pull.drain((msg) => {
-      //    console.log('i got any kind of message', {
-      //      author: msg.value.author,
-      //      seq: msg.value.sequence,
-      //      myId: ssb.id,
-      //    })
-      //  })
-      //)
     }
 
     return {

@@ -47,7 +47,7 @@ test('create more', (t) => {
 
   // this is more of an integration test over the api
   server.tribes2.create({}, (err, data) => {
-    if (err) throw err
+    t.error(err, 'no error')
 
     const { id, secret, root } = data
     t.true(ref.isCloakedMsg(id), 'returns group identifier - groupId')
@@ -55,15 +55,9 @@ test('create more', (t) => {
       Buffer.isBuffer(secret) && secret.length === 32,
       'returns group symmetric key - groupKey'
     )
-    //TODO: can we get the root msg unencrypted?
-    //t.match(
-    //  groupInitMsg.value.content,
-    //  /^[a-zA-Z0-9/+]+=*\.box2$/,
-    //  'encrypted init msg'
-    //)
 
     server.db.get(root, (err, value) => {
-      if (err) throw err
+      t.error(err, 'no error')
 
       t.deepEqual(
         value.content,
@@ -81,7 +75,7 @@ test('create more', (t) => {
         server.db.query(where(author(server.id)), descending(), toPullStream()),
         pull.map((msg) => msg.value.content),
         pull.collect((err, msgContents) => {
-          if (err) throw err
+          t.error(err, 'no error')
 
           t.deepEqual(
             msgContents[0], // contents of the latest message
@@ -104,8 +98,7 @@ test('create more', (t) => {
             },
             'The admin was was also added to the group'
           )
-          server.close()
-          t.end()
+          server.close(true, t.end)
         })
       )
     })
