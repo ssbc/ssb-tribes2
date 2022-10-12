@@ -85,7 +85,7 @@ test(`get-group-tangle-${n}-publishes`, (t) => {
   const server = Testbot()
   let count = 0
   server.tribes2.create(null, (err, data) => {
-    t.error(err, 'no error')
+    t.error(err, 'no error creating group')
 
     const groupId = data.id
     pull(
@@ -101,7 +101,7 @@ test(`get-group-tangle-${n}-publishes`, (t) => {
           count += m.value.content.tangles.group.previous.length
         },
         (err) => {
-          t.error(err, 'no error')
+          t.error(err, 'no error publishing')
 
           t.true(
             count < n * 8,
