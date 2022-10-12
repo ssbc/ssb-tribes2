@@ -171,6 +171,20 @@ module.exports = {
       })
     }
 
+    function listMembers(groupId) {
+      return pull(
+        ssb.db.query(
+          where(and(isDecrypted('box2'), type('group/add-member'))),
+          toPullStream()
+        ),
+        pull.map((msg) => lodashGet(msg, 'value.content.recps', [])),
+        pull.filter((recps) => recps.length > 1 && recps[0] === groupId),
+        pull.map((recps) => recps.slice(1)),
+        pull.flatten(),
+        pull.unique()
+      )
+    }
+
     // Listeners for joining groups
     function start() {
       pull(
@@ -180,9 +194,6 @@ module.exports = {
           toPullStream()
         ),
         pull.asyncMap((msg, cb) => {
-          // TODO: check if we already have this msg' group key in ssb-box2
-          // TODO: if we do, ignore this msg
-          // TODO: else, register the group key in ssb-box2
           // TODO: call ssb-db2 reindexEncrypted
 
           if (lodashGet(msg, 'value.content.recps', []).includes(ssb.id)) {
@@ -213,17 +224,6 @@ module.exports = {
         }),
         pull.drain(() => {})
       )
-
-      //pull(
-      //  ssb.db.query(live({ old: true }), toPullStream()),
-      //  pull.drain((msg) => {
-      //    console.log('i got any kind of message', {
-      //      author: msg.value.author,
-      //      seq: msg.value.sequence,
-      //      myId: ssb.id,
-      //    })
-      //  })
-      //)
     }
 
     return {
@@ -232,6 +232,7 @@ module.exports = {
       list,
       addMembers,
       publish,
+      listMembers,
       start,
     }
   },
