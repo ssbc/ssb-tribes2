@@ -224,17 +224,6 @@ module.exports = {
         }),
         pull.drain(() => {})
       )
-
-      //pull(
-      //  ssb.db.query(live({ old: true }), toPullStream()),
-      //  pull.drain((msg) => {
-      //    console.log('i got any kind of message', {
-      //      author: msg.value.author,
-      //      seq: msg.value.sequence,
-      //      myId: ssb.id,
-      //    })
-      //  })
-      //)
     }
 
     return {
