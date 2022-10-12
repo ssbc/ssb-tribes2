@@ -56,11 +56,15 @@ test('add member', async (t) => {
 
     const authorIds = [newPerson.id, ssbKeys.generate().id]
 
-    let invite = await kaitiaki.tribes2.addMembers(group.id, authorIds, {
-      text: 'welcome friends',
-    })
+    const encryptedInvite = await kaitiaki.tribes2.addMembers(
+      group.id,
+      authorIds,
+      {
+        text: 'welcome friends',
+      }
+    )
 
-    invite = await p(kaitiaki.db.get)(invite.key)
+    const invite = await p(kaitiaki.db.get)(encryptedInvite.key)
 
     const expected = {
       type: 'group/add-member',
@@ -72,12 +76,14 @@ test('add member', async (t) => {
       recps: [group.id, ...authorIds],
 
       tangles: {
-        group: { root: group.root },
+        group: {
+          root: group.root,
+          // we don't know the key of the last message, that was the admin adding themselves
+          previous: invite.content.tangles.group.previous,
+        },
         members: { root: group.root, previous: [group.root] },
       },
     }
-    // we don't know the key of the last message, that was the admin adding themselves
-    expected.tangles.group.previous = invite.content.tangles.group.previous
     t.deepEqual(invite.content, expected, 'kaitiaki sent invite')
 
     /* kaitiaki posts to group, new person can read */
@@ -113,5 +119,7 @@ test('add member', async (t) => {
     t.fail(err)
   }
 
-  kaitiaki.close(true, () => newPerson.close(true))
+  await new Promise((resolve) => {
+    kaitiaki.close(true, () => newPerson.close(true, resolve))
+  })
 })
