@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2022 Mix Irving
+//
+// SPDX-License-Identifier: LGPL-3.0-only
+
 const test = require('tape')
 const keys = require('ssb-keys')
 const Testbot = require('./helpers/testbot')
