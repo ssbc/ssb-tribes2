@@ -10,8 +10,8 @@ const Testbot = require('./helpers/testbot')
 const replicate = require('./helpers/replicate')
 
 test('get added to a group', async (t) => {
-  const alice = Testbot({ keys: ssbKeys.generate(null, 'alice') })
-  const bob = Testbot({ keys: ssbKeys.generate(null, 'bob') })
+  const alice = Testbot({ keys: ssbKeys.generate(null, 'alice', 'buttwoo-v1') })
+  const bob = Testbot({ keys: ssbKeys.generate(null, 'bob', 'buttwoo-v1') })
 
   alice.tribes2.start()
   bob.tribes2.start()

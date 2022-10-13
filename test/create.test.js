@@ -28,11 +28,7 @@ test('create', async (t) => {
     recps: [id],
   }
 
-  const msg = await p(ssb.db.create)({
-    content,
-    //keys: subfeed.keys,
-    encryptionFormat: 'box2',
-  }).catch(t.error)
+  const msg = await ssb.tribes2.publish(content).catch(t.error)
 
   t.equal(typeof msg.value.content, 'string', 'content is a string')
   //t.equal(msg.value.author, subfeed.id)
@@ -47,6 +43,7 @@ test('create more', (t) => {
 
   // this is more of an integration test over the api
   server.tribes2.create({}, (err, data) => {
+    if (err) console.error(err)
     t.error(err, 'no error')
 
     const { id, secret, root } = data

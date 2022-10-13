@@ -19,11 +19,16 @@ module.exports = function createSbot(opts = {}) {
   const dir = opts.path || `/tmp/ssb-tribes2-tests-${opts.name || count++}`
   if (opts.rimraf !== false) rimraf.sync(dir)
 
-  const keys = opts.keys || ssbKeys.loadOrCreateSync(path.join(dir, 'secret'))
+  const keys =
+    opts.keys ||
+    ssbKeys.loadOrCreateSync(path.join(dir, 'secret'), {
+      feedFormat: 'buttwoo-v1',
+    })
 
   const stack = SecretStack({ appKey: caps.shs })
     .use(require('ssb-db2/core'))
-    .use(require('ssb-classic'))
+    //.use(require('ssb-classic'))
+    .use(require('ssb-buttwoo'))
     .use(require('ssb-box2'))
     .use(require('ssb-db2/compat/feedstate'))
     .use(require('ssb-db2/compat/ebt'))
