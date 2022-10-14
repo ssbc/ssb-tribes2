@@ -19,8 +19,8 @@ module.exports = async function replicate(person1, person2) {
     const interval = setInterval(async () => {
       const nowPerson1Clock = await p(person1.ebt.clock)()
       const isSynced1 = nowPerson1Clock[person2.id] === clock2[person2.id]
-      const isSynced2 =
-        (await p(person2.ebt.clock)())[person1.id] === clock1[person1.id]
+      const nowPerson2Clock = await p(person2.ebt.clock)()
+      const isSynced2 = nowPerson2Clock[person1.id] === clock1[person1.id]
 
       if (isSynced1 && isSynced2) {
         clearInterval(interval)
