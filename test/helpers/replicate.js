@@ -17,14 +17,14 @@ module.exports = async function replicate(person1, person2) {
   await p(person1.connect)(person2.getAddress())
   await new Promise((res) => {
     const interval = setInterval(async () => {
-      const isSynced1 =
-        (await p(person1.ebt.clock)())[person2.id] === clock2[person2.id]
+      const nowPerson1Clock = await p(person1.ebt.clock)()
+      const isSynced1 = nowPerson1Clock[person2.id] === clock2[person2.id]
       const isSynced2 =
         (await p(person2.ebt.clock)())[person1.id] === clock1[person1.id]
 
       if (isSynced1 && isSynced2) {
         clearInterval(interval)
-        res()
+        setTimeout(() => res(), 500)
       }
     }, 100)
   })
