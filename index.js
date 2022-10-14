@@ -15,6 +15,7 @@ const {
   live,
   toPullStream,
 } = require('ssb-db2/operators')
+const butt2 = require('ssb-buttwoo')
 const { keySchemes } = require('private-group-spec')
 const { SecretKey } = require('ssb-private-group-keys')
 //const Crut = require('ssb-crut')
@@ -58,7 +59,7 @@ module.exports = {
           recps: recipientKeys,
           encryptionFormat: 'box2',
           feedFormat: 'buttwoo-v1',
-          tag: 0,
+          tag: butt2.tags.SSB_FEED,
         },
         (err, groupInitMsg) => {
           if (err) return cb(err)
