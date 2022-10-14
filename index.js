@@ -59,7 +59,9 @@ module.exports = {
           recps: recipientKeys,
           encryptionFormat: 'box2',
           feedFormat: 'buttwoo-v1',
-          tag: butt2.tags.SSB_FEED,
+          //TODO: SSB_FEED errors
+          // https://github.com/ssbc/ssb-buttwoo/issues/5
+          tag: 0, //butt2.tags.SSB_FEED,
         },
         (err, groupInitMsg) => {
           if (err) return cb(err)
