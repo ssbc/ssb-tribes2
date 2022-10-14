@@ -173,7 +173,7 @@ module.exports = {
             content,
             encryptionFormat: 'box2',
             feedFormat: 'buttwoo-v1',
-            //tag: 0,
+            tag: 0,
           },
           (err, msg) => {
             if (err) return cb(err)
