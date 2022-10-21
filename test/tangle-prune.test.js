@@ -3,18 +3,8 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 
 const test = require('tape')
-//const bipf = require('bipf')
 const Testbot = require('./helpers/testbot')
 const prunePublish = require('../lib/prune-publish')
-
-//const chars = 'abcABC123=+? '.split('')
-//const encodedLength = (obj) => bipf.encodingLength(obj)
-//const randomChar = () => chars.sort(() => (Math.random() < 0.5 ? -1 : +1))[0]
-//const randomText = (length) => {
-//  let output = ''
-//  while (output.length < length) output += randomChar()
-//  return output
-//}
 
 test('prune a message with way too big `previous`', (t) => {
   const ssb = Testbot()
@@ -77,7 +67,7 @@ test('publish many messages that might need pruning', (t) => {
 
     //console.time('publish')
     Promise.all(publishes)
-      .then(async (msgs) => {
+      .then(async () => {
         //console.timeEnd('publish')
 
         ssb.close(true, t.end)
