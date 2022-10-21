@@ -47,14 +47,41 @@ test('prune a message with way too big `previous`', (t) => {
           `pruned ${4000 - msg16len} from 'previous', ${msg16len} remaining`
         )
 
-        //const result1 = tanglePrune(content(4000, 1))
-        //t.true(
-        //  encodedLength(result1) <= max1recp,
-        //  `pruned ${4000 - result1.tangles.group.previous.length}`
-        //)
+        t.true(msg16len > 10, 'there are some previouses left')
 
         ssb.close(true, t.end)
       })
     })
+  })
+})
+
+test('publish many messages that might need pruning', (t) => {
+  const n = 5000
+  const ssb = Testbot()
+
+  const publishArray = new Array(n).fill().map((item, i) => i)
+
+  ssb.tribes2.create(null, (err, group) => {
+    const publishes = publishArray.map(
+      (value) =>
+        new Promise((res, rej) => {
+          ssb.tribes2.publish(
+            { type: 'potato', content: value, recps: [group.id] },
+            (err, msg) => {
+              if (err) return rej(err)
+              return res(msg)
+            }
+          )
+        })
+    )
+
+    //console.time('publish')
+    Promise.all(publishes)
+      .then(async (msgs) => {
+        //console.timeEnd('publish')
+
+        ssb.close(true, t.end)
+      })
+      .catch(t.error)
   })
 })
