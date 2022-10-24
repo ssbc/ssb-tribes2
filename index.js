@@ -20,6 +20,7 @@ const { SecretKey } = require('ssb-private-group-keys')
 //const Crut = require('ssb-crut')
 const buildGroupId = require('./lib/build-group-id')
 const AddGroupTangle = require('./lib/add-group-tangle')
+const initSpec = require('./spec/init')
 
 module.exports = {
   name: 'tribes2',
@@ -46,7 +47,8 @@ module.exports = {
           group: { root: null, previous: null },
         },
       }
-      //if (!initSpec.isValid(content)) return cb(new Error(initSpec.isValid.errorsString))
+      if (!initSpec.isValid(content))
+        return cb(new Error(initSpec.isValid.errorsString))
 
       const recipientKeys = [
         { key: groupKey.toBuffer(), scheme: keySchemes.private_group },
