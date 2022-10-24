@@ -21,6 +21,7 @@ const { SecretKey } = require('ssb-private-group-keys')
 const buildGroupId = require('./lib/build-group-id')
 const AddGroupTangle = require('./lib/add-group-tangle')
 const initSpec = require('./spec/init')
+const addMemberSpec = require('./spec/add-member')
 
 module.exports = {
   name: 'tribes2',
@@ -138,8 +139,8 @@ module.exports = {
 
         if (opts.text) content.text = opts.text
 
-        //if (!addMemberSpec.isValid(content))
-        //  return cb(new Error(addMemberSpec.isValid.errorsString))
+        if (!addMemberSpec.isValid(content))
+          return cb(new Error(addMemberSpec.isValid.errorsString))
 
         publish(content, (err, msg) => {
           if (err) return cb(err)
