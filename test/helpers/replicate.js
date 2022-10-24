@@ -24,7 +24,7 @@ module.exports = async function replicate(person1, person2) {
 
       if (isSynced1 && isSynced2) {
         clearInterval(interval)
-        setTimeout(() => res(), 500)
+        res()
       }
     }, 100)
   })
