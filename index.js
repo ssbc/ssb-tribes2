@@ -133,6 +133,12 @@ module.exports = {
               root,
               previous: [root], // TODO calculate previous for members tangle
             },
+            // likely incorrect group tangle and this will be overwritten by publish()
+            // we just add it here to make the spec pass
+            group: {
+              root,
+              previous: [root],
+            },
           },
           recps,
         }
