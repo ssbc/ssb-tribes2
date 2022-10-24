@@ -6,7 +6,7 @@ const { promisify } = require('util')
 const pull = require('pull-stream')
 const paraMap = require('pull-paramap')
 const pullAsync = require('pull-async')
-const lodashGet = require('lodash.get')
+const lGet = require('lodash.get')
 const {
   where,
   and,
@@ -97,11 +97,33 @@ module.exports = {
     }
 
     function list() {
+      //return pull(
+      //  pullAsync((cb) => ssb.box2.listGroupIds(cb)),
+      //  pull.map((ids) => pull.values(ids)),
+      //  pull.flatten(),
+      //  paraMap(get, 4)
+      //)
       return pull(
-        pullAsync((cb) => ssb.box2.listGroupIds(cb)),
-        pull.map((ids) => pull.values(ids)),
-        pull.flatten(),
-        paraMap(get, 4)
+        ssb.db.query(
+          where(and(isDecrypted('box2'), type('group/add-member'))),
+          toPullStream()
+        ),
+        pull.map((msg) => {
+          if (lGet(msg, 'value.content.recps', []).includes(ssb.id)) {
+            const groupRoot = lGet(msg, 'value.content.root')
+            const groupKey = Buffer.from(
+              lGet(msg, 'value.content.groupKey'),
+              'base64'
+            )
+            const groupId = lGet(msg, 'value.content.recps[0]')
+
+            return { id: groupId, secret: groupKey, root: groupRoot }
+          } else {
+            return null
+          }
+        }),
+        pull.filter(),
+        pull.unique('id')
       )
     }
 
@@ -177,7 +199,7 @@ module.exports = {
           where(and(isDecrypted('box2'), type('group/add-member'))),
           toPullStream()
         ),
-        pull.map((msg) => lodashGet(msg, 'value.content.recps', [])),
+        pull.map((msg) => lGet(msg, 'value.content.recps', [])),
         pull.filter((recps) => recps.length > 1 && recps[0] === groupId),
         pull.map((recps) => recps.slice(1)),
         pull.flatten(),
@@ -186,45 +208,45 @@ module.exports = {
     }
 
     // Listeners for joining groups
-    function start() {
-      pull(
-        ssb.db.query(
-          where(and(isDecrypted('box2'), type('group/add-member'))),
-          live({ old: true }),
-          toPullStream()
-        ),
-        pull.asyncMap((msg, cb) => {
-          // TODO: call ssb-db2 reindexEncrypted
+    //function start() {
+    //  pull(
+    //    ssb.db.query(
+    //      where(and(isDecrypted('box2'), type('group/add-member'))),
+    //      live({ old: true }),
+    //      toPullStream()
+    //    ),
+    //    pull.asyncMap((msg, cb) => {
+    //      // TODO: call ssb-db2 reindexEncrypted
 
-          if (lodashGet(msg, 'value.content.recps', []).includes(ssb.id)) {
-            const groupRoot = lodashGet(msg, 'value.content.root')
-            const groupKey = lodashGet(msg, 'value.content.groupKey')
-            const groupId = lodashGet(msg, 'value.content.recps[0]')
+    //      if (lodashGet(msg, 'value.content.recps', []).includes(ssb.id)) {
+    //        const groupRoot = lodashGet(msg, 'value.content.root')
+    //        const groupKey = lodashGet(msg, 'value.content.groupKey')
+    //        const groupId = lodashGet(msg, 'value.content.recps[0]')
 
-            ssb.box2.getGroupKeyInfo(groupId, (err, info) => {
-              if (err) {
-                return console.error(
-                  'Error when finding group invite for me:',
-                  err
-                )
-              }
+    //        ssb.box2.getGroupKeyInfo(groupId, (err, info) => {
+    //          if (err) {
+    //            return console.error(
+    //              'Error when finding group invite for me:',
+    //              err
+    //            )
+    //          }
 
-              if (!info) {
-                // we're not already in the group
-                ssb.box2.addGroupInfo(groupId, {
-                  key: groupKey,
-                  root: groupRoot,
-                })
-              }
-              return cb()
-            })
-          } else {
-            return cb()
-          }
-        }),
-        pull.drain(() => {})
-      )
-    }
+    //          if (!info) {
+    //            // we're not already in the group
+    //            ssb.box2.addGroupInfo(groupId, {
+    //              key: groupKey,
+    //              root: groupRoot,
+    //            })
+    //          }
+    //          return cb()
+    //        })
+    //      } else {
+    //        return cb()
+    //      }
+    //    }),
+    //    pull.drain(() => {})
+    //  )
+    //}
 
     return {
       create,
@@ -233,7 +255,8 @@ module.exports = {
       addMembers,
       publish,
       listMembers,
-      start,
+      //TODO: remove
+      start: () => {},
     }
   },
 }
