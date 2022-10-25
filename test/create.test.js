@@ -108,22 +108,17 @@ test('create more', (t) => {
 
 test('root message is encrypted', (t) => {
   const alice = Testbot()
-  const bob = Testbot()
 
   alice.tribes2.start()
-  bob.tribes2.start()
-
   alice.tribes2.create({}, async (err, group) => {
-    t.error(err, 'no error')
+    if (err) t.error(err, 'no error')
 
-    await replicate(alice, bob)
+    alice.db.getMsg(group.root, (err, kvt) => {
+      if (err) t.error(err)
 
-    bob.db.get(group.root, (err, value) => {
-      t.error(err)
+      t.true(kvt.meta && kvt.meta.private, 'encrypted init msg')
 
-      t.match(value.content, /^[a-zA-Z0-9/+]+=*\.box2$/, 'encrypted init msg')
-
-      alice.close(true, () => bob.close(true, t.end))
+      alice.close(true, t.end)
     })
   })
 })
