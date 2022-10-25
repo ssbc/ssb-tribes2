@@ -28,4 +28,8 @@ module.exports = async function replicate(person1, person2) {
       }
     }, 100)
   })
+  await Promise.all([
+    p(person1.tribes2.onCaughtUp)(),
+    p(person2.tribes2.onCaughtUp)(),
+  ])
 }

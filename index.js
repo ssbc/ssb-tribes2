@@ -13,6 +13,7 @@ const {
   isDecrypted,
   type,
   live,
+  descending,
   toPullStream,
 } = require('ssb-db2/operators')
 const { keySchemes } = require('private-group-spec')
@@ -185,6 +186,7 @@ module.exports = {
       )
     }
 
+    let processingGroupAddMember = 0
     // Listeners for joining groups
     function start() {
       pull(
@@ -197,6 +199,7 @@ module.exports = {
           // TODO: call ssb-db2 reindexEncrypted
 
           if (lodashGet(msg, 'value.content.recps', []).includes(ssb.id)) {
+            processingGroupAddMember++
             const groupRoot = lodashGet(msg, 'value.content.root')
             const groupKey = lodashGet(msg, 'value.content.groupKey')
             const groupId = lodashGet(msg, 'value.content.recps[0]')
@@ -216,6 +219,7 @@ module.exports = {
                   root: groupRoot,
                 })
               }
+              processingGroupAddMember--
               return cb()
             })
           } else {
@@ -226,7 +230,28 @@ module.exports = {
       )
     }
 
+    // This is a bit hacky, because it fixes the race condition with `start()`
+    // by relying on ssb-db2 internals. This only works because the query in
+    // `start()` was initiated before this one, and because ssb-db2 and jitdb
+    // have an internal queue of queries that are executed in order.
+    function onCaughtUp(cb) {
+      pull(
+        ssb.db.query(where(isDecrypted('box2')), descending(), toPullStream()),
+        pull.take(1),
+        pull.collect((err) => {
+          if (err) return cb(err)
+          let interval = setInterval(() => {
+            if (processingGroupAddMember === 0) {
+              clearInterval(interval)
+              cb()
+            }
+          }, 10)
+        })
+      )
+    }
+
     return {
+      // Public API
       create,
       get,
       list,
@@ -234,6 +259,9 @@ module.exports = {
       publish,
       listMembers,
       start,
+
+      // Internal API, for tests etc
+      onCaughtUp,
     }
   },
 }
