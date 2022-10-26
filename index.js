@@ -15,13 +15,16 @@ const {
   live,
   toPullStream,
 } = require('ssb-db2/operators')
-const { keySchemes } = require('private-group-spec')
+const {
+  keySchemes,
+  validator: {
+    group: { init: initSpec, addMember: addMemberSpec },
+  },
+} = require('private-group-spec')
 const { SecretKey } = require('ssb-private-group-keys')
 //const Crut = require('ssb-crut')
 const buildGroupId = require('./lib/build-group-id')
 const AddGroupTangle = require('./lib/add-group-tangle')
-const initSpec = require('./spec/init')
-const addMemberSpec = require('./spec/add-member')
 
 module.exports = {
   name: 'tribes2',
@@ -48,8 +51,7 @@ module.exports = {
           group: { root: null, previous: null },
         },
       }
-      if (!initSpec.isValid(content))
-        return cb(new Error(initSpec.isValid.errorsString))
+      if (!initSpec(content)) return cb(new Error(initSpec.errorsString))
 
       const recipientKeys = [
         { key: groupKey.toBuffer(), scheme: keySchemes.private_group },
@@ -145,8 +147,8 @@ module.exports = {
 
         if (opts.text) content.text = opts.text
 
-        if (!addMemberSpec.isValid(content))
-          return cb(new Error(addMemberSpec.isValid.errorsString))
+        if (!addMemberSpec(content))
+          return cb(new Error(addMemberSpec.errorsString))
 
         publish(content, (err, msg) => {
           if (err) return cb(err)
