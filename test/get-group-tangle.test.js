@@ -172,7 +172,7 @@ test('get-group-tangle with branch', (t) => {
         t.error(err, 'alice adds bob to group') // Not actually an error?
 
         // Alice shares the group creation and invite with Bob.
-        await replicate(alice, bob)
+        await replicate(alice, bob, { waitUntilMembersOf: group.id })
 
         // Both servers should see the same group tangle
         getAliceGroupTangle(group.id, (err, aliceTangle) => {
