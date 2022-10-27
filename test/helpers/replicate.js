@@ -43,6 +43,6 @@ async function waitUntilMember(person, groupId) {
         isMember = true
       })
       .catch(() => {})
-    await new Promise((res) => setTimeout(res, 100))
+    await p(setTimeout)(100)
   }
 }
