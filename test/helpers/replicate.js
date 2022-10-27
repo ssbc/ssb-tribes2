@@ -36,7 +36,7 @@ module.exports = async function replicate(person1, person2, opts = {}) {
 
 async function waitUntilMember(person, groupId) {
   let isMember = false
-  while (!isMember) {
+  for (let i = 0; !isMember && i < 50; i++) {
     await person.tribes2
       .get(groupId)
       .then(() => {
