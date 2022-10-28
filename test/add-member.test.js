@@ -25,7 +25,7 @@ test('get added to a group', async (t) => {
 
   await alice.tribes2.addMembers(groupId, [bob.id])
 
-  await replicate(alice, bob)
+  await replicate(alice, bob, { waitUntilMembersOf: groupId })
 
   await new Promise((res) =>
     pull(

@@ -8,6 +8,7 @@ const { promisify: p } = require('util')
 const pull = require('pull-stream')
 const { author, descending, toPullStream, where } = require('ssb-db2/operators')
 const Testbot = require('./helpers/testbot')
+const replicate = require('./helpers/replicate')
 
 test('create', async (t) => {
   const ssb = Testbot()
@@ -101,6 +102,23 @@ test('create more', (t) => {
           server.close(true, t.end)
         })
       )
+    })
+  })
+})
+
+test('root message is encrypted', (t) => {
+  const alice = Testbot()
+
+  alice.tribes2.start()
+  alice.tribes2.create({}, async (err, group) => {
+    if (err) t.error(err, 'no error')
+
+    alice.db.getMsg(group.root, (err, kvt) => {
+      if (err) t.error(err)
+
+      t.true(kvt.meta && kvt.meta.private, 'encrypted init msg')
+
+      alice.close(true, t.end)
     })
   })
 })

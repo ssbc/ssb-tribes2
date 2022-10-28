@@ -25,6 +25,7 @@ const { SecretKey } = require('ssb-private-group-keys')
 //const Crut = require('ssb-crut')
 const buildGroupId = require('./lib/build-group-id')
 const AddGroupTangle = require('./lib/add-group-tangle')
+const prunePublish = require('./lib/prune-publish')
 
 module.exports = {
   name: 'tribes2',
@@ -174,11 +175,7 @@ module.exports = {
       addGroupTangle(content, (err, content) => {
         if (err) return cb(err)
 
-        ssb.db.create({ content, encryptionFormat: 'box2' }, (err, msg) => {
-          if (err) return cb(err)
-
-          cb(null, msg)
-        })
+        prunePublish(ssb, content, cb)
       })
     }
 

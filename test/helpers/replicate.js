@@ -7,7 +7,7 @@ const { promisify: p } = require('util')
 /**
  * Fully replicates person1's feed to person2 and vice versa
  */
-module.exports = async function replicate(person1, person2) {
+module.exports = async function replicate(person1, person2, opts = {}) {
   const clock1 = await p(person1.ebt.clock)()
   const clock2 = await p(person2.ebt.clock)()
   person1.ebt.request(person1.id, true)
@@ -28,4 +28,21 @@ module.exports = async function replicate(person1, person2) {
       }
     }, 100)
   })
+  if (opts.waitUntilMembersOf) {
+    await waitUntilMember(person1, opts.waitUntilMembersOf)
+    await waitUntilMember(person2, opts.waitUntilMembersOf)
+  }
+}
+
+async function waitUntilMember(person, groupId) {
+  let isMember = false
+  for (let i = 0; !isMember && i < 50; i++) {
+    await person.tribes2
+      .get(groupId)
+      .then(() => {
+        isMember = true
+      })
+      .catch(() => {})
+    await p(setTimeout)(100)
+  }
 }
