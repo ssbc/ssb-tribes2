@@ -15,7 +15,12 @@ const {
   live,
   toPullStream,
 } = require('ssb-db2/operators')
-const { keySchemes } = require('private-group-spec')
+const {
+  keySchemes,
+  validator: {
+    group: { init: initSpec, addMember: addMemberSpec },
+  },
+} = require('private-group-spec')
 const { SecretKey } = require('ssb-private-group-keys')
 //const Crut = require('ssb-crut')
 const buildGroupId = require('./lib/build-group-id')
@@ -47,7 +52,7 @@ module.exports = {
           group: { root: null, previous: null },
         },
       }
-      //if (!initSpec.isValid(content)) return cb(new Error(initSpec.isValid.errorsString))
+      if (!initSpec(content)) return cb(new Error(initSpec.errorsString))
 
       const recipientKeys = [
         { key: groupKey.toBuffer(), scheme: keySchemes.private_group },
@@ -131,14 +136,20 @@ module.exports = {
               root,
               previous: [root], // TODO calculate previous for members tangle
             },
+            // likely incorrect group tangle and this will be overwritten by publish()
+            // we just add it here to make the spec pass
+            group: {
+              root,
+              previous: [root],
+            },
           },
           recps,
         }
 
         if (opts.text) content.text = opts.text
 
-        //if (!addMemberSpec.isValid(content))
-        //  return cb(new Error(addMemberSpec.isValid.errorsString))
+        if (!addMemberSpec(content))
+          return cb(new Error(addMemberSpec.errorsString))
 
         publish(content, (err, msg) => {
           if (err) return cb(err)
