@@ -22,6 +22,7 @@ const {
   },
 } = require('private-group-spec')
 const { SecretKey } = require('ssb-private-group-keys')
+const { fromMessageSigil } = require('ssb-uri2')
 //const Crut = require('ssb-crut')
 const buildGroupId = require('./lib/build-group-id')
 const AddGroupTangle = require('./lib/add-group-tangle')
@@ -70,7 +71,7 @@ module.exports = {
           const data = {
             id: buildGroupId({ groupInitMsg, groupKey: groupKey.toBuffer() }),
             secret: groupKey.toBuffer(),
-            root: groupInitMsg.key,
+            root: fromMessageSigil(groupInitMsg.key),
             subfeed: '',
           }
 
