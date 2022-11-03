@@ -3,7 +3,11 @@
 // SPDX-License-Identifier: CC0-1.0
 
 const test = require('tape')
-const { isClassicMessageSSBURI, isIdentityGroupSSBURI } = require('ssb-uri2')
+const {
+  isClassicMessageSSBURI,
+  isIdentityGroupSSBURI,
+  fromFeedSigil,
+} = require('ssb-uri2')
 const { promisify: p } = require('util')
 const pull = require('pull-stream')
 const { author, descending, toPullStream, where } = require('ssb-db2/operators')
@@ -84,7 +88,7 @@ test('create more', (t) => {
               version: 'v1',
               groupKey: secret.toString('base64'),
               root: root,
-              recps: [id, server.id], // me being added to the group
+              recps: [id, fromFeedSigil(server.id)], // me being added to the group
               tangles: {
                 members: {
                   root: root,
