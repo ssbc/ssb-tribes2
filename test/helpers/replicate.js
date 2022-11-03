@@ -45,4 +45,5 @@ async function waitUntilMember(person, groupId) {
       .catch(() => {})
     await p(setTimeout)(100)
   }
+  if (!isMember) throw new Error("Didn't become a member in time")
 }

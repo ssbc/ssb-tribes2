@@ -22,7 +22,8 @@ const {
   },
 } = require('private-group-spec')
 const { SecretKey } = require('ssb-private-group-keys')
-const { fromMessageSigil } = require('ssb-uri2')
+const { fromMessageSigil, fromFeedSigil } = require('ssb-uri2')
+const ref = require('ssb-ref')
 //const Crut = require('ssb-crut')
 const buildGroupId = require('./lib/build-group-id')
 const AddGroupTangle = require('./lib/add-group-tangle')
@@ -125,7 +126,11 @@ module.exports = {
       get(groupId, (err, { secret, root }) => {
         if (err) return cb(err)
 
-        const recps = [groupId, ...feedIds]
+        const feedIdUris = feedIds.map((feedId) =>
+          ref.isFeedId(feedId) ? fromFeedSigil(feedId) : feedId
+        )
+
+        const recps = [groupId, ...feedIdUris]
 
         const content = {
           type: 'group/add-member',
@@ -205,7 +210,11 @@ module.exports = {
         pull.asyncMap((msg, cb) => {
           // TODO: call ssb-db2 reindexEncrypted
 
-          if (lodashGet(msg, 'value.content.recps', []).includes(ssb.id)) {
+          if (
+            lodashGet(msg, 'value.content.recps', []).includes(
+              fromFeedSigil(ssb.id)
+            )
+          ) {
             const groupRoot = lodashGet(msg, 'value.content.root')
             const groupKey = lodashGet(msg, 'value.content.groupKey')
             const groupId = lodashGet(msg, 'value.content.recps[0]')

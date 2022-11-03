@@ -41,6 +41,7 @@
     "ssb-crut": "^4.6.1",
     "ssb-meta-feeds": "~0.30.0",
     "ssb-private-group-keys": "^1.0.0",
+    "ssb-ref": "^2.16.0",
     "ssb-uri2": "^2.4.0"
   },
   "devDependencies": {
