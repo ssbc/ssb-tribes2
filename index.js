@@ -22,9 +22,7 @@ const {
   },
 } = require('private-group-spec')
 const { SecretKey } = require('ssb-private-group-keys')
-const { fromMessageSigil, fromFeedSigil } = require('ssb-uri2')
-const ref = require('ssb-ref')
-//const Crut = require('ssb-crut')
+const { fromMessageSigil, fromFeedSigil, isFeedSSBURI } = require('ssb-uri2')
 const buildGroupId = require('./lib/build-group-id')
 const AddGroupTangle = require('./lib/add-group-tangle')
 const prunePublish = require('./lib/prune-publish')
@@ -126,9 +124,11 @@ module.exports = {
       get(groupId, (err, { secret, root }) => {
         if (err) return cb(err)
 
-        const feedIdUris = feedIds.map((feedId) =>
-          ref.isFeedId(feedId) ? fromFeedSigil(feedId) : feedId
-        )
+        const feedIdUris = feedIds
+          .map((feedId) =>
+            isFeedSSBURI(feedId) ? feedId : fromFeedSigil(feedId)
+          )
+          .filter(Boolean)
 
         const recps = [groupId, ...feedIdUris]
 
