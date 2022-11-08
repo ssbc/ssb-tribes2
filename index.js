@@ -22,7 +22,6 @@ const {
   },
 } = require('private-group-spec')
 const { SecretKey } = require('ssb-private-group-keys')
-//const Crut = require('ssb-crut')
 const buildGroupId = require('./lib/build-group-id')
 const AddGroupTangle = require('./lib/add-group-tangle')
 const prunePublish = require('./lib/prune-publish')
@@ -31,6 +30,7 @@ module.exports = {
   name: 'tribes2',
   manifest: {
     create: 'async',
+    publish: 'async',
     list: 'source',
     addMembers: 'async',
     start: 'async',
@@ -38,14 +38,30 @@ module.exports = {
   init(ssb, config) {
     const addGroupTangle = AddGroupTangle(ssb)
 
+    function findOrCreateGroupFeed(input, cb) {
+      const groupKey = Buffer.isBuffer(input) ? new SecretKey(input) : input
+
+      const recps = [
+        { key: groupKey.toBuffer(), scheme: keySchemes.private_group },
+      ]
+
+      const groupFeedDetails = {
+        purpose: groupKey.toString(),
+        feedFormat: 'classic',
+        recps,
+        encryptionFormat: 'box2',
+      }
+
+      ssb.metafeeds.findOrCreate(groupFeedDetails, (err, groupFeed) => {
+        if (err) return cb(err)
+        ssb.box2.addKeypair(groupFeed.keys)
+        cb(null, groupFeed)
+      })
+    }
+
     function create(opts = {}, cb) {
       if (cb === undefined) return promisify(create)(opts)
 
-      // TODO: use ssb-meta-feeds findOrCreate to create a group feed
-      // TODO: publish the message on the group feed
-      // TODO: consider what happens if the app crashes between any step
-
-      const groupKey = new SecretKey()
       const content = {
         type: 'group/init',
         tangles: {
@@ -54,36 +70,48 @@ module.exports = {
       }
       if (!initSpec(content)) return cb(new Error(initSpec.errorsString))
 
-      const recipientKeys = [
-        { key: groupKey.toBuffer(), scheme: keySchemes.private_group },
-      ]
+      const groupKey = new SecretKey()
 
-      ssb.db.create(
-        {
-          content,
-          recps: recipientKeys,
-          encryptionFormat: 'box2',
-        },
-        (err, groupInitMsg) => {
-          if (err) return cb(err)
+      findOrCreateGroupFeed(groupKey, (err, groupFeed) => {
+        if (err) return cb(err)
 
-          const data = {
-            id: buildGroupId({ groupInitMsg, groupKey: groupKey.toBuffer() }),
-            secret: groupKey.toBuffer(),
-            root: groupInitMsg.key,
-            subfeed: '',
-          }
+        const recps = [
+          { key: groupKey.toBuffer(), scheme: keySchemes.private_group },
+        ]
 
-          ssb.box2.addGroupInfo(data.id, { key: data.secret, root: data.root })
-
-          // adding myself for recovery reasons
-          addMembers(data.id, [ssb.id], {}, (err) => {
+        ssb.db.create(
+          {
+            keys: groupFeed.keys,
+            content,
+            recps,
+            encryptionFormat: 'box2',
+          },
+          (err, groupInitMsg) => {
             if (err) return cb(err)
 
-            return cb(null, data)
-          })
-        }
-      )
+            const data = {
+              id: buildGroupId({ groupInitMsg, groupKey: groupKey.toBuffer() }),
+              secret: groupKey.toBuffer(),
+              root: groupInitMsg.key,
+              subfeed: groupFeed.keys,
+            }
+
+            ssb.box2.addGroupInfo(data.id, {
+              key: data.secret,
+              root: data.root,
+            })
+
+            // Adding myself for recovery reasons
+            addMembers(data.id, [ssb.id], {}, (err) => {
+              if (err) return cb(err)
+
+              return cb(null, data)
+            })
+          }
+        )
+      })
+
+      // TODO: consider what happens if the app crashes between any step
     }
 
     function get(id, cb) {
@@ -151,14 +179,20 @@ module.exports = {
         if (!addMemberSpec(content))
           return cb(new Error(addMemberSpec.errorsString))
 
-        publish(content, (err, msg) => {
-          if (err) return cb(err)
+        const invitations = {
+          purpose: 'invitations',
+          feedFormat: 'classic',
+        }
 
-          //TODO: this is an optimization, use the db query instead for now
-          //keystore.group.registerAuthors(groupId, feedIds, (err) => {
-          //  if (err) return cb(err)
-          return cb(null, msg)
-          //})
+        ssb.metafeeds.findOrCreate(invitations, (err, invitationsFeed) => {
+          if (err) return cb(err)
+          ssb.box2.addKeypair(invitationsFeed.keys)
+
+          addGroupTangle(content, (err, content) => {
+            if (err) return cb(err)
+
+            prunePublish(ssb, content, invitationsFeed.keys, cb)
+          })
         })
       })
     }
@@ -171,11 +205,20 @@ module.exports = {
       const recps = content.recps
       if (!recps || !Array.isArray(recps) || recps.length < 1)
         return cb(new Error('Missing recps'))
+      const groupId = recps[0]
 
       addGroupTangle(content, (err, content) => {
         if (err) return cb(err)
 
-        prunePublish(ssb, content, cb)
+        get(groupId, (err, { secret }) => {
+          if (err) return cb(err)
+
+          findOrCreateGroupFeed(secret, (err, groupFeed) => {
+            if (err) return cb(err)
+
+            prunePublish(ssb, content, groupFeed.keys, cb)
+          })
+        })
       })
     }
 
@@ -201,34 +244,29 @@ module.exports = {
           live({ old: true }),
           toPullStream()
         ),
+        pull.filter((msg) =>
+          lodashGet(msg, 'value.content.recps', []).includes(ssb.id)
+        ),
         pull.asyncMap((msg, cb) => {
-          // TODO: call ssb-db2 reindexEncrypted
+          const groupId = lodashGet(msg, 'value.content.recps[0]')
 
-          if (lodashGet(msg, 'value.content.recps', []).includes(ssb.id)) {
-            const groupRoot = lodashGet(msg, 'value.content.root')
-            const groupKey = lodashGet(msg, 'value.content.groupKey')
-            const groupId = lodashGet(msg, 'value.content.recps[0]')
+          ssb.box2.getGroupKeyInfo(groupId, (err, info) => {
+            if (err) {
+              console.error('Error when finding group invite for me:', err)
+              return
+            }
 
-            ssb.box2.getGroupKeyInfo(groupId, (err, info) => {
-              if (err) {
-                return console.error(
-                  'Error when finding group invite for me:',
-                  err
-                )
-              }
-
-              if (!info) {
-                // we're not already in the group
-                ssb.box2.addGroupInfo(groupId, {
-                  key: groupKey,
-                  root: groupRoot,
-                })
-              }
-              return cb()
-            })
-          } else {
-            return cb()
-          }
+            if (!info) {
+              // We're not yet in the group
+              ssb.box2.addGroupInfo(groupId, {
+                key: lodashGet(msg, 'value.content.groupKey'),
+                root: lodashGet(msg, 'value.content.root'),
+              })
+              ssb.db.reindexEncrypted(cb)
+            } else {
+              cb()
+            }
+          })
         }),
         pull.drain(() => {})
       )

@@ -27,7 +27,7 @@ test('prune a message with way too big `previous`', (t) => {
     })
 
     //console.time('prune')
-    prunePublish(ssb, content(4000, 16), (err, encMsg16) => {
+    prunePublish(ssb, content(4000, 16), group.subfeed, (err, encMsg16) => {
       //console.timeEnd('prune')
       ssb.db.get(encMsg16.key, (err, msg16) => {
         const msg16len = msg16.content.tangles.group.previous.length

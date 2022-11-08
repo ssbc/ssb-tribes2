@@ -10,8 +10,20 @@ const Testbot = require('./helpers/testbot')
 const replicate = require('./helpers/replicate')
 
 test('get added to a group', async (t) => {
-  const alice = Testbot({ keys: ssbKeys.generate(null, 'alice') })
-  const bob = Testbot({ keys: ssbKeys.generate(null, 'bob') })
+  const alice = Testbot({
+    keys: ssbKeys.generate(null, 'alice'),
+    mfSeed: Buffer.from(
+      '000000000000000000000000000000000000000000000000000000000000a1ce',
+      'hex'
+    ),
+  })
+  const bob = Testbot({
+    keys: ssbKeys.generate(null, 'bob'),
+    mfSeed: Buffer.from(
+      '0000000000000000000000000000000000000000000000000000000000000b0b',
+      'hex'
+    ),
+  })
 
   alice.tribes2.start()
   bob.tribes2.start()
@@ -21,7 +33,7 @@ test('get added to a group', async (t) => {
     subfeed,
     secret,
     root,
-  } = await alice.tribes2.create().catch(t.error)
+  } = await alice.tribes2.create().catch(t.fail)
 
   await alice.tribes2.addMembers(groupId, [bob.id])
 
@@ -34,19 +46,32 @@ test('get added to a group', async (t) => {
         t.equal(bobList.length, 1, 'bob is a member of a group now')
         const group = bobList[0]
         t.equal(group.id, groupId)
-        //TODO: subfeed
         t.true(group.secret.equals(secret))
         t.equal(group.root, root)
-
-        alice.close(true, () => bob.close(true, () => res()))
+        res()
       })
     )
   )
+
+  await p(alice.close)(true)
+  await p(bob.close)(true)
 })
 
 test('add member', async (t) => {
-  const kaitiaki = Testbot()
-  const newPerson = Testbot()
+  const kaitiaki = Testbot({
+    keys: ssbKeys.generate(null, 'kaitiaki'),
+    mfSeed: Buffer.from(
+      '000000000000000000000000000000000000000000000000000000000000a11a',
+      'hex'
+    ),
+  })
+  const newPerson = Testbot({
+    keys: ssbKeys.generate(null, 'bob'),
+    mfSeed: Buffer.from(
+      '0000000000000000000000000000000000000000000000000000000000000b0b',
+      'hex'
+    ),
+  })
   kaitiaki.tribes2.start()
   newPerson.tribes2.start()
 
@@ -54,7 +79,7 @@ test('add member', async (t) => {
     const group = await kaitiaki.tribes2.create()
     t.true(group.id, 'creates group')
 
-    const authorIds = [newPerson.id, ssbKeys.generate().id]
+    const authorIds = [newPerson.id, ssbKeys.generate(null, 'carol').id]
 
     const encryptedInvite = await kaitiaki.tribes2.addMembers(
       group.id,

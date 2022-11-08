@@ -5,7 +5,13 @@
 const test = require('tape')
 const pull = require('pull-stream')
 const paraMap = require('pull-paramap')
-const { author, descending, toPullStream, where } = require('ssb-db2/operators')
+const {
+  author,
+  or,
+  descending,
+  toPullStream,
+  where,
+} = require('ssb-db2/operators')
 
 const GetGroupTangle = require('../lib/get-group-tangle')
 const Testbot = require('./helpers/testbot')
@@ -15,48 +21,46 @@ test('get-group-tangle unit test', (t) => {
   const name = `get-group-tangle-${Date.now()}`
   const server = Testbot({ name })
 
-  server.tribes2.create(null, (err, group) => {
-    t.error(err, 'no error')
-
-    const getGroupTangle = GetGroupTangle(server)
-
-    getGroupTangle(group.id, (err, groupTangle) => {
+  server.metafeeds.findOrCreate(
+    { purpose: 'invitations' },
+    (err, invitations) => {
       t.error(err, 'no error')
 
-      const { root, previous } = groupTangle
-      const rootKey = group.root
+      server.tribes2.create(null, (err, group) => {
+        t.error(err, 'no error')
 
-      pull(
-        server.db.query(where(author(server.id)), descending(), toPullStream()),
-        pull.map((m) => m.key),
-        pull.take(1),
-        pull.collect((err, keys) => {
+        const getGroupTangle = GetGroupTangle(server)
+
+        getGroupTangle(group.id, async (err, groupTangle) => {
           t.error(err, 'no error')
 
-          t.deepEqual(
-            { root, previous },
-            { root: rootKey, previous: [keys[0]] },
-            'group add-member of admin should be the tip'
-          )
+          const { root, previous } = groupTangle
+          const rootKey = group.root
 
-          //  publishing to the group:
-          const content = {
-            type: 'memo',
-            root: rootKey,
-            message: 'unneccessary',
-            recps: [group.id],
-          }
-
-          server.tribes2.publish(content, (err, msg) => {
-            t.error(err, 'no error')
-
-            getGroupTangle(group.id, (err, { root, previous }) => {
+          pull(
+            server.db.query(
+              where(or(author(group.subfeed.id), author(invitations.id))),
+              descending(),
+              toPullStream()
+            ),
+            pull.map((m) => m.key),
+            pull.take(1),
+            pull.collect((err, keys) => {
               t.error(err, 'no error')
+
               t.deepEqual(
                 { root, previous },
-                { root: rootKey, previous: [msg.key] },
-                'adding message to root'
+                { root: rootKey, previous: [keys[0]] },
+                'group add-member of admin should be the tip'
               )
+
+              //  publishing to the group:
+              const content = {
+                type: 'memo',
+                root: rootKey,
+                message: 'unneccessary',
+                recps: [group.id],
+              }
 
               server.tribes2.publish(content, (err, msg) => {
                 t.error(err, 'no error')
@@ -66,17 +70,30 @@ test('get-group-tangle unit test', (t) => {
                   t.deepEqual(
                     { root, previous },
                     { root: rootKey, previous: [msg.key] },
-                    'adding message to tip'
+                    'adding message to root'
                   )
-                  server.close(true, t.end)
+
+                  server.tribes2.publish(content, (err, msg) => {
+                    t.error(err, 'no error')
+
+                    getGroupTangle(group.id, (err, { root, previous }) => {
+                      t.error(err, 'no error')
+                      t.deepEqual(
+                        { root, previous },
+                        { root: rootKey, previous: [msg.key] },
+                        'adding message to tip'
+                      )
+                      server.close(true, t.end)
+                    })
+                  })
                 })
               })
             })
-          })
+          )
         })
-      )
-    })
-  })
+      })
+    }
+  )
 })
 
 const n = 100
