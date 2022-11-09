@@ -116,8 +116,10 @@ module.exports = {
 
       if (!feedIds || feedIds.length === 0)
         return cb(new Error('No feedIds provided to addMembers'))
-      if (feedIds.length > 16)
-        return cb(new Error(`${feedIds.length} is more than 16 recipients`))
+      if (feedIds.length > 15)
+        return cb(
+          new Error(`Tried to add ${feedIds.length} members, the max is 15`)
+        )
 
       // TODO
       // copy a lot from ssb-tribes but don't use the keystore from there
