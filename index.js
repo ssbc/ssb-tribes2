@@ -54,7 +54,7 @@ module.exports = {
 
       ssb.metafeeds.findOrCreate(groupFeedDetails, (err, groupFeed) => {
         if (err) return cb(err)
-        ssb.box2.addKeypair(groupFeed.keys)
+        // ssb.box2.addKeypair(groupFeed.keys)
         cb(null, groupFeed)
       })
     }
