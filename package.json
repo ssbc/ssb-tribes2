@@ -25,6 +25,7 @@
   "files": [
     "package.json.license",
     "LICENSES/*",
+    "lib/*.js",
     "*.js"
   ],
   "dependencies": {
