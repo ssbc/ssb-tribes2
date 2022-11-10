@@ -261,7 +261,7 @@ module.exports = {
                 key: lodashGet(msg, 'value.content.groupKey'),
                 root: lodashGet(msg, 'value.content.root'),
               })
-              ssb.db.reindexEncrypted(cb)
+              cb()
             } else {
               cb()
             }
