@@ -3,12 +3,15 @@
 // SPDX-License-Identifier: CC0-1.0
 
 const test = require('tape')
-const ref = require('ssb-ref')
+const {
+  isClassicMessageSSBURI,
+  isIdentityGroupSSBURI,
+  fromFeedSigil,
+} = require('ssb-uri2')
 const { promisify: p } = require('util')
 const pull = require('pull-stream')
 const { author, descending, toPullStream, where } = require('ssb-db2/operators')
 const Testbot = require('./helpers/testbot')
-const replicate = require('./helpers/replicate')
 
 test('create', async (t) => {
   const ssb = Testbot()
@@ -17,9 +20,9 @@ test('create', async (t) => {
     .create()
     .catch(t.error)
 
-  t.true(ref.isCloakedMsgId(id), 'has id')
+  t.true(isIdentityGroupSSBURI(id), 'has group id')
   t.true(Buffer.isBuffer(secret), 'has secret')
-  t.true(ref.isMsg(root), 'has root')
+  t.true(isClassicMessageSSBURI(root), 'has root')
   //TODO
   //t.true(subfeed && ref.isFeed(subfeed.id), 'has subfeed')
 
@@ -51,7 +54,7 @@ test('create more', (t) => {
     t.error(err, 'no error')
 
     const { id, secret, root } = data
-    t.true(ref.isCloakedMsg(id), 'returns group identifier - groupId')
+    t.true(isIdentityGroupSSBURI(id), 'returns group identifier - groupId')
     t.true(
       Buffer.isBuffer(secret) && secret.length === 32,
       'returns group symmetric key - groupKey'
@@ -85,7 +88,7 @@ test('create more', (t) => {
               version: 'v1',
               groupKey: secret.toString('base64'),
               root: root,
-              recps: [id, server.id], // me being added to the group
+              recps: [id, fromFeedSigil(server.id)], // me being added to the group
               tangles: {
                 members: {
                   root: root,
