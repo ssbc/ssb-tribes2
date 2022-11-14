@@ -8,6 +8,7 @@ const {
   isIdentityGroupSSBURI,
   fromFeedSigil,
 } = require('ssb-uri2')
+const Ref = require('ssb-ref')
 const { promisify: p } = require('util')
 const { where, type, toPromise } = require('ssb-db2/operators')
 const Testbot = require('./helpers/testbot')
@@ -22,7 +23,7 @@ test('create', async (t) => {
   t.true(isIdentityGroupSSBURI(id), 'has group id')
   t.true(Buffer.isBuffer(secret), 'has secret')
   t.true(isClassicMessageSSBURI(root), 'has root')
-  t.true(ref.isFeed(subfeed.id), 'has subfeed')
+  t.true(Ref.isFeed(subfeed.id), 'has subfeed')
 
   await p(ssb.close)(true)
 })
