@@ -22,6 +22,7 @@ const {
   },
 } = require('private-group-spec')
 const { SecretKey } = require('ssb-private-group-keys')
+const { fromMessageSigil, fromFeedSigil, isFeedSSBURI } = require('ssb-uri2')
 const buildGroupId = require('./lib/build-group-id')
 const AddGroupTangle = require('./lib/add-group-tangle')
 const prunePublish = require('./lib/prune-publish')
@@ -91,7 +92,7 @@ module.exports = {
             const data = {
               id: buildGroupId({ groupInitMsg, groupKey: groupKey.toBuffer() }),
               secret: groupKey.toBuffer(),
-              root: groupInitMsg.key,
+              root: fromMessageSigil(groupInitMsg.key),
               subfeed: groupFeed.keys,
             }
 
@@ -143,15 +144,23 @@ module.exports = {
 
       if (!feedIds || feedIds.length === 0)
         return cb(new Error('No feedIds provided to addMembers'))
-      if (feedIds.length > 16)
-        return cb(new Error(`${feedIds.length} is more than 16 recipients`))
+      if (feedIds.length > 15)
+        return cb(
+          new Error(`Tried to add ${feedIds.length} members, the max is 15`)
+        )
 
       // TODO
       // copy a lot from ssb-tribes but don't use the keystore from there
       get(groupId, (err, { secret, root }) => {
         if (err) return cb(err)
 
-        const recps = [groupId, ...feedIds]
+        const feedIdUris = feedIds
+          .map((feedId) =>
+            isFeedSSBURI(feedId) ? feedId : fromFeedSigil(feedId)
+          )
+          .filter(Boolean)
+
+        const recps = [groupId, ...feedIdUris]
 
         const content = {
           type: 'group/add-member',
@@ -243,9 +252,10 @@ module.exports = {
           live({ old: true }),
           toPullStream()
         ),
-        pull.filter((msg) =>
-          lodashGet(msg, 'value.content.recps', []).includes(ssb.id)
-        ),
+        pull.filter((msg) => {
+          const myId = fromFeedSigil(ssb.id)
+          return lodashGet(msg, 'value.content.recps', []).includes(myId)
+        }),
         pull.asyncMap((msg, cb) => {
           const groupId = lodashGet(msg, 'value.content.recps[0]')
 

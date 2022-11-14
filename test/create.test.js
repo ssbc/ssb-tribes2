@@ -3,7 +3,11 @@
 // SPDX-License-Identifier: CC0-1.0
 
 const test = require('tape')
-const ref = require('ssb-ref')
+const {
+  isClassicMessageSSBURI,
+  isIdentityGroupSSBURI,
+  fromFeedSigil,
+} = require('ssb-uri2')
 const { promisify: p } = require('util')
 const { where, type, toPromise } = require('ssb-db2/operators')
 const Testbot = require('./helpers/testbot')
@@ -15,9 +19,9 @@ test('create', async (t) => {
     .create()
     .catch(t.error)
 
-  t.true(ref.isCloakedMsgId(id), 'has id')
+  t.true(isIdentityGroupSSBURI(id), 'has group id')
   t.true(Buffer.isBuffer(secret), 'has secret')
-  t.true(ref.isMsg(root), 'has root')
+  t.true(isClassicMessageSSBURI(root), 'has root')
   t.true(ref.isFeed(subfeed.id), 'has subfeed')
 
   await p(ssb.close)(true)
@@ -29,7 +33,7 @@ test('create more', async (t) => {
 
   const group = await ssb.tribes2.create().catch(t.fail)
 
-  t.true(ref.isCloakedMsg(group.id), 'returns group identifier - groupId')
+  t.true(isIdentityGroupSSBURI(group.id), 'returns group identifier - groupId')
   t.true(
     Buffer.isBuffer(group.secret) && group.secret.length === 32,
     'returns group symmetric key - groupKey'
@@ -60,7 +64,7 @@ test('create more', async (t) => {
       version: 'v1',
       groupKey: group.secret.toString('base64'),
       root: group.root,
-      recps: [group.id, ssb.id], // me being added to the group
+      recps: [group.id, fromFeedSigil(ssb.id)], // me being added to the group
       tangles: {
         members: {
           root: group.root,

@@ -6,6 +6,7 @@ const test = require('tape')
 const pull = require('pull-stream')
 const { promisify: p } = require('util')
 const ssbKeys = require('ssb-keys')
+const { fromFeedSigil } = require('ssb-uri2')
 const Testbot = require('./helpers/testbot')
 const replicate = require('./helpers/replicate')
 
@@ -79,7 +80,10 @@ test('add member', async (t) => {
     const group = await kaitiaki.tribes2.create()
     t.true(group.id, 'creates group')
 
-    const authorIds = [newPerson.id, ssbKeys.generate(null, 'carol').id]
+    const authorIds = [
+      fromFeedSigil(newPerson.id),
+      fromFeedSigil(ssbKeys.generate(null, 'carol').id),
+    ]
 
     const encryptedInvite = await kaitiaki.tribes2.addMembers(
       group.id,

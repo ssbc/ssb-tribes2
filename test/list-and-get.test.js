@@ -5,7 +5,7 @@
 const test = require('tape')
 const { promisify: p } = require('util')
 const pull = require('pull-stream')
-const ref = require('ssb-ref')
+const { isClassicMessageSSBURI, isIdentityGroupSSBURI } = require('ssb-uri2')
 const Testbot = require('./helpers/testbot')
 
 test('tribes.list + tribes.get', (t) => {
@@ -94,11 +94,11 @@ test('get', async (t) => {
 
   //- `subfeed` *Keys* - the keys of the subfeed you should publish group data to
   t.equal(id, group.id)
-  t.true(ref.isCloakedMsg(group.id))
+  t.true(isIdentityGroupSSBURI(group.id))
   //TODO: subfeed
   t.true(Buffer.isBuffer(group.secret))
   t.equal(secret, group.secret)
-  t.true(ref.isMsg(group.root), 'has root')
+  t.true(isClassicMessageSSBURI(group.root), 'has root')
   t.equal(root, group.root)
 
   await p(ssb.close)(true)
@@ -110,7 +110,7 @@ test('list', (t) => {
   ssb.tribes2
     .create()
     .then(({ id: id1, secret: secret1 }) => {
-      t.true(ref.isCloakedMsgId(id1), 'has id')
+      t.true(isIdentityGroupSSBURI(id1), 'has id')
 
       pull(
         ssb.tribes2.list(),
