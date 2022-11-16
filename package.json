@@ -43,7 +43,7 @@
     "pull-paramap": "^1.2.2",
     "pull-stream": "^3.6.14",
     "ssb-bfe": "^3.7.0",
-    "ssb-box2": "ssbc/ssb-box2#dm-keys-triangle",
+    "ssb-box2": "^4.0.0",
     "ssb-crut": "^4.6.1",
     "ssb-meta-feeds": "~0.38.0",
     "ssb-private-group-keys": "^1.1.1",
