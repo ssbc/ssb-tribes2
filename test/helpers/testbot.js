@@ -26,10 +26,10 @@ module.exports = function createSbot(opts = {}) {
     .use(require('ssb-db2/core'))
     .use(require('ssb-classic'))
     .use(require('ssb-bendy-butt'))
+    .use(require('ssb-meta-feeds'))
     .use(require('ssb-box2'))
     .use(require('ssb-db2/compat/feedstate'))
     .use(require('ssb-db2/compat/ebt'))
-    .use(require('ssb-meta-feeds'))
     .use(require('ssb-ebt'))
     .use(require('../..'))
 

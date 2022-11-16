@@ -42,6 +42,8 @@ test('create more', async (t) => {
 
   const msgVal = await p(ssb.db.get)(group.root).catch(t.fail)
 
+  const root = await p(ssb.metafeeds.findOrCreate)()
+
   t.deepEqual(
     msgVal.content,
     {
@@ -65,7 +67,7 @@ test('create more', async (t) => {
       version: 'v1',
       groupKey: group.secret.toString('base64'),
       root: group.root,
-      recps: [group.id, fromFeedSigil(ssb.id)], // me being added to the group
+      recps: [group.id, root.id], // me being added to the group
       tangles: {
         members: {
           root: group.root,

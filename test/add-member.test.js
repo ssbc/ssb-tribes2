@@ -6,7 +6,6 @@ const test = require('tape')
 const pull = require('pull-stream')
 const { promisify: p } = require('util')
 const ssbKeys = require('ssb-keys')
-const { fromFeedSigil } = require('ssb-uri2')
 const Testbot = require('./helpers/testbot')
 const replicate = require('./helpers/replicate')
 
@@ -28,6 +27,13 @@ test('get added to a group', async (t) => {
 
   alice.tribes2.start()
   bob.tribes2.start()
+  t.pass('tribes2 started for both alice and bob')
+
+  const aliceRoot = await p(alice.metafeeds.findOrCreate)()
+  const bobRoot = await p(bob.metafeeds.findOrCreate)()
+
+  await replicate(alice, bob)
+  t.pass('alice and bob replicate their trees')
 
   const {
     id: groupId,
@@ -35,10 +41,13 @@ test('get added to a group', async (t) => {
     secret,
     root,
   } = await alice.tribes2.create().catch(t.fail)
+  t.pass('alice created a group')
 
-  await alice.tribes2.addMembers(groupId, [bob.id])
+  await alice.tribes2.addMembers(groupId, [bobRoot.id])
+  t.pass('alice added bob to the group')
 
   await replicate(alice, bob, { waitUntilMembersOf: groupId })
+  t.pass('alice and bob replicate')
 
   await new Promise((res) =>
     pull(
@@ -75,19 +84,22 @@ test('add member', async (t) => {
   })
   kaitiaki.tribes2.start()
   newPerson.tribes2.start()
+  t.pass('they start up tribes2')
+
+  const newPersonRoot = await p(newPerson.metafeeds.findOrCreate)()
+
+  await replicate(kaitiaki, newPerson)
+  t.pass('they replicate their trees')
 
   try {
     const group = await kaitiaki.tribes2.create()
     t.true(group.id, 'creates group')
 
-    const authorIds = [
-      fromFeedSigil(newPerson.id),
-      fromFeedSigil(ssbKeys.generate(null, 'carol').id),
-    ]
+    const newMembers = [newPersonRoot.id]
 
     const encryptedInvite = await kaitiaki.tribes2.addMembers(
       group.id,
-      authorIds,
+      newMembers,
       {
         text: 'welcome friends',
       }
@@ -102,7 +114,7 @@ test('add member', async (t) => {
       root: group.root,
 
       text: 'welcome friends',
-      recps: [group.id, ...authorIds],
+      recps: [group.id, ...newMembers],
 
       tangles: {
         group: {
@@ -148,7 +160,6 @@ test('add member', async (t) => {
     t.fail(err)
   }
 
-  await new Promise((resolve) => {
-    kaitiaki.close(true, () => newPerson.close(true, resolve))
-  })
+  await p(kaitiaki.close)(true)
+  await p(newPerson.close)(true)
 })
