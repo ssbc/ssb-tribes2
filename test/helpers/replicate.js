@@ -60,17 +60,38 @@ module.exports = async function replicate(person1, person2, opts = {}) {
   await retryUntil(async () => {
     const tree2AtPerson1 = await p(getSimpleTree)(person1, person2Root.id)
     const tree1AtPerson2 = await p(getSimpleTree)(person2, person1Root.id)
+    // console.log('PERSON 1:')
+    // await p(person1.metafeeds.printTree)(person1Root.id, { id: true })
+    // await p(person1.metafeeds.printTree)(person2Root.id, { id: true })
+    // console.log('PERSON 2:')
+    // await p(person2.metafeeds.printTree)(person1Root.id, { id: true })
+    // await p(person2.metafeeds.printTree)(person2Root.id, { id: true })
+    // console.log('---------------------------')
     return (
       deepEqual(tree1AtPerson1, tree1AtPerson2) &&
       deepEqual(tree2AtPerson1, tree2AtPerson2)
     )
   })
 
+  const feedIds1 = treeToIds(tree1AtPerson1)
+  const feedIds2 = treeToIds(tree2AtPerson2)
+  // console.log(feedIds1);
+  // console.log(feedIds2);
+
   // Wait until both have replicated all feeds in full
   await retryUntil(async () => {
     const newClock1 = await p(person1.getVectorClock)()
     const newClock2 = await p(person2.getVectorClock)()
-    return deepEqual(newClock1, newClock2)
+    // console.log('PERSON 1:', newClock1)
+    // console.log('PERSON 2:', newClock2)
+    // console.log('---------------------')
+    for (const feedId of feedIds1) {
+      if (newClock2[feedId] !== newClock1[feedId]) return false
+    }
+    for (const feedId of feedIds2) {
+      if (newClock1[feedId] !== newClock2[feedId]) return false
+    }
+    return true
   })
 
   // Wait until they have computed that they are members of the group
@@ -104,6 +125,19 @@ async function retryUntil(fn) {
     else await p(setTimeout)(100)
   }
   if (!result) throw new Error('retryUntil timed out')
+}
+
+function treeToIds(tree) {
+  const ids = []
+  ids.push(tree.id)
+  function traverse(node) {
+    for (const child of node.children) {
+      ids.push(child.id)
+      traverse(child)
+    }
+  }
+  traverse(tree)
+  return ids
 }
 
 // TODO: this is a copy of the same function in ssb-meta-feeds, we should
