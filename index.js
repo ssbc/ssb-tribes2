@@ -165,8 +165,6 @@ module.exports = {
           new Error(`Tried to add ${feedIds.length} members, the max is 15`)
         )
 
-      // TODO
-      // copy a lot from ssb-tribes but don't use the keystore from there
       get(groupId, (err, { secret, root }) => {
         if (err) return cb(err)
 
@@ -200,13 +198,12 @@ module.exports = {
 
         if (opts.text) content.text = opts.text
 
-        // FIXME: this should accept bendybutt-v1 feed IDs
+        // TODO: this should accept bendybutt-v1 feed IDs
         // if (!addMemberSpec(content))
         //   return cb(new Error(addMemberSpec.errorsString))
 
         findOrCreateInvitationsFeed((err, invitationsFeed) => {
           if (err) return cb(err)
-          // ssb.box2.addKeypair(invitationsFeed.keys)
 
           addGroupTangle(content, (err, content) => {
             if (err) return cb(err)
