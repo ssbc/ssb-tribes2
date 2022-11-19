@@ -163,3 +163,87 @@ test('add member', async (t) => {
   await p(kaitiaki.close)(true)
   await p(newPerson.close)(true)
 })
+
+test('addMembers empty', async (t) => {
+  const alice = Testbot({
+    keys: ssbKeys.generate(null, 'alice'),
+    mfSeed: Buffer.from(
+      '000000000000000000000000000000000000000000000000000000000000a1ce',
+      'hex'
+    ),
+  })
+
+  alice.tribes2.start()
+  t.pass('tribes2 started')
+
+  const group = await alice.tribes2.create().catch(t.fail)
+  t.pass('alice created a group')
+
+  try {
+    await alice.tribes2.addMembers(group.id, [])
+    t.fail('addMembers should throw')
+  } catch (err) {
+    t.equal(err.message, 'No feedIds provided to addMembers')
+  }
+
+  await p(alice.close)(true)
+})
+
+test('addMembers wrong feed format for feed IDs', async (t) => {
+  const alice = Testbot({
+    keys: ssbKeys.generate(null, 'alice'),
+    mfSeed: Buffer.from(
+      '000000000000000000000000000000000000000000000000000000000000a1ce',
+      'hex'
+    ),
+  })
+
+  alice.tribes2.start()
+  t.pass('tribes2 started')
+
+  const group = await alice.tribes2.create().catch(t.fail)
+  t.pass('alice created a group')
+
+  const classicId = ssbKeys.generate(null, 'carol').id
+
+  try {
+    await alice.tribes2.addMembers(group.id, [classicId])
+    t.fail('addMembers should throw')
+  } catch (err) {
+    t.equal(err.message, 'addMembers only supports bendybutt-v1 feed IDs')
+  }
+
+  await p(alice.close)(true)
+})
+
+test('addMembers too many members', async (t) => {
+  const alice = Testbot({
+    keys: ssbKeys.generate(null, 'alice'),
+    mfSeed: Buffer.from(
+      '000000000000000000000000000000000000000000000000000000000000a1ce',
+      'hex'
+    ),
+  })
+
+  alice.tribes2.start()
+  t.pass('tribes2 started')
+
+  const group = await alice.tribes2.create().catch(t.fail)
+  t.pass('alice created a group')
+
+  const TOTAL = 20
+
+  const feedIds = Array.from(
+    { length: TOTAL },
+    (_, i) => ssbKeys.generate(null, `bob${i}`).id
+  )
+
+  try {
+    await alice.tribes2.addMembers(group.id, feedIds)
+    t.fail('addMembers should throw')
+  } catch (err) {
+    t.equal(err.message, 'Tried to add ' + TOTAL + ' members, the max is 15')
+  }
+
+  await p(alice.close)(true)
+})

@@ -22,7 +22,12 @@ const {
   },
 } = require('private-group-spec')
 const { SecretKey } = require('ssb-private-group-keys')
-const { fromMessageSigil, fromFeedSigil, isFeedSSBURI } = require('ssb-uri2')
+const {
+  fromMessageSigil,
+  fromFeedSigil,
+  isFeedSSBURI,
+  isBendyButtV1FeedSSBURI,
+} = require('ssb-uri2')
 const buildGroupId = require('./lib/build-group-id')
 const AddGroupTangle = require('./lib/add-group-tangle')
 const prunePublish = require('./lib/prune-publish')
@@ -164,17 +169,11 @@ module.exports = {
         return cb(
           new Error(`Tried to add ${feedIds.length} members, the max is 15`)
         )
+      if (feedIds.some((id) => !isBendyButtV1FeedSSBURI(id)))
+        return cb(new Error('addMembers only supports bendybutt-v1 feed IDs'))
 
       get(groupId, (err, { secret, root }) => {
         if (err) return cb(err)
-
-        const feedIdUris = feedIds
-          .map((feedId) =>
-            isFeedSSBURI(feedId) ? feedId : fromFeedSigil(feedId)
-          )
-          .filter(Boolean)
-
-        const recps = [groupId, ...feedIdUris]
 
         const content = {
           type: 'group/add-member',
@@ -186,14 +185,14 @@ module.exports = {
               root,
               previous: [root], // TODO calculate previous for members tangle
             },
-            // likely incorrect group tangle and this will be overwritten by publish()
-            // we just add it here to make the spec pass
+            // likely incorrect group tangle and this will be overwritten by
+            // publish(), we just add it here to make the spec pass
             group: {
               root,
               previous: [root],
             },
           },
-          recps,
+          recps: [groupId, ...feedIds],
         }
 
         if (opts.text) content.text = opts.text
