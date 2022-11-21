@@ -23,8 +23,8 @@ test('get-group-tangle unit test', (t) => {
   const server = Testbot({ name })
 
   server.metafeeds.findOrCreate(
-    { purpose: 'invitations' },
-    (err, invitations) => {
+    { purpose: 'group/additions' },
+    (err, additions) => {
       t.error(err, 'no error')
 
       server.tribes2.create(null, (err, group) => {
@@ -40,7 +40,7 @@ test('get-group-tangle unit test', (t) => {
 
           pull(
             server.db.query(
-              where(or(author(group.subfeed.id), author(invitations.id))),
+              where(or(author(group.subfeed.id), author(additions.id))),
               descending(),
               toPullStream()
             ),
