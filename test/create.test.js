@@ -8,9 +8,9 @@ const {
   isIdentityGroupSSBURI,
   fromFeedSigil,
 } = require('ssb-uri2')
+const Ref = require('ssb-ref')
 const { promisify: p } = require('util')
-const pull = require('pull-stream')
-const { author, descending, toPullStream, where } = require('ssb-db2/operators')
+const { where, type, toPromise } = require('ssb-db2/operators')
 const Testbot = require('./helpers/testbot')
 
 test('create', async (t) => {
@@ -23,112 +23,84 @@ test('create', async (t) => {
   t.true(isIdentityGroupSSBURI(id), 'has group id')
   t.true(Buffer.isBuffer(secret), 'has secret')
   t.true(isClassicMessageSSBURI(root), 'has root')
-  //TODO
-  //t.true(subfeed && ref.isFeed(subfeed.id), 'has subfeed')
-
-  const content = {
-    type: 'post',
-    text: 'hello this is test',
-    recps: [id],
-  }
-
-  const msg = await p(ssb.db.create)({
-    content,
-    //keys: subfeed.keys,
-    encryptionFormat: 'box2',
-  }).catch(t.error)
-
-  t.equal(typeof msg.value.content, 'string', 'content is a string')
-  //t.equal(msg.value.author, subfeed.id)
-  // create, add self, post
-  t.equal(msg.value.sequence, 3, 'this is the 3rd msg')
+  t.true(Ref.isFeed(subfeed.id), 'has subfeed')
 
   await p(ssb.close)(true)
 })
 
-test('create more', (t) => {
-  const server = Testbot()
+// this is more of an integration test over the api
+test('create more', async (t) => {
+  const ssb = Testbot()
 
-  // this is more of an integration test over the api
-  server.tribes2.create({}, (err, data) => {
-    t.error(err, 'no error')
+  const group = await ssb.tribes2.create().catch(t.fail)
 
-    const { id, secret, root } = data
-    t.true(isIdentityGroupSSBURI(id), 'returns group identifier - groupId')
-    t.true(
-      Buffer.isBuffer(secret) && secret.length === 32,
-      'returns group symmetric key - groupKey'
-    )
+  t.true(isIdentityGroupSSBURI(group.id), 'returns group identifier - groupId')
+  t.true(
+    Buffer.isBuffer(group.secret) && group.secret.length === 32,
+    'returns group symmetric key - groupKey'
+  )
 
-    server.db.get(root, (err, value) => {
-      t.error(err, 'no error')
+  const msgVal = await p(ssb.db.get)(group.root).catch(t.fail)
 
-      t.deepEqual(
-        value.content,
-        {
-          type: 'group/init',
-          tangles: {
-            group: { root: null, previous: null },
-          },
+  const root = await p(ssb.metafeeds.findOrCreate)()
+
+  t.deepEqual(
+    msgVal.content,
+    {
+      type: 'group/init',
+      tangles: {
+        group: { root: null, previous: null },
+      },
+    },
+    'can decrypt group/init'
+  )
+
+  // check I published a group/add-member to myself
+  const msgs = await ssb.db.query(where(type('group/add-member')), toPromise())
+
+  t.equals(msgs.length, 1, 'published only one group/add-member message')
+
+  t.deepEqual(
+    msgs[0].value.content, // contents of the latest message
+    {
+      type: 'group/add-member',
+      version: 'v1',
+      groupKey: group.secret.toString('base64'),
+      root: group.root,
+      recps: [group.id, root.id], // me being added to the group
+      tangles: {
+        members: {
+          root: group.root,
+          previous: [group.root],
         },
-        'can decrypt group/init'
-      )
+        group: {
+          root: group.root,
+          previous: [group.root],
+        },
+      },
+    },
+    'The admin was was also added to the group'
+  )
 
-      // check I published a group/add-member to myself
-      pull(
-        server.db.query(where(author(server.id)), descending(), toPullStream()),
-        pull.map((msg) => msg.value.content),
-        pull.collect((err, msgContents) => {
-          t.error(err, 'no error')
-
-          t.deepEqual(
-            msgContents[0], // contents of the latest message
-            {
-              type: 'group/add-member',
-              version: 'v1',
-              groupKey: secret.toString('base64'),
-              root: root,
-              recps: [id, fromFeedSigil(server.id)], // me being added to the group
-              tangles: {
-                members: {
-                  root: root,
-                  previous: [root],
-                },
-                group: {
-                  root: root,
-                  previous: [root],
-                },
-              },
-            },
-            'The admin was was also added to the group'
-          )
-          server.close(true, t.end)
-        })
-      )
-    })
-  })
+  await p(ssb.close)(true)
 })
 
-test('root message is encrypted', (t) => {
+test('root message is encrypted', async (t) => {
   const alice = Testbot()
 
   alice.tribes2.start()
-  alice.tribes2.create({}, async (err, group) => {
-    if (err) t.error(err, 'no error')
+  const group = await alice.tribes2.create().catch(t.fail)
 
-    alice.db.getMsg(group.root, (err, kvt) => {
-      if (err) t.error(err)
+  const kvt = await p(alice.db.getMsg)(group.root).catch(t.fail)
 
-      t.true(kvt.meta && kvt.meta.private, 'encrypted init msg')
+  t.true(kvt.meta && kvt.meta.private, 'encrypted init msg')
 
-      alice.close(true, t.end)
-    })
-  })
+  await p(alice.close)(true)
 })
 
 //TODO
 test.skip('tribes.create (opts.addPOBox)', (t) => {
-  const server = Server()
+  const server = Testbot()
 
   // this is more of an integration test over the api
   server.tribes.create({ addPOBox: true }, (err, data) => {

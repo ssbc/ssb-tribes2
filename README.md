@@ -6,7 +6,14 @@ SPDX-License-Identifier: CC0-1.0
 
 # ssb-tribes2
 
-TODO TODO
+A [secret-stack] plugin that makes it easy to create, manage, and publish
+messages in SSB "Private Groups", following
+[this spec](https://github.com/ssbc/ssb-meta-feeds-group-spec). This module is
+made to work with [ssb-db2] as the database and with [metafeeds], where your
+content in the group is placed on a dedicated feed in your metafeed tree.
+Replication of those group-specific feeds at scale is handled by [ssb-replication-scheduler].
+
+Successor of [ssb-tribes].
 
 ## Installation
 
@@ -17,41 +24,72 @@ npm install ssb-tribes2
 ## Usage in ssb-db2
 
 - Requires **Node.js 12** or higher
-- Requires `secret-stack@^6.2.0`
-- Requires `ssb-db2@>=5.0.0`
-- Requires `ssb-box2@>2.0.2`
-- TODO
+- Requires `secret-stack>=6.2.0`
+- Requires `ssb-db2>=6.2.2`
+- Requires `ssb-box2>=4.0.0`
+- Requires `ssb-meta-feeds>=0.38.0`
 
 ```diff
  const ssb = SecretStack({ caps: require('ssb-caps') })
    .use(require('ssb-master'))
 +  .use(require('ssb-db2'))
    .use(require('ssb-conn'))
-+  .use(require('ssb-box2'))
++  .use(require('ssb-meta-feeds'))
 +  .use(require('ssb-tribes2'))
    .use(require('ssb-blobs'))
    .call(null, config)
 ```
 
-Then
+Then **to create a group** and **publish to it**,
 
 ```js
+// This is needed to continously detect new groups we were added to
 ssb.tribes2.start()
 
+// Create a new group, no further details required, thus the empty object
 ssb.tribes2.create({}, (err, group) => {
-  ssb.db.create(
+
+  // Publish a new message to the group, notice the recps
+  ssb.tribes2.publish(
     {
-      keys: group.mySubfeedKeys,
-      content: {
-        type: 'post',
-        text: 'welcome to the group',
-        recps: [group.id],
-      },
-      encryptionFormat: 'box2',
+      type: 'post',
+      text: 'welcome to the group',
+      recps: [group.id],
     },
     cb
   )
 })
+```
+
+If you want to **add more members** to the group:
+
+```js
+// You need to know your friends' (bob and carol) *root* metafeed IDs
+ssb.tribes2.addMembers(group.id, [bobRootId, carolRootId], (err, msg) => {
+  // msg is the message that was published on your invitations feed
+})
+```
+
+Then you **list the current members** of the group:
+
+```js
+pull(
+  ssb.tribes2.listMembers(group.id),
+  pull.collect((err, members) => {
+    // `members` is an Array of root metafeed IDs
+  })
+)
+```
+
+Finally, you can **list all the groups you are a member of**:
+
+```js
+pull(
+  ssb.tribes2.list(),
+  pull.collect((err, groups) => {
+    // `groups` is an Array of group objects like { id, secret }
+  })
+)
 ```
 
 ## API
@@ -111,3 +149,9 @@ changes and new encryption / indexing as required.
 ## License
 
 LGPL-3.0-only
+
+[secret-stack]: https://github.com/ssbc/secret-stack
+[ssb-db2]: https://github.com/ssbc/ssb-db2
+[ssb-tribes]: https://github.com/ssbc/ssb-tribes
+[metafeeds]: https://github.com/ssbc/ssb-meta-feeds
+[ssb-replication-scheduler]: https://github.com/ssbc/ssb-replication-scheduler

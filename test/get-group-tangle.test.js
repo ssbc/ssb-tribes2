@@ -5,7 +5,14 @@
 const test = require('tape')
 const pull = require('pull-stream')
 const paraMap = require('pull-paramap')
-const { author, descending, toPullStream, where } = require('ssb-db2/operators')
+const { promisify: p } = require('util')
+const {
+  author,
+  or,
+  descending,
+  toPullStream,
+  where,
+} = require('ssb-db2/operators')
 
 const GetGroupTangle = require('../lib/get-group-tangle')
 const Testbot = require('./helpers/testbot')
@@ -15,48 +22,46 @@ test('get-group-tangle unit test', (t) => {
   const name = `get-group-tangle-${Date.now()}`
   const server = Testbot({ name })
 
-  server.tribes2.create(null, (err, group) => {
-    t.error(err, 'no error')
-
-    const getGroupTangle = GetGroupTangle(server)
-
-    getGroupTangle(group.id, (err, groupTangle) => {
+  server.metafeeds.findOrCreate(
+    { purpose: 'invitations' },
+    (err, invitations) => {
       t.error(err, 'no error')
 
-      const { root, previous } = groupTangle
-      const rootKey = group.root
+      server.tribes2.create(null, (err, group) => {
+        t.error(err, 'no error')
 
-      pull(
-        server.db.query(where(author(server.id)), descending(), toPullStream()),
-        pull.map((m) => m.key),
-        pull.take(1),
-        pull.collect((err, keys) => {
+        const getGroupTangle = GetGroupTangle(server)
+
+        getGroupTangle(group.id, async (err, groupTangle) => {
           t.error(err, 'no error')
 
-          t.deepEqual(
-            { root, previous },
-            { root: rootKey, previous: [keys[0]] },
-            'group add-member of admin should be the tip'
-          )
+          const { root, previous } = groupTangle
+          const rootKey = group.root
 
-          //  publishing to the group:
-          const content = {
-            type: 'memo',
-            root: rootKey,
-            message: 'unneccessary',
-            recps: [group.id],
-          }
-
-          server.tribes2.publish(content, (err, msg) => {
-            t.error(err, 'no error')
-
-            getGroupTangle(group.id, (err, { root, previous }) => {
+          pull(
+            server.db.query(
+              where(or(author(group.subfeed.id), author(invitations.id))),
+              descending(),
+              toPullStream()
+            ),
+            pull.map((m) => m.key),
+            pull.take(1),
+            pull.collect((err, keys) => {
               t.error(err, 'no error')
+
               t.deepEqual(
                 { root, previous },
-                { root: rootKey, previous: [msg.key] },
-                'adding message to root'
+                { root: rootKey, previous: [keys[0]] },
+                'group add-member of admin should be the tip'
               )
+
+              //  publishing to the group:
+              const content = {
+                type: 'memo',
+                root: rootKey,
+                message: 'unneccessary',
+                recps: [group.id],
+              }
 
               server.tribes2.publish(content, (err, msg) => {
                 t.error(err, 'no error')
@@ -66,17 +71,30 @@ test('get-group-tangle unit test', (t) => {
                   t.deepEqual(
                     { root, previous },
                     { root: rootKey, previous: [msg.key] },
-                    'adding message to tip'
+                    'adding message to root'
                   )
-                  server.close(true, t.end)
+
+                  server.tribes2.publish(content, (err, msg) => {
+                    t.error(err, 'no error')
+
+                    getGroupTangle(group.id, (err, { root, previous }) => {
+                      t.error(err, 'no error')
+                      t.deepEqual(
+                        { root, previous },
+                        { root: rootKey, previous: [msg.key] },
+                        'adding message to tip'
+                      )
+                      server.close(true, t.end)
+                    })
+                  })
                 })
               })
             })
-          })
+          )
         })
-      )
-    })
-  })
+      })
+    }
+  )
 })
 
 const n = 100
@@ -151,72 +169,64 @@ test('get-group-tangle', (t) => {
   })
 })
 
-test('get-group-tangle with branch', (t) => {
+test('get-group-tangle with branch', async (t) => {
   const alice = Testbot()
   alice.tribes2.start()
+
   const bob = Testbot()
   bob.tribes2.start()
+  t.pass('started tribes2')
+
+  const bobRoot = await p(bob.metafeeds.findOrCreate)()
+
+  await replicate(alice, bob)
+  t.pass('alice and bob replicated their trees')
 
   // Alice creates a group
-  alice.tribes2.create(null, (err, group) => {
-    t.error(err, 'no error')
+  const group = await p(alice.tribes2.create)(null).catch(t.fail)
+  t.pass('alice created a group')
 
-    const getAliceGroupTangle = GetGroupTangle(alice)
-    const getBobGroupTangle = GetGroupTangle(bob)
+  const getAliceGroupTangle = GetGroupTangle(alice)
+  const getBobGroupTangle = GetGroupTangle(bob)
 
-    alice.tribes2.addMembers(
-      group.id,
-      [bob.id],
-      { text: 'ahoy' },
-      async (err, invite) => {
-        t.error(err, 'alice adds bob to group') // Not actually an error?
+  const invite = await p(alice.tribes2.addMembers)(group.id, [bobRoot.id], {
+    text: 'ahoy',
+  }).catch(t.fail)
+  t.pass('alice invited bob')
 
-        // Alice shares the group creation and invite with Bob.
-        await replicate(alice, bob, { waitUntilMembersOf: group.id })
+  // Alice shares the group creation and invite with Bob.
+  await replicate(alice, bob, { waitUntilMembersOf: group.id })
+  t.pass('alice and bob replicated their group feeds')
 
-        // Both servers should see the same group tangle
-        getAliceGroupTangle(group.id, (err, aliceTangle) => {
-          t.error(err, 'no error')
-          getBobGroupTangle(group.id, (err, bobTangle) => {
-            t.error(err, 'no error')
-            t.deepEqual(aliceTangle, bobTangle, 'tangles should match')
-            t.deepEqual(aliceTangle.root, group.root, 'the root is the groupId')
-            t.deepEqual(
-              aliceTangle.previous,
-              [invite.key],
-              'previous is the invite key'
-            )
+  // Both servers should see the same group tangle
+  const aliceTangle = await p(getAliceGroupTangle)(group.id).catch(t.fail)
+  const bobTangle = await p(getBobGroupTangle)(group.id).catch(t.fail)
+  t.deepEqual(aliceTangle, bobTangle, 'tangles should match')
+  t.deepEqual(aliceTangle.root, group.root, 'the root is the groupId')
+  t.deepEqual(aliceTangle.previous, [invite.key], 'previous is the invite key')
 
-            // Alice and Bob will both publish a message
-            const content = () => ({
-              type: 'memo',
-              message: 'branch',
-              recps: [group.id],
-            })
-
-            alice.tribes2.publish(content(), (err) => {
-              t.error(err, 'alice publishes a new message')
-
-              bob.tribes2.publish(content(), async (err) => {
-                t.error(err, 'no error')
-                // Then Bob shares his message with Alice
-                await replicate(bob, alice)
-                // There should now be a branch in Alice's group tangle
-                getAliceGroupTangle(group.id, (err, aliceTangle) => {
-                  t.error(err, 'no error')
-
-                  t.deepEqual(
-                    aliceTangle.previous.length,
-                    2,
-                    'There should be two tips'
-                  )
-                  alice.close(true, () => bob.close(true, t.end))
-                })
-              })
-            })
-          })
-        })
-      }
-    )
+  // Alice and Bob will both publish a message
+  const content = () => ({
+    type: 'memo',
+    message: 'branch',
+    recps: [group.id],
   })
+
+  await p(alice.tribes2.publish)(content()).catch(t.fail)
+  t.pass('alice published a message')
+
+  await p(bob.tribes2.publish)(content()).catch(t.fail)
+  t.pass('bob published a message')
+
+  // Then Bob shares his message with Alice
+  await replicate(bob, alice)
+  t.pass('bob and alice replicated their trees')
+
+  // There should now be a branch in Alice's group tangle
+  const aliceTangle2 = await p(getAliceGroupTangle)(group.id).catch(t.fail)
+
+  t.deepEqual(aliceTangle2.previous.length, 2, 'There should be two tips')
+
+  await p(alice.close)(true)
+  await p(bob.close)(true)
 })
