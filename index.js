@@ -22,15 +22,10 @@ const {
   },
 } = require('private-group-spec')
 const { SecretKey } = require('ssb-private-group-keys')
-const {
-  fromMessageSigil,
-  fromFeedSigil,
-  isFeedSSBURI,
-  isBendyButtV1FeedSSBURI,
-} = require('ssb-uri2')
+const { fromMessageSigil, isBendyButtV1FeedSSBURI } = require('ssb-uri2')
 const buildGroupId = require('./lib/build-group-id')
 const AddGroupTangle = require('./lib/add-group-tangle')
-const prunePublish = require('./lib/prune-publish')
+const publishAndPrune = require('./lib/prune-publish')
 
 module.exports = {
   name: 'tribes2',
@@ -58,6 +53,7 @@ module.exports = {
 
       const recps = [
         { key: groupKey.toBuffer(), scheme: keySchemes.private_group },
+        // TODO: add self to recps, for crash-resistance
       ]
 
       const groupFeedDetails = {
@@ -207,7 +203,7 @@ module.exports = {
           addGroupTangle(content, (err, content) => {
             if (err) return cb(err)
 
-            prunePublish(ssb, content, invitationsFeed.keys, cb)
+            publishAndPrune(ssb, content, invitationsFeed.keys, cb)
           })
         })
       })
@@ -232,7 +228,7 @@ module.exports = {
           findOrCreateGroupFeed(secret, (err, groupFeed) => {
             if (err) return cb(err)
 
-            prunePublish(ssb, content, groupFeed.keys, cb)
+            publishAndPrune(ssb, content, groupFeed.keys, cb)
           })
         })
       })
