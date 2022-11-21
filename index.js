@@ -39,9 +39,9 @@ module.exports = {
   init(ssb, config) {
     const addGroupTangle = AddGroupTangle(ssb)
 
-    function findOrCreateInvitationsFeed(cb) {
+    function findOrCreateAdditionsFeed(cb) {
       const details = {
-        purpose: 'invitations',
+        purpose: 'group/additions',
         feedFormat: 'classic',
       }
 
@@ -197,13 +197,13 @@ module.exports = {
         // if (!addMemberSpec(content))
         //   return cb(new Error(addMemberSpec.errorsString))
 
-        findOrCreateInvitationsFeed((err, invitationsFeed) => {
+        findOrCreateAdditionsFeed((err, additionsFeed) => {
           if (err) return cb(err)
 
           addGroupTangle(content, (err, content) => {
             if (err) return cb(err)
 
-            publishAndPrune(ssb, content, invitationsFeed.keys, cb)
+            publishAndPrune(ssb, content, additionsFeed.keys, cb)
           })
         })
       })
@@ -252,9 +252,8 @@ module.exports = {
     function start() {
       ssb.metafeeds.findOrCreate((err, myRoot) => {
         if (err) throw new Error('Could not find or create my root feed')
-        findOrCreateInvitationsFeed((err) => {
-          if (err)
-            console.warn('Error finding or creating invitations feed', err)
+        findOrCreateAdditionsFeed((err) => {
+          if (err) console.warn('Error finding or creating additions feed', err)
         })
 
         pull(
