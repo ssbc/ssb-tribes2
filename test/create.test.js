@@ -64,8 +64,8 @@ test('create more', async (t) => {
     msgs[0].value.content, // contents of the latest message
     {
       type: 'group/add-member',
-      version: 'v1',
-      groupKey: group.secret.toString('base64'),
+      version: 'v2',
+      secret: group.secret.toString('base64'),
       root: group.root,
       recps: [group.id, root.id], // me being added to the group
       tangles: {

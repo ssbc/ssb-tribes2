@@ -109,8 +109,8 @@ test('add member', async (t) => {
 
     const expected = {
       type: 'group/add-member',
-      version: 'v1',
-      groupKey: group.secret.toString('base64'),
+      version: 'v2',
+      secret: group.secret.toString('base64'),
       root: group.root,
 
       text: 'welcome friends',

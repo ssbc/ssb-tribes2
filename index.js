@@ -49,15 +49,15 @@ module.exports = {
     }
 
     function findOrCreateGroupFeed(input, cb) {
-      const groupKey = Buffer.isBuffer(input) ? new SecretKey(input) : input
+      const secret = Buffer.isBuffer(input) ? new SecretKey(input) : input
 
       const recps = [
-        { key: groupKey.toBuffer(), scheme: keySchemes.private_group },
+        { key: secret.toBuffer(), scheme: keySchemes.private_group },
         // TODO: add self to recps, for crash-resistance
       ]
 
       const groupFeedDetails = {
-        purpose: groupKey.toString(),
+        purpose: secret.toString(),
         feedFormat: 'classic',
         recps,
         encryptionFormat: 'box2',
@@ -80,16 +80,16 @@ module.exports = {
       }
       if (!initSpec(content)) return cb(new Error(initSpec.errorsString))
 
-      const groupKey = new SecretKey()
+      const secret = new SecretKey()
 
       ssb.metafeeds.findOrCreate(function gotRoot(err, root) {
         if (err) return cb(err)
 
-        findOrCreateGroupFeed(groupKey, function gotGroupFeed(err, groupFeed) {
+        findOrCreateGroupFeed(secret, function gotGroupFeed(err, groupFeed) {
           if (err) return cb(err)
 
           const recps = [
-            { key: groupKey.toBuffer(), scheme: keySchemes.private_group },
+            { key: secret.toBuffer(), scheme: keySchemes.private_group },
           ]
 
           ssb.db.create(
@@ -105,9 +105,9 @@ module.exports = {
               const data = {
                 id: buildGroupId({
                   groupInitMsg,
-                  groupKey: groupKey.toBuffer(),
+                  groupKey: secret.toBuffer(),
                 }),
-                secret: groupKey.toBuffer(),
+                secret: secret.toBuffer(),
                 root: fromMessageSigil(groupInitMsg.key),
                 subfeed: groupFeed.keys,
               }
@@ -173,8 +173,8 @@ module.exports = {
 
         const content = {
           type: 'group/add-member',
-          version: 'v1',
-          groupKey: secret.toString('base64'),
+          version: 'v2',
+          secret: secret.toString('base64'),
           root,
           tangles: {
             members: {
@@ -277,7 +277,7 @@ module.exports = {
               if (!info) {
                 // We're not yet in the group
                 ssb.box2.addGroupInfo(groupId, {
-                  key: lodashGet(msg, 'value.content.groupKey'),
+                  key: lodashGet(msg, 'value.content.secret'),
                   root: lodashGet(msg, 'value.content.root'),
                 })
                 ssb.db.reindexEncrypted(cb)
