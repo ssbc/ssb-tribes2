@@ -4,6 +4,7 @@
 
 const { promisify: p } = require('util')
 const pull = require('pull-stream')
+const pullCat = require('pull-cat')
 const deepEqual = require('fast-deep-equal')
 
 /**
@@ -28,25 +29,36 @@ module.exports = async function replicate(person1, person2, opts = {}) {
   person2.ebt.request(person2Root.id, true)
 
   // person1 replicate all the trees in their forest, from top to bottom
-  let drain1
-  pull(
-    person1.metafeeds.branchStream({ old: true, live: true }),
-    pull.flatten(),
-    pull.map((feedDetails) => feedDetails.id),
-    pull.unique(),
-    (drain1 = pull.drain((feedId) => {
-      person1.ebt.request(feedId, true)
-    }))
-  )
+  //let drain1
+  //pull(
+  //  pullCat([
+  //    person1.metafeeds.branchStream({ old: true, live: true }),
+  //    person2.metafeeds.branchStream({ old: true, live: true }),
+  //  ]),
+  //  pull.flatten(),
+  //  pull.map((feedDetails) => feedDetails.id),
+  //  pull.unique(),
+  //  (drain1 = pull.drain((feedId) => {
+  //    person1.ebt.request(feedId, true)
+  //  }))
+  //)
 
   // person2 replicate all the trees in their forest, from top to bottom
   let drain2
   pull(
-    person2.metafeeds.branchStream({ old: true, live: true }),
+    pullCat([
+      person1.metafeeds.branchStream({ old: true, live: true }),
+      person2.metafeeds.branchStream({ old: true, live: true }),
+    ]),
     pull.flatten(),
-    pull.map((feedDetails) => feedDetails.id),
+    pull.map((feedDetails) => {
+      console.log('replicating purpose', feedDetails.purpose)
+      return feedDetails.id
+    }),
     pull.unique(),
     (drain2 = pull.drain((feedId) => {
+      //console.log('p2 replicating', feedId)
+      person1.ebt.request(feedId, true)
       person2.ebt.request(feedId, true)
     }))
   )
@@ -54,24 +66,29 @@ module.exports = async function replicate(person1, person2, opts = {}) {
   // Establish a network connection
   const conn = await p(person1.connect)(person2.getAddress())
 
+  await p(setTimeout)(10000)
+  return
+
   // Wait until both have the same forest
   const tree1AtPerson1 = await p(getSimpleTree)(person1, person1Root.id)
   const tree2AtPerson2 = await p(getSimpleTree)(person2, person2Root.id)
   await retryUntil(async () => {
     const tree2AtPerson1 = await p(getSimpleTree)(person1, person2Root.id)
     const tree1AtPerson2 = await p(getSimpleTree)(person2, person1Root.id)
-    // console.log('PERSON 1:')
-    // await p(person1.metafeeds.printTree)(person1Root.id, { id: true })
-    // await p(person1.metafeeds.printTree)(person2Root.id, { id: true })
-    // console.log('PERSON 2:')
-    // await p(person2.metafeeds.printTree)(person1Root.id, { id: true })
-    // await p(person2.metafeeds.printTree)(person2Root.id, { id: true })
-    // console.log('---------------------------')
-    return (
-      deepEqual(tree1AtPerson1, tree1AtPerson2) &&
-      deepEqual(tree2AtPerson1, tree2AtPerson2)
-    )
+    console.log('PERSON 1:')
+    await p(person1.metafeeds.printTree)(person1Root.id, { id: true })
+    await p(person1.metafeeds.printTree)(person2Root.id, { id: true })
+    console.log('PERSON 2:')
+    await p(person2.metafeeds.printTree)(person1Root.id, { id: true })
+    await p(person2.metafeeds.printTree)(person2Root.id, { id: true })
+    console.log('---------------------------')
+
+    const tree1 = deepEqual(tree1AtPerson1, tree1AtPerson2)
+    const tree2 = deepEqual(tree2AtPerson1, tree2AtPerson2)
+    //console.log({ tree1, tree2 })
+    return tree1 && tree2
   })
+  console.log('got past tree equality')
 
   const feedIds1 = treeToIds(tree1AtPerson1)
   const feedIds2 = treeToIds(tree2AtPerson2)
@@ -111,7 +128,7 @@ module.exports = async function replicate(person1, person2, opts = {}) {
     )
   }
 
-  drain1.abort()
+  //drain1.abort()
   drain2.abort()
 
   await p(conn.close)(true)
