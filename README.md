@@ -48,7 +48,6 @@ ssb.tribes2.start()
 
 // Create a new group, no further details required, thus the empty object
 ssb.tribes2.create({}, (err, group) => {
-
   // Publish a new message to the group, notice the recps
   ssb.tribes2.publish(
     {

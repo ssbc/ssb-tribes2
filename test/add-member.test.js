@@ -247,3 +247,75 @@ test('addMembers too many members', async (t) => {
 
   await p(alice.close)(true)
 })
+
+// for replicating a group you're not in yet
+async function replicateGroup(p1, p2, group) {
+  const groupSecret = group.secret.toString('base64')
+  console.log('groupSecret', groupSecret)
+
+  p1.ebt.request(groupSecret, true)
+  p2.ebt.request(groupSecret, true)
+
+  const conn = await p(p1.connect)(p2.getAddress())
+  await p(setTimeout)(10000)
+  await p(conn.close)(true)
+}
+
+test.only('can read older messages from before being added to group', async (t) => {
+  const alice = Testbot({
+    //keys: ssbKeys.generate(null, 'kaitiaki'),
+    //mfSeed: Buffer.from(
+    //  '000000000000000000000000000000000000000000000000000000000000a11a',
+    //  'hex'
+    //),
+  })
+  const bob = Testbot({
+    //keys: ssbKeys.generate(null, 'bob'),
+    //mfSeed: Buffer.from(
+    //  '0000000000000000000000000000000000000000000000000000000000000b0b',
+    //  'hex'
+    //),
+  })
+  alice.tribes2.start()
+  bob.tribes2.start()
+  t.pass('they start up tribes2')
+
+  const group = await alice.tribes2.create()
+  t.true(group.id, 'alice creates group')
+
+  const earlyMsg = await alice.tribes2.publish({
+    type: 'post',
+    text: 'i just created a group with only me in it',
+    recps: [group.id],
+  })
+  t.pass('alice publishes encrypted msg')
+
+  //await replicateGroup(alice, bob, group)
+  await replicate(alice, bob).catch(t.fail)
+  t.pass('they replicate the so far encrypted msg')
+
+  const encryptedMsg = await p(bob.db.getMsg)(earlyMsg.key).catch(t.fail)
+
+  t.true(
+    encryptedMsg.meta && encryptedMsg.meta.private,
+    "bob can't decrypt group message before he's in it"
+  )
+
+  const bobRoot = await p(bob.metafeeds.findOrCreate)()
+
+  await alice.tribes2.addMembers(group.id, [bobRoot.id])
+  t.pass('alice adds bob to the group')
+
+  await replicate(alice, bob, { waitUntilMembersOf: group.id })
+  t.pass("they replicate bob's invite")
+
+  const unencryptedMsg = await p(bob.db.getMsg)(earlyMsg.key)
+
+  t.false(
+    unencryptedMsg.meta && unencryptedMsg.meta.private,
+    "bob can decrypt the old group message once he's in the group"
+  )
+
+  await p(alice.close)(true)
+  await p(bob.close)(true)
+})
