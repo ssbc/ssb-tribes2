@@ -51,21 +51,30 @@ module.exports = {
     function findOrCreateGroupFeed(input, cb) {
       const secret = Buffer.isBuffer(input) ? new SecretKey(input) : input
 
-      const recps = [
-        { key: secret.toBuffer(), scheme: keySchemes.private_group },
-        // TODO: add self to recps, for crash-resistance
-      ]
+      //TODO: look for empty group feeds (i.e. we've crashed here before)
+      // that aren't the additions feed!
+      // is there maybe a safer way to do this? :thinking:
 
-      const groupFeedDetails = {
-        purpose: secret.toString(),
-        feedFormat: 'classic',
-        recps,
-        encryptionFormat: 'box2',
-      }
-
-      ssb.metafeeds.findOrCreate(groupFeedDetails, (err, groupFeed) => {
+      ssb.metafeeds.findOrCreate(function gotRoot(err, root) {
         if (err) return cb(err)
-        cb(null, groupFeed)
+
+        const recps = [
+          { key: secret.toBuffer(), scheme: keySchemes.private_group },
+          // encrypt to myself to be able to get back to the group without finding the group/add-member for me (maybe i crashed before adding myself)
+          root,
+        ]
+
+        const groupFeedDetails = {
+          purpose: secret.toString(),
+          feedFormat: 'classic',
+          recps,
+          encryptionFormat: 'box2',
+        }
+
+        ssb.metafeeds.findOrCreate(groupFeedDetails, (err, groupFeed) => {
+          if (err) return cb(err)
+          cb(null, groupFeed)
+        })
       })
     }
 
