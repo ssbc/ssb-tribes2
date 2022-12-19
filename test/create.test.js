@@ -3,14 +3,13 @@
 // SPDX-License-Identifier: CC0-1.0
 
 const test = require('tape')
-const {
-  isClassicMessageSSBURI,
-  isIdentityGroupSSBURI,
-  fromFeedSigil,
-} = require('ssb-uri2')
+const { isClassicMessageSSBURI, isIdentityGroupSSBURI } = require('ssb-uri2')
+const { SecretKey } = require('ssb-private-group-keys')
+const { keySchemes } = require('private-group-spec')
 const Ref = require('ssb-ref')
 const { promisify: p } = require('util')
 const { where, type, toPromise } = require('ssb-db2/operators')
+const pull = require('pull-stream')
 const Testbot = require('./helpers/testbot')
 
 test('create', async (t) => {
@@ -110,5 +109,87 @@ test.skip('tribes.create (opts.addPOBox)', (t) => {
 
     server.close()
     t.end()
+  })
+})
+
+test('create reuses an unused group feed (because of an earlier crash or something)', (t) => {
+  const server = Testbot()
+
+  function countGroupFeeds(cb) {
+    pull(
+      server.metafeeds.branchStream({ live: false }),
+      pull.map((branch) => {
+        console.log('branch', branch)
+        return branch
+      }),
+      pull.filter((branch) => branch.length === 4),
+      pull.map((branch) => branch[3]),
+      pull.filter((feed) => feed.recps),
+      pull.collect((err, feeds) => {
+        if (err) return cb(err)
+        console.log('feeds', feeds)
+        server.metafeeds.printTree(server.id, { id: true }, () => {})
+        return cb(null, feeds.length)
+      })
+    )
+  }
+
+  server.metafeeds.findOrCreate((err, root) => {
+    if (err) t.fail(err)
+
+    t.pass('got root')
+    console.log('root', root)
+
+    countGroupFeeds((err, num) => {
+      if (err) t.fail(err)
+
+      t.equal(num, 0, 'there are no group feeds yet')
+
+      server.tribes2.create(null, (err) => {
+        if (err) t.fail(err)
+
+        countGroupFeeds((err, num) => {
+          if (err) t.fail(err)
+          t.equal(num, 1, 'there is 1 group feed after we created a group')
+
+          const secret = new SecretKey()
+          server.metafeeds.findOrCreate(
+            {
+              purpose: secret.toString(),
+              feedFormat: 'classic',
+              recps: [
+                { key: secret.toBuffer(), scheme: keySchemes.private_group },
+                root.id,
+              ],
+              encryptionFormat: 'box2',
+            },
+            (err) => {
+              if (err) t.fail(err)
+
+              countGroupFeeds((err, num) => {
+                if (err) t.fail(err)
+                t.equal(
+                  num,
+                  2,
+                  'there is 1 used group feed and 1 dummy one, the empty one we created now'
+                )
+
+                server.tribes2.create(null, (err) => {
+                  if (err) t.fail(err)
+                  countGroupFeeds((err, num) => {
+                    if (err) t.fail(err)
+                    t.equal(
+                      num,
+                      2,
+                      'there are still only 2 group feeds after creating another group. the empty one got used by create()'
+                    )
+                  })
+                })
+              })
+            }
+          )
+        })
+      })
+    })
   })
 })
