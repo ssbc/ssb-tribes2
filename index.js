@@ -52,7 +52,7 @@ module.exports = {
     function findEmptyGroupFeed(rootId, cb) {
       console.log('in empty function')
       pull(
-        ssb.metafeeds.branchStream({ root: rootId, live: false }),
+        ssb.metafeeds.branchStream({ root: rootId, old: true, live: false }),
         pull.filter((branch) => branch.length === 4),
         pull.map((branch) => branch[3]),
         pull.filter((feed) => feed.recps),
@@ -147,13 +147,15 @@ module.exports = {
         findOrCreateGroupFeed(null, function gotGroupFeed(err, groupFeed) {
           if (err) return cb(err)
 
-          console.log('create group feed', groupFeed)
+          //console.log('create group feed', groupFeed)
 
           const secret = new SecretKey(Buffer.from(groupFeed.purpose, 'base64'))
 
           const recps = [
             { key: secret.toBuffer(), scheme: keySchemes.private_group },
           ]
+
+          console.log('about to post root msg')
 
           ssb.db.create(
             {
@@ -164,6 +166,8 @@ module.exports = {
             },
             (err, groupInitMsg) => {
               if (err) return cb(err)
+
+              console.log('just published root msg')
 
               const data = {
                 id: buildGroupId({
