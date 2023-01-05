@@ -13,6 +13,7 @@ const {
   isDecrypted,
   type,
   live,
+  author,
   toPullStream,
 } = require('ssb-db2/operators')
 const {
@@ -48,12 +49,51 @@ module.exports = {
       ssb.metafeeds.findOrCreate(details, cb)
     }
 
-    function findOrCreateGroupFeed(input, cb) {
-      const secret = Buffer.isBuffer(input) ? new SecretKey(input) : input
+    function findEmptyGroupFeed(rootId, cb) {
+      console.log('in empty function')
+      let found = false
+      pull(
+        ssb.metafeeds.branchStream({ root: rootId, old: true, live: false }),
+        pull.filter((branch) => branch.length === 4),
+        pull.map((branch) => branch[3]),
+        // only grab feeds that look like group feeds
+        pull.filter((feed) => feed.recps && feed.purpose.length === 44),
+        paraMap((feed, cb) => {
+          return pull(
+            ssb.db.query(where(author(feed.id)), toPullStream()),
+            pull.take(1),
+            pull.collect((err, res) => {
+              if (res.length === 0) {
+                // we're only interested in empty feeds
+                return cb(null, feed)
+              } else {
+                return cb()
+              }
+            })
+          )
+        }),
+        pull.filter(),
+        pull.unique('id'),
+        pull.take(1),
+        pull.drain(
+          (empty) => {
+            found = true
+            return cb(null, empty)
+          },
+          (err) => {
+            if (err) return cb(err)
+            if (found) return
+            return cb(null, undefined)
+          }
+        )
+      )
+    }
 
+    function findOrCreateFromSecret(secret, rootId, cb) {
       const recps = [
         { key: secret.toBuffer(), scheme: keySchemes.private_group },
-        // TODO: add self to recps, for crash-resistance
+        // encrypt to myself to be able to get back to the group without finding the group/add-member for me (maybe i crashed before adding myself)
+        rootId,
       ]
 
       const groupFeedDetails = {
@@ -69,6 +109,36 @@ module.exports = {
       })
     }
 
+    function findOrCreateGroupFeed(input = null, cb) {
+      const inputSecret = Buffer.isBuffer(input) ? new SecretKey(input) : input
+
+      ssb.metafeeds.findOrCreate(function gotRoot(err, root) {
+        if (err) return cb(err)
+
+        // 1. publish. we know the secret and should just findOrCreate the feed
+        // 2. create. we don't have a secret yet but can make or find one
+        //   2.1. try to find an empty feed in case we've crashed before. use the secret from that one
+        //   2.2. if we can't find an empty feed, make a new secret and findOrCreate
+
+        if (inputSecret) {
+          return findOrCreateFromSecret(inputSecret, root.id, cb)
+        } else {
+          findEmptyGroupFeed(root.id, (err, emptyFeed) => {
+            if (err) return cb(err)
+
+            console.log('emptyFeed', emptyFeed)
+
+            if (emptyFeed) {
+              return cb(null, emptyFeed)
+            } else {
+              const newSecret = new SecretKey()
+              findOrCreateFromSecret(newSecret, root.id, cb)
+            }
+          })
+        }
+      })
+    }
+
     function create(opts = {}, cb) {
       if (cb === undefined) return promisify(create)(opts)
 
@@ -80,17 +150,21 @@ module.exports = {
       }
       if (!initSpec(content)) return cb(new Error(initSpec.errorsString))
 
-      const secret = new SecretKey()
-
       ssb.metafeeds.findOrCreate(function gotRoot(err, root) {
         if (err) return cb(err)
 
-        findOrCreateGroupFeed(secret, function gotGroupFeed(err, groupFeed) {
+        findOrCreateGroupFeed(null, function gotGroupFeed(err, groupFeed) {
           if (err) return cb(err)
+
+          //console.log('create group feed', groupFeed)
+
+          const secret = new SecretKey(Buffer.from(groupFeed.purpose, 'base64'))
 
           const recps = [
             { key: secret.toBuffer(), scheme: keySchemes.private_group },
           ]
+
+          console.log('about to post root msg')
 
           ssb.db.create(
             {
@@ -102,6 +176,8 @@ module.exports = {
             (err, groupInitMsg) => {
               if (err) return cb(err)
 
+              console.log('just published root msg')
+
               const data = {
                 id: buildGroupId({
                   groupInitMsg,
@@ -111,6 +187,8 @@ module.exports = {
                 root: fromMessageSigil(groupInitMsg.key),
                 subfeed: groupFeed.keys,
               }
+
+              //console.log('new group', data)
 
               ssb.box2.addGroupInfo(data.id, {
                 key: data.secret,
