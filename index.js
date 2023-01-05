@@ -56,7 +56,8 @@ module.exports = {
         ssb.metafeeds.branchStream({ root: rootId, old: true, live: false }),
         pull.filter((branch) => branch.length === 4),
         pull.map((branch) => branch[3]),
-        pull.filter((feed) => feed.recps),
+        // only grab feeds that look like group feeds
+        pull.filter((feed) => feed.recps && feed.purpose.length === 44),
         paraMap((feed, cb) => {
           return pull(
             ssb.db.query(where(author(feed.id)), toPullStream()),
