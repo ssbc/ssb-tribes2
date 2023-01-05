@@ -51,6 +51,7 @@ module.exports = {
 
     function findEmptyGroupFeed(rootId, cb) {
       console.log('in empty function')
+      let found = false
       pull(
         ssb.metafeeds.branchStream({ root: rootId, old: true, live: false }),
         pull.filter((branch) => branch.length === 4),
@@ -72,11 +73,18 @@ module.exports = {
         }),
         pull.filter(),
         pull.unique('id'),
-        //pull.flatten(),
-        pull.collect((err, empties) => {
-          if (err) return cb(err)
-          return cb(null, empties[0])
-        })
+        pull.take(1),
+        pull.drain(
+          (empty) => {
+            found = true
+            return cb(null, empty)
+          },
+          (err) => {
+            if (err) return cb(err)
+            if (found) return
+            return cb(null, undefined)
+          }
+        )
       )
     }
 
