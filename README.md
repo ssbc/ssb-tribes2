@@ -28,12 +28,14 @@ npm install ssb-tribes2
 - Requires `ssb-db2>=6.2.2`
 - Requires `ssb-box2>=4.0.0`
 - Requires `ssb-meta-feeds>=0.38.0`
+- Requires `ssb-bendy-butt>=1.0.0`
 
 ```diff
  const ssb = SecretStack({ caps: require('ssb-caps') })
    .use(require('ssb-master'))
 +  .use(require('ssb-db2'))
    .use(require('ssb-conn'))
++  .use(require('ssb-bendy-butt'))
 +  .use(require('ssb-meta-feeds'))
 +  .use(require('ssb-tribes2'))
    .use(require('ssb-blobs'))
