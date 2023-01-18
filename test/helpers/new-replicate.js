@@ -10,6 +10,7 @@ const deepEqual = require('fast-deep-equal')
  * Fully replicates person1's metafeed tree to person2 and vice versa
  */
 module.exports = async function replicate(person1, person2) {
+  console.log('in replicate')
   // Replicate self
   person1.ebt.request(person1.id, true)
   person2.ebt.request(person2.id, true)
@@ -36,6 +37,7 @@ module.exports = async function replicate(person1, person2) {
     pull.unique(),
     (drain1 = pull.drain((feedId) => {
       person1.ebt.request(feedId, true)
+      person2.ebt.request(feedId, true)
     }))
   )
 
@@ -48,38 +50,49 @@ module.exports = async function replicate(person1, person2) {
     pull.unique(),
     (drain2 = pull.drain((feedId) => {
       person2.ebt.request(feedId, true)
+      person1.ebt.request(feedId, true)
     }))
   )
 
+  console.log('about to network')
   // Establish a network connection
   const conn = await p(person1.connect)(person2.getAddress())
 
   // Wait until both have the same forest
-  let inSync = false
   const tree1AtPerson1 = await p(getSimpleTree)(person1, person1Root.id)
   const tree2AtPerson2 = await p(getSimpleTree)(person2, person2Root.id)
-  while (!inSync) {
-    await p(setTimeout)(100)
+  retryUntil(async () => {
     const tree2AtPerson1 = await p(getSimpleTree)(person1, person2Root.id)
     const tree1AtPerson2 = await p(getSimpleTree)(person2, person1Root.id)
-    inSync =
+    console.log('tree1atperson1', tree1AtPerson1)
+    console.log('tree1atperson2', tree1AtPerson2)
+    return (
       deepEqual(tree1AtPerson1, tree1AtPerson2) &&
       deepEqual(tree2AtPerson1, tree2AtPerson2)
-  }
+    )
+  })
 
   // Wait until both have replicated all feeds in full
-  inSync = false
-  while (!inSync) {
-    await p(setTimeout)(100)
+  retryUntil(async () => {
     const newClock1 = await p(person1.getVectorClock)()
     const newClock2 = await p(person2.getVectorClock)()
-    inSync = deepEqual(newClock1, newClock2)
-  }
+    return deepEqual(newClock1, newClock2)
+  })
 
   drain1.abort()
   drain2.abort()
 
   await p(conn.close)(true)
+}
+
+async function retryUntil(fn) {
+  let result = false
+  for (let i = 0; i < 100; i++) {
+    result = await fn()
+    if (result) return
+    else await p(setTimeout)(100)
+  }
+  if (!result) throw new Error('retryUntil timed out')
 }
 
 // TODO: this is a copy of the same function in ssb-meta-feeds, we should

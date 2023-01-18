@@ -36,6 +36,7 @@ module.exports = async function replicate(person1, person2, opts = {}) {
     pull.unique(),
     (drain1 = pull.drain((feedId) => {
       person1.ebt.request(feedId, true)
+      person2.ebt.request(feedId, true)
     }))
   )
 
@@ -47,6 +48,7 @@ module.exports = async function replicate(person1, person2, opts = {}) {
     pull.map((feedDetails) => feedDetails.id),
     pull.unique(),
     (drain2 = pull.drain((feedId) => {
+      person1.ebt.request(feedId, true)
       person2.ebt.request(feedId, true)
     }))
   )

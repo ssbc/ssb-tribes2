@@ -248,46 +248,75 @@ module.exports = {
       )
     }
 
-    // Listeners for joining groups
-    function start() {
-      ssb.metafeeds.findOrCreate((err, myRoot) => {
-        if (err) throw new Error('Could not find or create my root feed')
-        findOrCreateAdditionsFeed((err) => {
-          if (err) console.warn('Error finding or creating additions feed', err)
-        })
+    function listInvites() {
+      return pull(
+        pull.values([0]),
+        pull.asyncMap((n, cb) => {
+          ssb.metafeeds.findOrCreate((err, myRoot) => {
+            if (err) throw new Error('Could not find or create my root feed')
 
-        pull(
-          ssb.db.query(
-            where(and(isDecrypted('box2'), type('group/add-member'))),
-            live({ old: true }),
-            toPullStream()
-          ),
-          pull.filter((msg) =>
-            lodashGet(msg, 'value.content.recps', []).includes(myRoot.id)
-          ),
-          pull.asyncMap((msg, cb) => {
-            const groupId = lodashGet(msg, 'value.content.recps[0]')
+            ssb.box2.listGroupIds((err, groupIds) => {
+              if (err) throw err
 
-            ssb.box2.getGroupKeyInfo(groupId, (err, info) => {
-              if (err) {
-                console.error('Error when finding group invite for me:', err)
-                return
-              }
-
-              if (!info) {
-                // We're not yet in the group
-                ssb.box2.addGroupInfo(groupId, {
-                  key: lodashGet(msg, 'value.content.secret'),
-                  root: lodashGet(msg, 'value.content.root'),
-                })
-                ssb.db.reindexEncrypted(cb)
-              } else {
-                cb()
-              }
+              return cb(
+                null,
+                pull(
+                  ssb.db.query(
+                    where(and(isDecrypted('box2'), type('group/add-member'))),
+                    live({ old: true }),
+                    toPullStream()
+                  ),
+                  pull.filter((msg) =>
+                    // it's an addition of us
+                    lodashGet(msg, 'value.content.recps', []).includes(
+                      myRoot.id
+                    )
+                  ),
+                  pull.filter(
+                    (msg) =>
+                      // we haven't already accepted the addition
+                      !groupIds.includes(
+                        lodashGet(msg, 'value.content.recps[0]')
+                      )
+                  ),
+                  pull.map((msg) => {
+                    return {
+                      id: lodashGet(msg, 'value.content.recps[0]'),
+                      secret: lodashGet(msg, 'value.content.groupKey'),
+                      root: lodashGet(msg, 'value.content.root'),
+                    }
+                  })
+                )
+              )
             })
-          }),
-          pull.drain(() => {})
-        )
+          })
+        }),
+        pull.flatten()
+      )
+    }
+
+    function acceptInvite(groupId, cb) {
+      if (cb === undefined) return promisify(acceptInvite)(groupId)
+
+      pull(
+        listInvites(),
+        pull.filter((groupInfo) => groupInfo.id === groupId),
+        pull.take(1),
+        pull.drain((groupInfo) => {
+          console.log({ groupInfo })
+          ssb.box2.addGroupInfo(groupInfo.id, {
+            key: groupInfo.secret,
+            root: groupInfo.root,
+          })
+
+          ssb.db.reindexEncrypted(cb)
+        })
+      )
+    }
+
+    function start() {
+      findOrCreateAdditionsFeed((err) => {
+        if (err) console.warn('Error finding or creating additions feed', err)
       })
     }
 
@@ -298,6 +327,8 @@ module.exports = {
       addMembers,
       publish,
       listMembers,
+      listInvites,
+      acceptInvite,
       start,
     }
   },

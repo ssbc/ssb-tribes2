@@ -7,9 +7,9 @@ const pull = require('pull-stream')
 const { promisify: p } = require('util')
 const ssbKeys = require('ssb-keys')
 const Testbot = require('./helpers/testbot')
-const replicate = require('./helpers/replicate')
+const replicate = require('./helpers/new-replicate')
 
-test('get added to a group', async (t) => {
+test.only('get added to a group', async (t) => {
   const alice = Testbot({
     keys: ssbKeys.generate(null, 'alice'),
     mfSeed: Buffer.from(
@@ -43,10 +43,15 @@ test('get added to a group', async (t) => {
   } = await alice.tribes2.create().catch(t.fail)
   t.pass('alice created a group')
 
-  await alice.tribes2.addMembers(groupId, [bobRoot.id])
+  console.log({ groupId, bobRootId: bobRoot.id })
+  await alice.tribes2.addMembers(groupId, [bobRoot.id]).catch(t.fail)
+  console.log('added bob')
   t.pass('alice added bob to the group')
 
-  await replicate(alice, bob, { waitUntilMembersOf: groupId })
+  console.log('about to replicate')
+  await replicate(alice, bob).catch(t.fail)
+  //await Promise.all([replicate(alice, bob), bob.tribes2.acceptInvite(groupId)])
+  console.log('replicated')
   t.pass('alice and bob replicate')
 
   await new Promise((res) =>
