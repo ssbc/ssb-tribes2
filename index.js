@@ -264,7 +264,6 @@ module.exports = {
                 pull(
                   ssb.db.query(
                     where(and(isDecrypted('box2'), type('group/add-member'))),
-                    live({ old: true }),
                     toPullStream()
                   ),
                   pull.filter((msg) =>
@@ -283,7 +282,10 @@ module.exports = {
                   pull.map((msg) => {
                     return {
                       id: lodashGet(msg, 'value.content.recps[0]'),
-                      secret: lodashGet(msg, 'value.content.secret'),
+                      secret: Buffer.from(
+                        lodashGet(msg, 'value.content.secret'),
+                        'base64'
+                      ),
                       root: lodashGet(msg, 'value.content.root'),
                     }
                   })
