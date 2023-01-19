@@ -144,7 +144,7 @@ Returns a pull stream source listing every known member of the group with id `gr
 
 ### `ssb.tribes2.listInvites() => source`
 
-Returns a pull stream source listing invites (another user sent you one with `addMembers`) that you haven't accepted yet.
+Returns a pull stream source listing invites (another user sent you one with `addMembers`) that you haven't accepted yet. The invites are on the same format as that of #create.
 
 ### `ssb.tribes2.acceptInvite(groupId, cb)`
 
