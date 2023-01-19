@@ -56,30 +56,6 @@ module.exports = async function replicate(person1, person2) {
   // Establish a network connection
   const conn = await p(person1.connect)(person2.getAddress())
 
-  // Wait until both have the same forest
-  //const tree1AtPerson1 = await p(getSimpleTree)(person1, person1Root.id)
-  //const tree2AtPerson2 = await p(getSimpleTree)(person2, person2Root.id)
-  //await retryUntil(async () => {
-  //  const tree2AtPerson1 = await p(getSimpleTree)(person1, person2Root.id)
-  //  const tree1AtPerson2 = await p(getSimpleTree)(person2, person1Root.id)
-  //  //console.log('tree1atperson1', JSON.stringify(tree1AtPerson1, null, 2))
-  //  //console.log('tree1atperson2', JSON.stringify(tree1AtPerson2, null, 2))
-
-  //  //console.log('are they equal?', deepEqual(tree1AtPerson1, tree1AtPerson2))
-
-  //  console.log('PERSON 1:')
-  //  await p(person1.metafeeds.printTree)(person1Root.id, { id: true })
-  //  await p(person1.metafeeds.printTree)(person2Root.id, { id: true })
-  //  console.log('PERSON 2:')
-  //  await p(person2.metafeeds.printTree)(person1Root.id, { id: true })
-  //  await p(person2.metafeeds.printTree)(person2Root.id, { id: true })
-  //  console.log('---------------------------')
-  //  return (
-  //    deepEqual(tree1AtPerson1, tree1AtPerson2) &&
-  //    deepEqual(tree2AtPerson1, tree2AtPerson2)
-  //  )
-  //})
-
   // Wait until both have replicated all feeds in full
   await retryUntil(async () => {
     const newClock1 = await p(person1.getVectorClock)()
@@ -101,36 +77,4 @@ async function retryUntil(fn) {
     else await p(setTimeout)(100)
   }
   if (!result) throw new Error('retryUntil timed out')
-}
-
-// TODO: this is a copy of the same function in ssb-meta-feeds, we should
-// probably just an opt there to generate this kind of tree (with only id)
-function getSimpleTree(sbot, root, cb) {
-  const tree = {}
-  pull(
-    sbot.metafeeds.branchStream({ root, old: true, live: false }),
-    pull.drain(
-      (branch) => {
-        for (let i = 0; i < branch.length; i++) {
-          const node = branch[i]
-          if (i === 0) currentNode = tree
-          else {
-            const parent = currentNode
-            currentNode = parent.children.find((child) => child.id === node.id)
-            if (!currentNode) {
-              parent.children.push((currentNode = {}))
-            }
-          }
-          if (!currentNode.id) {
-            currentNode.id = node.id
-            currentNode.children = []
-          }
-        }
-      },
-      (err) => {
-        if (err) return cb(err)
-        cb(null, tree)
-      }
-    )
-  )
 }
