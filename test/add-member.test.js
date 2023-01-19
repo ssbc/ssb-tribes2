@@ -43,7 +43,6 @@ test('get added to a group', async (t) => {
   } = await alice.tribes2.create().catch(t.fail)
   t.pass('alice created a group')
 
-  //console.log({ groupId, bobRootId: bobRoot.id })
   await alice.tribes2.addMembers(groupId, [bobRoot.id]).catch((err) => {
     console.error('add member fail', err)
     t.fail(err)
