@@ -16,7 +16,7 @@ const {
 
 const GetGroupTangle = require('../lib/get-group-tangle')
 const Testbot = require('./helpers/testbot')
-const replicate = require('./helpers/replicate')
+const replicate = require('./helpers/new-replicate')
 
 test('get-group-tangle unit test', (t) => {
   const name = `get-group-tangle-${Date.now()}`
@@ -169,7 +169,7 @@ test('get-group-tangle', (t) => {
   })
 })
 
-test('get-group-tangle with branch', async (t) => {
+test.only('get-group-tangle with branch', async (t) => {
   const alice = Testbot()
   alice.tribes2.start()
 
