@@ -169,7 +169,7 @@ test('get-group-tangle', (t) => {
   })
 })
 
-test.only('get-group-tangle with branch', async (t) => {
+test('get-group-tangle with branch', async (t) => {
   const alice = Testbot()
   alice.tribes2.start()
 
