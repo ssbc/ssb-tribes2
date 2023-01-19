@@ -11,23 +11,6 @@ const deepEqual = require('fast-deep-equal')
  * Fully replicates person1's metafeed tree to person2 and vice versa
  */
 module.exports = async function replicate(person1, person2) {
-  // Replicate self
-  person1.ebt.request(person1.id, true)
-  person2.ebt.request(person2.id, true)
-
-  // Replicate each other's main feeds
-  person1.ebt.request(person2.id, true)
-  person2.ebt.request(person1.id, true)
-
-  const person1Root = await p(person1.metafeeds.findOrCreate)()
-  const person2Root = await p(person2.metafeeds.findOrCreate)()
-
-  // Replicate each other's metafeed roots
-  person1.ebt.request(person1Root.id, true)
-  person1.ebt.request(person2Root.id, true)
-  person2.ebt.request(person1Root.id, true)
-  person2.ebt.request(person2Root.id, true)
-
   // persons replicate all the trees in their forests, from top to bottom
   let drain
   pull(
