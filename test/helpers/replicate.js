@@ -4,6 +4,7 @@
 
 const { promisify: p } = require('util')
 const pull = require('pull-stream')
+const pullMany = require('pull-many')
 const deepEqual = require('fast-deep-equal')
 
 /**
@@ -27,29 +28,19 @@ module.exports = async function replicate(person1, person2) {
   person2.ebt.request(person1Root.id, true)
   person2.ebt.request(person2Root.id, true)
 
-  // person1 replicate all the trees in their forest, from top to bottom
-  let drain1
+  // persons replicate all the trees in their forests, from top to bottom
+  let drain
   pull(
-    person1.metafeeds.branchStream({ old: true, live: true }),
+    pullMany([
+      person1.metafeeds.branchStream({ old: true, live: true }),
+      person2.metafeeds.branchStream({ old: true, live: true }),
+    ]),
     pull.flatten(),
     pull.map((feedDetails) => feedDetails.id),
     pull.unique(),
-    (drain1 = pull.drain((feedId) => {
+    (drain = pull.drain((feedId) => {
       person1.ebt.request(feedId, true)
       person2.ebt.request(feedId, true)
-    }))
-  )
-
-  // person2 replicate all the trees in their forest, from top to bottom
-  let drain2
-  pull(
-    person2.metafeeds.branchStream({ old: true, live: true }),
-    pull.flatten(),
-    pull.map((feedDetails) => feedDetails.id),
-    pull.unique(),
-    (drain2 = pull.drain((feedId) => {
-      person2.ebt.request(feedId, true)
-      person1.ebt.request(feedId, true)
     }))
   )
 
@@ -63,8 +54,7 @@ module.exports = async function replicate(person1, person2) {
     return deepEqual(newClock1, newClock2)
   })
 
-  drain1.abort()
-  drain2.abort()
+  drain.abort()
 
   await p(conn.close)(true)
 }
