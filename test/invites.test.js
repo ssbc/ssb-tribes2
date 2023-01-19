@@ -5,7 +5,7 @@ const ssbKeys = require('ssb-keys')
 const Testbot = require('./helpers/testbot')
 const replicate = require('./helpers/replicate')
 
-test('lists correct group invite', async (t) => {
+test('lists correct group invite and accepting actually does something', async (t) => {
   const alice = Testbot({
     keys: ssbKeys.generate(null, 'alice'),
     mfSeed: Buffer.from(
