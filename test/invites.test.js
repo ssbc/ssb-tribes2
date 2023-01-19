@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2023 Jacob Karlsson
+//
+// SPDX-License-Identifier: LGPL-3.0-only
+
 const test = require('tape')
 const pull = require('pull-stream')
 const { promisify: p } = require('util')
