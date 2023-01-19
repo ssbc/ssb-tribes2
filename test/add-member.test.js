@@ -7,7 +7,7 @@ const pull = require('pull-stream')
 const { promisify: p } = require('util')
 const ssbKeys = require('ssb-keys')
 const Testbot = require('./helpers/testbot')
-const replicate = require('./helpers/new-replicate')
+const replicate = require('./helpers/replicate')
 
 test('get added to a group', async (t) => {
   const alice = Testbot({

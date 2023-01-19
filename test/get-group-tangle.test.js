@@ -16,7 +16,7 @@ const {
 
 const GetGroupTangle = require('../lib/get-group-tangle')
 const Testbot = require('./helpers/testbot')
-const replicate = require('./helpers/new-replicate')
+const replicate = require('./helpers/replicate')
 
 test('get-group-tangle unit test', (t) => {
   const name = `get-group-tangle-${Date.now()}`
