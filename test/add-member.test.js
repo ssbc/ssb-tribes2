@@ -143,6 +143,9 @@ test('add member', async (t) => {
     }
     const { key: greetingKey } = await kaitiaki.tribes2.publish(greetingContent)
     await replicate(kaitiaki, newPerson)
+
+    await newPerson.tribes2.acceptInvite(group.id)
+
     const greetingMsg = await p(newPerson.db.getMsg)(greetingKey)
     t.deepEqual(
       greetingMsg.value.content,

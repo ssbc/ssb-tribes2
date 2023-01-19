@@ -195,8 +195,10 @@ test('get-group-tangle with branch', async (t) => {
   t.pass('alice invited bob')
 
   // Alice shares the group creation and invite with Bob.
-  await replicate(alice, bob, { waitUntilMembersOf: group.id })
+  await replicate(alice, bob)
   t.pass('alice and bob replicated their group feeds')
+
+  await bob.tribes2.acceptInvite(group.id)
 
   // Both servers should see the same group tangle
   const aliceTangle = await p(getAliceGroupTangle)(group.id).catch(t.fail)
