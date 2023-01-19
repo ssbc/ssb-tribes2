@@ -10,7 +10,6 @@ const deepEqual = require('fast-deep-equal')
  * Fully replicates person1's metafeed tree to person2 and vice versa
  */
 module.exports = async function replicate(person1, person2) {
-  console.log('in replicate')
   // Replicate self
   person1.ebt.request(person1.id, true)
   person2.ebt.request(person2.id, true)
@@ -54,26 +53,35 @@ module.exports = async function replicate(person1, person2) {
     }))
   )
 
-  console.log('about to network')
   // Establish a network connection
   const conn = await p(person1.connect)(person2.getAddress())
 
   // Wait until both have the same forest
-  const tree1AtPerson1 = await p(getSimpleTree)(person1, person1Root.id)
-  const tree2AtPerson2 = await p(getSimpleTree)(person2, person2Root.id)
-  retryUntil(async () => {
-    const tree2AtPerson1 = await p(getSimpleTree)(person1, person2Root.id)
-    const tree1AtPerson2 = await p(getSimpleTree)(person2, person1Root.id)
-    console.log('tree1atperson1', tree1AtPerson1)
-    console.log('tree1atperson2', tree1AtPerson2)
-    return (
-      deepEqual(tree1AtPerson1, tree1AtPerson2) &&
-      deepEqual(tree2AtPerson1, tree2AtPerson2)
-    )
-  })
+  //const tree1AtPerson1 = await p(getSimpleTree)(person1, person1Root.id)
+  //const tree2AtPerson2 = await p(getSimpleTree)(person2, person2Root.id)
+  //await retryUntil(async () => {
+  //  const tree2AtPerson1 = await p(getSimpleTree)(person1, person2Root.id)
+  //  const tree1AtPerson2 = await p(getSimpleTree)(person2, person1Root.id)
+  //  //console.log('tree1atperson1', JSON.stringify(tree1AtPerson1, null, 2))
+  //  //console.log('tree1atperson2', JSON.stringify(tree1AtPerson2, null, 2))
+
+  //  //console.log('are they equal?', deepEqual(tree1AtPerson1, tree1AtPerson2))
+
+  //  console.log('PERSON 1:')
+  //  await p(person1.metafeeds.printTree)(person1Root.id, { id: true })
+  //  await p(person1.metafeeds.printTree)(person2Root.id, { id: true })
+  //  console.log('PERSON 2:')
+  //  await p(person2.metafeeds.printTree)(person1Root.id, { id: true })
+  //  await p(person2.metafeeds.printTree)(person2Root.id, { id: true })
+  //  console.log('---------------------------')
+  //  return (
+  //    deepEqual(tree1AtPerson1, tree1AtPerson2) &&
+  //    deepEqual(tree2AtPerson1, tree2AtPerson2)
+  //  )
+  //})
 
   // Wait until both have replicated all feeds in full
-  retryUntil(async () => {
+  await retryUntil(async () => {
     const newClock1 = await p(person1.getVectorClock)()
     const newClock2 = await p(person2.getVectorClock)()
     return deepEqual(newClock1, newClock2)

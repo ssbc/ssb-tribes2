@@ -7,6 +7,7 @@ const pull = require('pull-stream')
 const paraMap = require('pull-paramap')
 const pullAsync = require('pull-async')
 const lodashGet = require('lodash.get')
+const clarify = require('clarify-error')
 const {
   where,
   and,
@@ -282,7 +283,7 @@ module.exports = {
                   pull.map((msg) => {
                     return {
                       id: lodashGet(msg, 'value.content.recps[0]'),
-                      secret: lodashGet(msg, 'value.content.groupKey'),
+                      secret: lodashGet(msg, 'value.content.secret'),
                       root: lodashGet(msg, 'value.content.root'),
                     }
                   })
@@ -298,25 +299,37 @@ module.exports = {
     function acceptInvite(groupId, cb) {
       if (cb === undefined) return promisify(acceptInvite)(groupId)
 
+      let foundInvite = false
       pull(
         listInvites(),
         pull.filter((groupInfo) => groupInfo.id === groupId),
         pull.take(1),
-        pull.drain((groupInfo) => {
-          console.log({ groupInfo })
-          ssb.box2.addGroupInfo(groupInfo.id, {
-            key: groupInfo.secret,
-            root: groupInfo.root,
-          })
+        pull.drain(
+          (groupInfo) => {
+            foundInvite = true
+            ssb.box2.addGroupInfo(groupInfo.id, {
+              key: groupInfo.secret,
+              root: groupInfo.root,
+            })
 
-          ssb.db.reindexEncrypted(cb)
-        })
+            ssb.db.reindexEncrypted(cb)
+          },
+          (err) => {
+            if (err) return cb(err)
+            if (!foundInvite)
+              return cb(new Error("Didn't find invite for that group id"))
+          }
+        )
       )
     }
 
-    function start() {
+    function start(cb) {
+      if (cb === undefined) return promisify(start)()
+
       findOrCreateAdditionsFeed((err) => {
-        if (err) console.warn('Error finding or creating additions feed', err)
+        if (err)
+          return cb(clarify(err, 'Error finding or creating additions feed'))
+        return cb()
       })
     }
 

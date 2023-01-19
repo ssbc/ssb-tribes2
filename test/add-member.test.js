@@ -9,7 +9,7 @@ const ssbKeys = require('ssb-keys')
 const Testbot = require('./helpers/testbot')
 const replicate = require('./helpers/new-replicate')
 
-test.only('get added to a group', async (t) => {
+test('get added to a group', async (t) => {
   const alice = Testbot({
     keys: ssbKeys.generate(null, 'alice'),
     mfSeed: Buffer.from(
@@ -25,8 +25,8 @@ test.only('get added to a group', async (t) => {
     ),
   })
 
-  alice.tribes2.start()
-  bob.tribes2.start()
+  await alice.tribes2.start()
+  await bob.tribes2.start()
   t.pass('tribes2 started for both alice and bob')
 
   const aliceRoot = await p(alice.metafeeds.findOrCreate)()
@@ -43,16 +43,19 @@ test.only('get added to a group', async (t) => {
   } = await alice.tribes2.create().catch(t.fail)
   t.pass('alice created a group')
 
-  console.log({ groupId, bobRootId: bobRoot.id })
-  await alice.tribes2.addMembers(groupId, [bobRoot.id]).catch(t.fail)
-  console.log('added bob')
+  //console.log({ groupId, bobRootId: bobRoot.id })
+  await alice.tribes2.addMembers(groupId, [bobRoot.id]).catch((err) => {
+    console.error('add member fail', err)
+    t.fail(err)
+  })
   t.pass('alice added bob to the group')
 
-  console.log('about to replicate')
   await replicate(alice, bob).catch(t.fail)
-  //await Promise.all([replicate(alice, bob), bob.tribes2.acceptInvite(groupId)])
-  console.log('replicated')
   t.pass('alice and bob replicate')
+
+  await bob.tribes2.acceptInvite(groupId)
+
+  t.pass('bob accepted invite')
 
   await new Promise((res) =>
     pull(
