@@ -118,16 +118,11 @@ test('create reuses an unused group feed (because of an earlier crash or somethi
   function countGroupFeeds(cb) {
     pull(
       server.metafeeds.branchStream({ old: true, live: false }),
-      pull.map((branch) => {
-        //console.log('branch', branch)
-        return branch
-      }),
       pull.filter((branch) => branch.length === 4),
       pull.map((branch) => branch[3]),
       pull.filter((feed) => feed.recps),
       pull.collect((err, feeds) => {
         if (err) return cb(err)
-        console.log('feeds len', feeds.length)
         server.metafeeds.printTree(server.id, { id: true }, () => {})
         return cb(null, feeds.length)
       })
@@ -138,7 +133,6 @@ test('create reuses an unused group feed (because of an earlier crash or somethi
     if (err) t.fail(err)
 
     t.pass('got root')
-    //console.log('root', root)
 
     countGroupFeeds((err, num) => {
       if (err) t.fail(err)
@@ -177,12 +171,8 @@ test('create reuses an unused group feed (because of an earlier crash or somethi
                 server.tribes2.create(null, (err) => {
                   if (err) t.fail(err)
 
-                  console.log('created second group')
-
                   countGroupFeeds((err, num) => {
                     if (err) t.fail(err)
-
-                    console.log('counted feeds again')
 
                     t.equal(
                       num,
