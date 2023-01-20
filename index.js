@@ -50,7 +50,6 @@ module.exports = {
     }
 
     function findEmptyGroupFeed(rootId, cb) {
-      console.log('in empty function')
       let found = false
       pull(
         ssb.metafeeds.branchStream({ root: rootId, old: true, live: false }),
@@ -126,8 +125,6 @@ module.exports = {
           findEmptyGroupFeed(root.id, (err, emptyFeed) => {
             if (err) return cb(err)
 
-            console.log('emptyFeed', emptyFeed)
-
             if (emptyFeed) {
               return cb(null, emptyFeed)
             } else {
@@ -156,15 +153,11 @@ module.exports = {
         findOrCreateGroupFeed(null, function gotGroupFeed(err, groupFeed) {
           if (err) return cb(err)
 
-          //console.log('create group feed', groupFeed)
-
           const secret = new SecretKey(Buffer.from(groupFeed.purpose, 'base64'))
 
           const recps = [
             { key: secret.toBuffer(), scheme: keySchemes.private_group },
           ]
-
-          console.log('about to post root msg')
 
           ssb.db.create(
             {
@@ -176,8 +169,6 @@ module.exports = {
             (err, groupInitMsg) => {
               if (err) return cb(err)
 
-              console.log('just published root msg')
-
               const data = {
                 id: buildGroupId({
                   groupInitMsg,
@@ -187,8 +178,6 @@ module.exports = {
                 root: fromMessageSigil(groupInitMsg.key),
                 subfeed: groupFeed.keys,
               }
-
-              //console.log('new group', data)
 
               ssb.box2.addGroupInfo(data.id, {
                 key: data.secret,
@@ -205,8 +194,6 @@ module.exports = {
           )
         })
       })
-
-      // TODO: consider what happens if the app crashes between any step
     }
 
     function get(id, cb) {
