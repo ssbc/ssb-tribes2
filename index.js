@@ -254,43 +254,44 @@ module.exports = {
         pull.values([0]), // dummy value used to kickstart the stream
         pull.asyncMap((n, cb) => {
           ssb.metafeeds.findOrCreate((err, myRoot) => {
-            if (err) return cb(clarify(err, 'Failed to get root metafeed when listing invites'))
+            if (err)
+              return cb(
+                clarify(err, 'Failed to get root metafeed when listing invites')
+              )
 
             ssb.box2.listGroupIds((err, groupIds) => {
-              if (err) return cb(clarify(err, 'Failed to list group IDs when listing invites'))
-
-              return cb(
-                null,
-                pull(
-                  ssb.db.query(
-                    where(and(isDecrypted('box2'), type('group/add-member'))),
-                    toPullStream()
-                  ),
-                  pull.filter((msg) =>
-                    // it's an addition of us
-                    lodashGet(msg, 'value.content.recps', []).includes(
-                      myRoot.id
-                    )
-                  ),
-                  pull.filter(
-                    (msg) =>
-                      // we haven't already accepted the addition
-                      !groupIds.includes(
-                        lodashGet(msg, 'value.content.recps[0]')
-                      )
-                  ),
-                  pull.map((msg) => {
-                    return {
-                      id: lodashGet(msg, 'value.content.recps[0]'),
-                      secret: Buffer.from(
-                        lodashGet(msg, 'value.content.secret'),
-                        'base64'
-                      ),
-                      root: lodashGet(msg, 'value.content.root'),
-                    }
-                  })
+              if (err)
+                return cb(
+                  clarify(err, 'Failed to list group IDs when listing invites')
                 )
+
+              const source = pull(
+                ssb.db.query(
+                  where(and(isDecrypted('box2'), type('group/add-member'))),
+                  toPullStream()
+                ),
+                pull.filter((msg) =>
+                  // it's an addition of us
+                  lodashGet(msg, 'value.content.recps', []).includes(myRoot.id)
+                ),
+                pull.filter(
+                  (msg) =>
+                    // we haven't already accepted the addition
+                    !groupIds.includes(lodashGet(msg, 'value.content.recps[0]'))
+                ),
+                pull.map((msg) => {
+                  return {
+                    id: lodashGet(msg, 'value.content.recps[0]'),
+                    secret: Buffer.from(
+                      lodashGet(msg, 'value.content.secret'),
+                      'base64'
+                    ),
+                    root: lodashGet(msg, 'value.content.root'),
+                  }
+                })
               )
+
+              return cb(null, source)
             })
           })
         }),
