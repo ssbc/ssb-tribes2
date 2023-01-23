@@ -197,8 +197,6 @@ module.exports = {
         // if (!addMemberSpec(content))
         //   return cb(new Error(addMemberSpec.errorsString))
 
-        console.log('about to get additions feed')
-
         findOrCreateAdditionsFeed((err, additionsFeed) => {
           if (err) return cb(err)
 
