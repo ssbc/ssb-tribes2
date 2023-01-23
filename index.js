@@ -80,9 +80,8 @@ module.exports = {
             return cb(null, empty)
           },
           (err) => {
-            if (err) return cb(err)
-            if (found) return
-            return cb(null, undefined)
+            if (err) cb(err)
+            if (!found) cb()
           }
         )
       )
