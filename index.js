@@ -197,6 +197,8 @@ module.exports = {
         // if (!addMemberSpec(content))
         //   return cb(new Error(addMemberSpec.errorsString))
 
+        console.log('about to get additions feed')
+
         findOrCreateAdditionsFeed((err, additionsFeed) => {
           if (err) return cb(err)
 
@@ -234,10 +236,11 @@ module.exports = {
       })
     }
 
-    function listMembers(groupId) {
+    function listMembers(groupId, opts = {}) {
       return pull(
         ssb.db.query(
           where(and(isDecrypted('box2'), type('group/add-member'))),
+          opts.live ? live({ old: true }) : null,
           toPullStream()
         ),
         pull.map((msg) => lodashGet(msg, 'value.content.recps', [])),
