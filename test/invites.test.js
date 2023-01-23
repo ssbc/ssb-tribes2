@@ -70,7 +70,7 @@ test('lists correct group invite and accepting actually does something', async (
 
   const msgUnEnc = await p(bob.db.get)(group.root).catch(t.fail)
   t.true(
-    msgUnEnc.content && msgUnEnc.content && msgUnEnc.content.type,
+    typeof msgUnEnc.content === 'object' && msgUnEnc.content.type,
     'bob can now read root msg after accepting the invite'
   )
 

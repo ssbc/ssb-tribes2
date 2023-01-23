@@ -251,13 +251,13 @@ module.exports = {
 
     function listInvites() {
       return pull(
-        pull.values([0]),
+        pull.values([0]), // dummy value used to kickstart the stream
         pull.asyncMap((n, cb) => {
           ssb.metafeeds.findOrCreate((err, myRoot) => {
-            if (err) throw new Error('Could not find or create my root feed')
+            if (err) return cb(clarify(err, 'Failed to get root metafeed when listing invites'))
 
             ssb.box2.listGroupIds((err, groupIds) => {
-              if (err) throw err
+              if (err) return cb(clarify(err, 'Failed to list group IDs when listing invites'))
 
               return cb(
                 null,
