@@ -54,8 +54,9 @@ test('lists correct group invite and accepting actually does something', async (
   t.equal(invite.root, group.root, 'correct root')
 
   const msgEnc = await p(bob.db.get)(group.root).catch(t.fail)
-  t.true(
-    msgEnc.content && msgEnc.content && !msgEnc.content.type,
+  t.equals(
+    typeof msgEnc.content,
+    'string',
     "bob can't read root msg before he's accepted the invite"
   )
 
