@@ -123,7 +123,6 @@ test('create reuses an unused group feed (because of an earlier crash or somethi
       pull.filter((feed) => feed.recps),
       pull.collect((err, feeds) => {
         if (err) return cb(err)
-        server.metafeeds.printTree(server.id, { id: true }, () => {})
         return cb(null, feeds.length)
       })
     )

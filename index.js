@@ -10,10 +10,12 @@ const lodashGet = require('lodash.get')
 const {
   where,
   and,
+  count,
   isDecrypted,
   type,
   live,
   author,
+  toCallback,
   toPullStream,
 } = require('ssb-db2/operators')
 const {
@@ -58,11 +60,13 @@ module.exports = {
         // only grab feeds that look like group feeds
         pull.filter((feed) => feed.recps && feed.purpose.length === 44),
         paraMap((feed, cb) => {
-          return pull(
-            ssb.db.query(where(author(feed.id)), toPullStream()),
-            pull.take(1),
-            pull.collect((err, res) => {
-              if (res.length === 0) {
+          ssb.db.query(
+            where(author(feed.id)),
+            count(),
+            toCallback((err, count) => {
+              if (err) return cb(err)
+
+              if (count === 0) {
                 // we're only interested in empty feeds
                 return cb(null, feed)
               } else {
@@ -75,9 +79,9 @@ module.exports = {
         pull.unique('id'),
         pull.take(1),
         pull.drain(
-          (empty) => {
+          (emptyFeed) => {
             found = true
-            return cb(null, empty)
+            return cb(null, emptyFeed)
           },
           (err) => {
             if (err) cb(err)
