@@ -151,9 +151,11 @@ Returns a pull stream source listing invites (another user sent you one with `ad
 
 Accepts an invite (addition) for a group, if you've received one, and starts to replicate and decrypt it.
 
-### `ssb.tribes2.start()`
+### `ssb.tribes2.start(cb)`
 
 Makes sure that you're set up to send and receive group invites, by creating an additions feed for you.
+
+- `cb` _Function_ - a callback of signature `(err)`
 
 ## License
 

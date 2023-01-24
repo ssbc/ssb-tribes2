@@ -34,9 +34,9 @@ test('list members', async (t) => {
     ),
   })
 
-  alice.tribes2.start()
-  bob.tribes2.start()
-  carol.tribes2.start()
+  await alice.tribes2.start()
+  await bob.tribes2.start()
+  await carol.tribes2.start()
 
   const aliceRoot = await p(alice.metafeeds.findOrCreate)()
   const bobRoot = await p(bob.metafeeds.findOrCreate)()
@@ -96,8 +96,8 @@ test('live list members', async (t) => {
     ),
   })
 
-  alice.tribes2.start()
-  bob.tribes2.start()
+  await alice.tribes2.start()
+  await bob.tribes2.start()
 
   const aliceRoot = await p(alice.metafeeds.findOrCreate)()
   const bobRoot = await p(bob.metafeeds.findOrCreate)()
