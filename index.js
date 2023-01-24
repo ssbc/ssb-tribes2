@@ -303,10 +303,11 @@ module.exports = {
       })
     }
 
-    function listMembers(groupId) {
+    function listMembers(groupId, opts = {}) {
       return pull(
         ssb.db.query(
           where(and(isDecrypted('box2'), type('group/add-member'))),
+          opts.live ? live({ old: true }) : null,
           toPullStream()
         ),
         pull.map((msg) => lodashGet(msg, 'value.content.recps', [])),
