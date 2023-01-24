@@ -65,7 +65,8 @@ module.exports = {
             where(author(feed.id)),
             count(),
             toCallback((err, count) => {
-              if (err) return cb(err)
+              // prettier-ignore
+              if (err) return cb(clarify(err, 'Failed to count messages in group feed'))
 
               if (count === 0) {
                 // we're only interested in empty feeds
@@ -85,7 +86,7 @@ module.exports = {
             return cb(null, emptyFeed)
           },
           (err) => {
-            if (err) cb(err)
+            if (err) cb(clarify(err, 'Failed to find empty group feed'))
             if (!found) cb()
           }
         )
@@ -107,7 +108,7 @@ module.exports = {
       }
 
       ssb.metafeeds.findOrCreate(groupFeedDetails, (err, groupFeed) => {
-        if (err) return cb(err)
+        if (err) return cb(clarify(err, 'Failed to find or create group feed'))
         cb(null, groupFeed)
       })
     }
@@ -116,7 +117,8 @@ module.exports = {
       const inputSecret = Buffer.isBuffer(input) ? new SecretKey(input) : input
 
       ssb.metafeeds.findOrCreate(function gotRoot(err, root) {
-        if (err) return cb(err)
+        // prettier-ignore
+        if (err) return cb(clarify(err, 'Failed to find or create root feed when finding or creating group feed'))
 
         // 1. publish. we know the secret and should just findOrCreate the feed
         // 2. create. we don't have a secret yet but can make or find one
@@ -127,7 +129,8 @@ module.exports = {
           return findOrCreateFromSecret(inputSecret, root.id, cb)
         } else {
           findEmptyGroupFeed(root.id, (err, emptyFeed) => {
-            if (err) return cb(err)
+            // prettier-ignore
+            if (err) return cb(clarify(err, 'Failed to find empty group feed when finding or creating a group'))
 
             if (emptyFeed) {
               return cb(null, emptyFeed)
@@ -152,10 +155,12 @@ module.exports = {
       if (!initSpec(content)) return cb(new Error(initSpec.errorsString))
 
       ssb.metafeeds.findOrCreate(function gotRoot(err, root) {
-        if (err) return cb(err)
+        // prettier-ignore
+        if (err) return cb(clarify(err, 'Failed to find or create root feed when creating a group'))
 
         findOrCreateGroupFeed(null, function gotGroupFeed(err, groupFeed) {
-          if (err) return cb(err)
+          // prettier-ignore
+          if (err) return cb(clarify(err, 'Failed to find or create group feed when creating a group'))
 
           const secret = new SecretKey(Buffer.from(groupFeed.purpose, 'base64'))
 
@@ -171,7 +176,8 @@ module.exports = {
               encryptionFormat: 'box2',
             },
             (err, groupInitMsg) => {
-              if (err) return cb(err)
+              // prettier-ignore
+              if (err) return cb(clarify(err, 'Failed to create group init message when creating a group'))
 
               const data = {
                 id: buildGroupId({
@@ -190,7 +196,8 @@ module.exports = {
 
               // Adding myself for recovery reasons
               addMembers(data.id, [root.id], {}, (err) => {
-                if (err) return cb(err)
+                // prettier-ignore
+                if (err) return cb(clarify(err, 'Failed to add myself to the group when creating a group'))
 
                 return cb(null, data)
               })
@@ -204,7 +211,7 @@ module.exports = {
       if (cb === undefined) return promisify(get)(id)
 
       ssb.box2.getGroupKeyInfo(id, (err, info) => {
-        if (err) return cb(err)
+        if (err) return cb(clarify(err, 'Failed to get group details'))
 
         if (!info) return cb(new Error(`Couldn't find group with id ${id}`))
 
@@ -228,17 +235,20 @@ module.exports = {
     function addMembers(groupId, feedIds, opts = {}, cb) {
       if (cb === undefined) return promisify(addMembers)(groupId, feedIds, opts)
 
-      if (!feedIds || feedIds.length === 0)
+      if (!feedIds || feedIds.length === 0) {
         return cb(new Error('No feedIds provided to addMembers'))
-      if (feedIds.length > 15)
-        return cb(
-          new Error(`Tried to add ${feedIds.length} members, the max is 15`)
-        )
-      if (feedIds.some((id) => !isBendyButtV1FeedSSBURI(id)))
+      }
+      if (feedIds.length > 15) {
+        // prettier-ignore
+        return cb(new Error(`Tried to add ${feedIds.length} members, the max is 15`))
+      }
+      if (feedIds.some((id) => !isBendyButtV1FeedSSBURI(id))) {
         return cb(new Error('addMembers only supports bendybutt-v1 feed IDs'))
+      }
 
       get(groupId, (err, { secret, root }) => {
-        if (err) return cb(err)
+        // prettier-ignore
+        if (err) return cb(clarify(err, `Failed to get group details when adding members`))
 
         const content = {
           type: 'group/add-member',
@@ -267,10 +277,12 @@ module.exports = {
         //   return cb(new Error(addMemberSpec.errorsString))
 
         findOrCreateAdditionsFeed((err, additionsFeed) => {
-          if (err) return cb(err)
+          // prettier-ignore
+          if (err) return cb(clarify(err, 'Failed to find or create additions feed when adding members'))
 
           addGroupTangle(content, (err, content) => {
-            if (err) return cb(err)
+            // prettier-ignore
+            if (err) return cb(clarify(err, 'Failed to add group tangle when adding members'))
 
             publishAndPrune(ssb, content, additionsFeed.keys, cb)
           })
@@ -284,18 +296,22 @@ module.exports = {
       if (!content) return cb(new Error('Missing content'))
 
       const recps = content.recps
-      if (!recps || !Array.isArray(recps) || recps.length < 1)
+      if (!recps || !Array.isArray(recps) || recps.length < 1) {
         return cb(new Error('Missing recps'))
+      }
       const groupId = recps[0]
 
       addGroupTangle(content, (err, content) => {
-        if (err) return cb(err)
+        // prettier-ignore
+        if (err) return cb(clarify(err, 'Failed to add group tangle when publishing to a group'))
 
         get(groupId, (err, { secret }) => {
-          if (err) return cb(err)
+          // prettier-ignore
+          if (err) return cb(clarify(err, 'Failed to get group details when publishing to a group'))
 
           findOrCreateGroupFeed(secret, (err, groupFeed) => {
-            if (err) return cb(err)
+            // prettier-ignore
+            if (err) return cb(clarify(err, 'Failed to find or create group feed when publishing to a group'))
 
             publishAndPrune(ssb, content, groupFeed.keys, cb)
           })
@@ -323,16 +339,12 @@ module.exports = {
         pull.values([0]), // dummy value used to kickstart the stream
         pull.asyncMap((n, cb) => {
           ssb.metafeeds.findOrCreate((err, myRoot) => {
-            if (err)
-              return cb(
-                clarify(err, 'Failed to get root metafeed when listing invites')
-              )
+            // prettier-ignore
+            if (err) return cb(clarify(err, 'Failed to get root metafeed when listing invites'))
 
             ssb.box2.listGroupIds((err, groupIds) => {
-              if (err)
-                return cb(
-                  clarify(err, 'Failed to list group IDs when listing invites')
-                )
+              // prettier-ignore
+              if (err) return cb(clarify(err, 'Failed to list group IDs when listing invites'))
 
               const source = pull(
                 ssb.db.query(
@@ -386,15 +398,21 @@ module.exports = {
                 root: groupInfo.root,
               },
               (err) => {
-                if (err) cb(err)
-                else ssb.db.reindexEncrypted(cb)
+                // prettier-ignore
+                if (err) return cb(clarify(err, 'Failed to add group info when accepting an invite'))
+                ssb.db.reindexEncrypted((err) => {
+                  // prettier-ignore
+                  if (err) cb(clarify(err, 'Failed to reindex encrypted messages when accepting an invite'))
+                  else cb()
+                })
               }
             )
           },
           (err) => {
-            if (err) return cb(err)
-            if (!foundInvite)
-              return cb(new Error("Didn't find invite for that group id"))
+            // prettier-ignore
+            if (err) return cb(clarify(err, 'Failed to list invites when accepting an invite'))
+            // prettier-ignore
+            if (!foundInvite) return cb(new Error("Didn't find invite for that group id"))
           }
         )
       )
@@ -404,8 +422,8 @@ module.exports = {
       if (cb === undefined) return promisify(start)()
 
       findOrCreateAdditionsFeed((err) => {
-        if (err)
-          return cb(clarify(err, 'Error finding or creating additions feed'))
+        // prettier-ignore
+        if (err) return cb(clarify(err, 'Error finding or creating additions feed when starting ssb-tribes2'))
         return cb()
       })
     }
