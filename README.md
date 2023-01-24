@@ -103,6 +103,7 @@ Creates a new private group.
 This creates an encryption key, sets up a sub-feed for the group, and initializes the
 group with a `group/init` message, and `group/add-member` to signal you were added.
 Calls back with important info about the group.
+NOTE: If `create` finds an empty (i.e. seemingly unused) group feed, it will start using that feed instead of creating a new one.
 
 - `opts` _Object_ - currently empty, but will be used in the future to specify details like whether the group has an admin subgroup, etc.
 - `cb` _Function_ - callback function of signature `(err, group)` where `group` is an object containing:
