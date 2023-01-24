@@ -7,12 +7,16 @@ const pull = require('pull-stream')
 const paraMap = require('pull-paramap')
 const pullAsync = require('pull-async')
 const lodashGet = require('lodash.get')
+const clarify = require('clarify-error')
 const {
   where,
   and,
+  count,
   isDecrypted,
   type,
   live,
+  author,
+  toCallback,
   toPullStream,
 } = require('ssb-db2/operators')
 const {
@@ -48,12 +52,51 @@ module.exports = {
       ssb.metafeeds.findOrCreate(details, cb)
     }
 
-    function findOrCreateGroupFeed(input, cb) {
-      const secret = Buffer.isBuffer(input) ? new SecretKey(input) : input
+    function findEmptyGroupFeed(rootId, cb) {
+      let found = false
+      pull(
+        ssb.metafeeds.branchStream({ root: rootId, old: true, live: false }),
+        pull.filter((branch) => branch.length === 4),
+        pull.map((branch) => branch[3]),
+        // only grab feeds that look like group feeds
+        pull.filter((feed) => feed.recps && feed.purpose.length === 44),
+        paraMap((feed, cb) => {
+          ssb.db.query(
+            where(author(feed.id)),
+            count(),
+            toCallback((err, count) => {
+              if (err) return cb(err)
 
+              if (count === 0) {
+                // we're only interested in empty feeds
+                return cb(null, feed)
+              } else {
+                return cb()
+              }
+            })
+          )
+        }),
+        pull.filter(),
+        pull.unique('id'),
+        pull.take(1),
+        pull.drain(
+          (emptyFeed) => {
+            found = true
+            return cb(null, emptyFeed)
+          },
+          (err) => {
+            if (err) cb(err)
+            if (!found) cb()
+          }
+        )
+      )
+    }
+
+    function findOrCreateFromSecret(secret, rootId, cb) {
       const recps = [
         { key: secret.toBuffer(), scheme: keySchemes.private_group },
-        // TODO: add self to recps, for crash-resistance
+        // encrypt to myself to be able to get back to the group without finding the group/add-member for me (maybe i crashed before adding myself)
+        rootId,
       ]
 
       const groupFeedDetails = {
@@ -69,6 +112,34 @@ module.exports = {
       })
     }
 
+    function findOrCreateGroupFeed(input = null, cb) {
+      const inputSecret = Buffer.isBuffer(input) ? new SecretKey(input) : input
+
+      ssb.metafeeds.findOrCreate(function gotRoot(err, root) {
+        if (err) return cb(err)
+
+        // 1. publish. we know the secret and should just findOrCreate the feed
+        // 2. create. we don't have a secret yet but can make or find one
+        //   2.1. try to find an empty feed in case we've crashed before. use the secret from that one
+        //   2.2. if we can't find an empty feed, make a new secret and findOrCreate
+
+        if (inputSecret) {
+          return findOrCreateFromSecret(inputSecret, root.id, cb)
+        } else {
+          findEmptyGroupFeed(root.id, (err, emptyFeed) => {
+            if (err) return cb(err)
+
+            if (emptyFeed) {
+              return cb(null, emptyFeed)
+            } else {
+              const newSecret = new SecretKey()
+              findOrCreateFromSecret(newSecret, root.id, cb)
+            }
+          })
+        }
+      })
+    }
+
     function create(opts = {}, cb) {
       if (cb === undefined) return promisify(create)(opts)
 
@@ -80,13 +151,13 @@ module.exports = {
       }
       if (!initSpec(content)) return cb(new Error(initSpec.errorsString))
 
-      const secret = new SecretKey()
-
       ssb.metafeeds.findOrCreate(function gotRoot(err, root) {
         if (err) return cb(err)
 
-        findOrCreateGroupFeed(secret, function gotGroupFeed(err, groupFeed) {
+        findOrCreateGroupFeed(null, function gotGroupFeed(err, groupFeed) {
           if (err) return cb(err)
+
+          const secret = new SecretKey(Buffer.from(groupFeed.purpose, 'base64'))
 
           const recps = [
             { key: secret.toBuffer(), scheme: keySchemes.private_group },
@@ -127,8 +198,6 @@ module.exports = {
           )
         })
       })
-
-      // TODO: consider what happens if the app crashes between any step
     }
 
     function get(id, cb) {
@@ -249,46 +318,90 @@ module.exports = {
       )
     }
 
-    // Listeners for joining groups
-    function start() {
-      ssb.metafeeds.findOrCreate((err, myRoot) => {
-        if (err) throw new Error('Could not find or create my root feed')
-        findOrCreateAdditionsFeed((err) => {
-          if (err) console.warn('Error finding or creating additions feed', err)
-        })
+    function listInvites() {
+      return pull(
+        pull.values([0]), // dummy value used to kickstart the stream
+        pull.asyncMap((n, cb) => {
+          ssb.metafeeds.findOrCreate((err, myRoot) => {
+            if (err)
+              return cb(
+                clarify(err, 'Failed to get root metafeed when listing invites')
+              )
 
-        pull(
-          ssb.db.query(
-            where(and(isDecrypted('box2'), type('group/add-member'))),
-            live({ old: true }),
-            toPullStream()
-          ),
-          pull.filter((msg) =>
-            lodashGet(msg, 'value.content.recps', []).includes(myRoot.id)
-          ),
-          pull.asyncMap((msg, cb) => {
-            const groupId = lodashGet(msg, 'value.content.recps[0]')
+            ssb.box2.listGroupIds((err, groupIds) => {
+              if (err)
+                return cb(
+                  clarify(err, 'Failed to list group IDs when listing invites')
+                )
 
-            ssb.box2.getGroupKeyInfo(groupId, (err, info) => {
-              if (err) {
-                console.error('Error when finding group invite for me:', err)
-                return
-              }
-
-              if (!info) {
-                // We're not yet in the group
-                ssb.box2.addGroupInfo(groupId, {
-                  key: lodashGet(msg, 'value.content.secret'),
-                  root: lodashGet(msg, 'value.content.root'),
+              const source = pull(
+                ssb.db.query(
+                  where(and(isDecrypted('box2'), type('group/add-member'))),
+                  toPullStream()
+                ),
+                pull.filter((msg) =>
+                  // it's an addition of us
+                  lodashGet(msg, 'value.content.recps', []).includes(myRoot.id)
+                ),
+                pull.filter(
+                  (msg) =>
+                    // we haven't already accepted the addition
+                    !groupIds.includes(lodashGet(msg, 'value.content.recps[0]'))
+                ),
+                pull.map((msg) => {
+                  return {
+                    id: lodashGet(msg, 'value.content.recps[0]'),
+                    secret: Buffer.from(
+                      lodashGet(msg, 'value.content.secret'),
+                      'base64'
+                    ),
+                    root: lodashGet(msg, 'value.content.root'),
+                  }
                 })
-                ssb.db.reindexEncrypted(cb)
-              } else {
-                cb()
-              }
+              )
+
+              return cb(null, source)
             })
-          }),
-          pull.drain(() => {})
+          })
+        }),
+        pull.flatten()
+      )
+    }
+
+    function acceptInvite(groupId, cb) {
+      if (cb === undefined) return promisify(acceptInvite)(groupId)
+
+      let foundInvite = false
+      pull(
+        listInvites(),
+        pull.filter((groupInfo) => groupInfo.id === groupId),
+        pull.take(1),
+        pull.drain(
+          (groupInfo) => {
+            foundInvite = true
+            ssb.box2.addGroupInfo(groupInfo.id, {
+              key: groupInfo.secret,
+              root: groupInfo.root,
+            })
+
+            ssb.db.reindexEncrypted(cb)
+          },
+          (err) => {
+            if (err) return cb(err)
+            if (!foundInvite)
+              return cb(new Error("Didn't find invite for that group id"))
+          }
         )
+      )
+    }
+
+    function start(cb) {
+      if (cb === undefined) return promisify(start)()
+
+      findOrCreateAdditionsFeed((err) => {
+        if (err)
+          return cb(clarify(err, 'Error finding or creating additions feed'))
+        return cb()
       })
     }
 
@@ -299,6 +412,8 @@ module.exports = {
       addMembers,
       publish,
       listMembers,
+      listInvites,
+      acceptInvite,
       start,
     }
   },

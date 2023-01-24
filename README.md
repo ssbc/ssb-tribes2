@@ -45,12 +45,11 @@ npm install ssb-tribes2
 Then **to create a group** and **publish to it**,
 
 ```js
-// This is needed to continously detect new groups we were added to
+// This is needed to automatically create an additions feed, needed to be able to send and receive invites
 ssb.tribes2.start()
 
 // Create a new group, no further details required, thus the empty object
 ssb.tribes2.create({}, (err, group) => {
-
   // Publish a new message to the group, notice the recps
   ssb.tribes2.publish(
     {
@@ -104,6 +103,7 @@ Creates a new private group.
 This creates an encryption key, sets up a sub-feed for the group, and initializes the
 group with a `group/init` message, and `group/add-member` to signal you were added.
 Calls back with important info about the group.
+NOTE: If `create` finds an empty (i.e. seemingly unused) group feed, it will start using that feed instead of creating a new one.
 
 - `opts` _Object_ - currently empty, but will be used in the future to specify details like whether the group has an admin subgroup, etc.
 - `cb` _Function_ - callback function of signature `(err, group)` where `group` is an object containing:
@@ -143,10 +143,17 @@ Publishes any kind of message encrypted to the group. The function wraps `ssb.db
 
 Returns a pull stream source listing every known member of the group with id `groupId`.
 
+### `ssb.tribes2.listInvites() => source`
+
+Returns a pull stream source listing invites (another user sent you one with `addMembers`) that you haven't accepted yet. The invites are on the same format as that of #create.
+
+### `ssb.tribes2.acceptInvite(groupId, cb)`
+
+Accepts an invite (addition) for a group, if you've received one, and starts to replicate and decrypt it.
+
 ### `ssb.tribes2.start()`
 
-Starts this module listening for `group/add-member` messages, which will then trigger replication
-changes and new encryption / indexing as required.
+Makes sure that you're set up to send and receive group invites, by creating an additions feed for you.
 
 ## License
 
