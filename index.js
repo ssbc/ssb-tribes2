@@ -7,6 +7,7 @@ const pull = require('pull-stream')
 const paraMap = require('pull-paramap')
 const pullAsync = require('pull-async')
 const lodashGet = require('lodash.get')
+const clarify = require('clarify-error')
 const {
   where,
   and,
@@ -316,46 +317,90 @@ module.exports = {
       )
     }
 
-    // Listeners for joining groups
-    function start() {
-      ssb.metafeeds.findOrCreate((err, myRoot) => {
-        if (err) throw new Error('Could not find or create my root feed')
-        findOrCreateAdditionsFeed((err) => {
-          if (err) console.warn('Error finding or creating additions feed', err)
-        })
+    function listInvites() {
+      return pull(
+        pull.values([0]), // dummy value used to kickstart the stream
+        pull.asyncMap((n, cb) => {
+          ssb.metafeeds.findOrCreate((err, myRoot) => {
+            if (err)
+              return cb(
+                clarify(err, 'Failed to get root metafeed when listing invites')
+              )
 
-        pull(
-          ssb.db.query(
-            where(and(isDecrypted('box2'), type('group/add-member'))),
-            live({ old: true }),
-            toPullStream()
-          ),
-          pull.filter((msg) =>
-            lodashGet(msg, 'value.content.recps', []).includes(myRoot.id)
-          ),
-          pull.asyncMap((msg, cb) => {
-            const groupId = lodashGet(msg, 'value.content.recps[0]')
+            ssb.box2.listGroupIds((err, groupIds) => {
+              if (err)
+                return cb(
+                  clarify(err, 'Failed to list group IDs when listing invites')
+                )
 
-            ssb.box2.getGroupKeyInfo(groupId, (err, info) => {
-              if (err) {
-                console.error('Error when finding group invite for me:', err)
-                return
-              }
-
-              if (!info) {
-                // We're not yet in the group
-                ssb.box2.addGroupInfo(groupId, {
-                  key: lodashGet(msg, 'value.content.secret'),
-                  root: lodashGet(msg, 'value.content.root'),
+              const source = pull(
+                ssb.db.query(
+                  where(and(isDecrypted('box2'), type('group/add-member'))),
+                  toPullStream()
+                ),
+                pull.filter((msg) =>
+                  // it's an addition of us
+                  lodashGet(msg, 'value.content.recps', []).includes(myRoot.id)
+                ),
+                pull.filter(
+                  (msg) =>
+                    // we haven't already accepted the addition
+                    !groupIds.includes(lodashGet(msg, 'value.content.recps[0]'))
+                ),
+                pull.map((msg) => {
+                  return {
+                    id: lodashGet(msg, 'value.content.recps[0]'),
+                    secret: Buffer.from(
+                      lodashGet(msg, 'value.content.secret'),
+                      'base64'
+                    ),
+                    root: lodashGet(msg, 'value.content.root'),
+                  }
                 })
-                ssb.db.reindexEncrypted(cb)
-              } else {
-                cb()
-              }
+              )
+
+              return cb(null, source)
             })
-          }),
-          pull.drain(() => {})
+          })
+        }),
+        pull.flatten()
+      )
+    }
+
+    function acceptInvite(groupId, cb) {
+      if (cb === undefined) return promisify(acceptInvite)(groupId)
+
+      let foundInvite = false
+      pull(
+        listInvites(),
+        pull.filter((groupInfo) => groupInfo.id === groupId),
+        pull.take(1),
+        pull.drain(
+          (groupInfo) => {
+            foundInvite = true
+            ssb.box2.addGroupInfo(groupInfo.id, {
+              key: groupInfo.secret,
+              root: groupInfo.root,
+            })
+
+            ssb.db.reindexEncrypted(cb)
+          },
+          (err) => {
+            if (err) return cb(err)
+            if (!foundInvite)
+              return cb(new Error("Didn't find invite for that group id"))
+          }
         )
+      )
+    }
+
+    function start(cb) {
+      if (cb === undefined) return promisify(start)()
+
+      findOrCreateAdditionsFeed((err) => {
+        if (err)
+          return cb(clarify(err, 'Error finding or creating additions feed'))
+        return cb()
       })
     }
 
@@ -366,6 +411,8 @@ module.exports = {
       addMembers,
       publish,
       listMembers,
+      listInvites,
+      acceptInvite,
       start,
     }
   },
