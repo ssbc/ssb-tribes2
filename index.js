@@ -379,12 +379,17 @@ module.exports = {
         pull.drain(
           (groupInfo) => {
             foundInvite = true
-            ssb.box2.addGroupInfo(groupInfo.id, {
-              key: groupInfo.secret,
-              root: groupInfo.root,
-            })
-
-            ssb.db.reindexEncrypted(cb)
+            ssb.box2.addGroupInfo(
+              groupInfo.id,
+              {
+                key: groupInfo.secret,
+                root: groupInfo.root,
+              },
+              (err) => {
+                if (err) cb(err)
+                else ssb.db.reindexEncrypted(cb)
+              }
+            )
           },
           (err) => {
             if (err) return cb(err)
