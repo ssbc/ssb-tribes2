@@ -223,11 +223,26 @@ module.exports = {
       })
     }
 
-    function list() {
+    function list(opts = {}) {
+      //return pull(
+      //  pullAsync((cb) => ssb.box2.listGroupIds({ live: !!opts.live }, cb)),
+      //  //pull.map((idStream) => {
+      //  //  console.log('idStream', idStream)
+      //  //  return pull(
+      //  //    idStream,
+      //  //    pull.map((id) => {
+      //  //      console.log('id', id)
+      //  //      return id
+      //  //    })
+      //  //  )
+      //  //}),
+      //  pull.flatten()
+      //)
       return pull(
-        pullAsync((cb) => ssb.box2.listGroupIds(cb)),
-        pull.map((ids) => pull.values(ids)),
-        pull.flatten(),
+        ssb.box2.listGroupIds({ live: !!opts.live }),
+        pull.map((id) => {
+          console.log('id', id)
+        }),
         paraMap(get, 4)
       )
     }
@@ -342,38 +357,50 @@ module.exports = {
             // prettier-ignore
             if (err) return cb(clarify(err, 'Failed to get root metafeed when listing invites'))
 
-            ssb.box2.listGroupIds((err, groupIds) => {
-              // prettier-ignore
-              if (err) return cb(clarify(err, 'Failed to list group IDs when listing invites'))
+            pull(
+              ssb.box2.listGroupIds(),
+              pull.collect((err, groupIds) => {
+                if (err)
+                  return cb(
+                    clarify(
+                      err,
+                      'Failed to list group IDs when listing invites'
+                    )
+                  )
 
-              const source = pull(
-                ssb.db.query(
-                  where(and(isDecrypted('box2'), type('group/add-member'))),
-                  toPullStream()
-                ),
-                pull.filter((msg) =>
-                  // it's an addition of us
-                  lodashGet(msg, 'value.content.recps', []).includes(myRoot.id)
-                ),
-                pull.filter(
-                  (msg) =>
-                    // we haven't already accepted the addition
-                    !groupIds.includes(lodashGet(msg, 'value.content.recps[0]'))
-                ),
-                pull.map((msg) => {
-                  return {
-                    id: lodashGet(msg, 'value.content.recps[0]'),
-                    secret: Buffer.from(
-                      lodashGet(msg, 'value.content.secret'),
-                      'base64'
-                    ),
-                    root: lodashGet(msg, 'value.content.root'),
-                  }
-                })
-              )
+                const source = pull(
+                  ssb.db.query(
+                    where(and(isDecrypted('box2'), type('group/add-member'))),
+                    toPullStream()
+                  ),
+                  pull.filter((msg) =>
+                    // it's an addition of us
+                    lodashGet(msg, 'value.content.recps', []).includes(
+                      myRoot.id
+                    )
+                  ),
+                  pull.filter(
+                    (msg) =>
+                      // we haven't already accepted the addition
+                      !groupIds.includes(
+                        lodashGet(msg, 'value.content.recps[0]')
+                      )
+                  ),
+                  pull.map((msg) => {
+                    return {
+                      id: lodashGet(msg, 'value.content.recps[0]'),
+                      secret: Buffer.from(
+                        lodashGet(msg, 'value.content.secret'),
+                        'base64'
+                      ),
+                      root: lodashGet(msg, 'value.content.root'),
+                    }
+                  })
+                )
 
-              return cb(null, source)
-            })
+                return cb(null, source)
+              })
+            )
           })
         }),
         pull.flatten()

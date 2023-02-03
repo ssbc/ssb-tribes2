@@ -6,7 +6,9 @@ const test = require('tape')
 const { promisify: p } = require('util')
 const pull = require('pull-stream')
 const { isClassicMessageSSBURI, isIdentityGroupSSBURI } = require('ssb-uri2')
+const ssbKeys = require('ssb-keys')
 const Testbot = require('./helpers/testbot')
+const replicate = require('./helpers/replicate')
 
 test('tribes.list + tribes.get', (t) => {
   const name = `list-and-get-groups-${Date.now()}`
@@ -138,4 +140,72 @@ test('list', (t) => {
       )
     })
     .catch(t.error)
+})
+
+test.only('live list groups', async (t) => {
+  const alice = Testbot({
+    keys: ssbKeys.generate(null, 'alice'),
+    mfSeed: Buffer.from(
+      '000000000000000000000000000000000000000000000000000000000000a1ce',
+      'hex'
+    ),
+  })
+
+  const bob = Testbot({
+    keys: ssbKeys.generate(null, 'bob'),
+    mfSeed: Buffer.from(
+      '0000000000000000000000000000000000000000000000000000000000000b0b',
+      'hex'
+    ),
+  })
+
+  await alice.tribes2.start()
+  await bob.tribes2.start()
+
+  const aliceRoot = await p(alice.metafeeds.findOrCreate)()
+  const bobRoot = await p(bob.metafeeds.findOrCreate)()
+
+  await replicate(alice, bob)
+  t.pass('alice and bob replicated their trees')
+
+  const groups = []
+  pull(
+    bob.tribes2.list({ live: true }),
+    pull.drain(
+      (group) => {
+        console.log('pushing group', group)
+        groups.push(group)
+      },
+      (err) => {
+        console.log('group stream finished')
+        if (err) t.fail(err)
+      }
+    )
+  )
+
+  await p(setTimeout)(2000)
+  t.deepEqual(groups, [], 'only alice in the group so far')
+
+  const group = await p(alice.tribes2.create)(null).catch(t.fail)
+  t.pass('alice created a group')
+
+  await alice.tribes2
+    .addMembers(group.id, [bobRoot.id])
+    .catch((err) => t.fail(err))
+  t.pass('bob was added')
+
+  await replicate(alice, bob).catch(t.fail)
+  console.log('finished replicating')
+  t.pass('alice and bob replicated the invite')
+
+  console.log('about to accept', group)
+  const acceptedInvite = await bob.tribes2.acceptInvite(group.id).catch(t.fail)
+  console.log('accepted invite', acceptedInvite)
+  t.pass('bob accepted invite')
+
+  await p(setTimeout)(2000)
+  t.deepEqual(groups, [group], 'bob now finds the group in the group list')
+
+  await p(alice.close)(true)
+  await p(bob.close)(true)
 })
