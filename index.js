@@ -215,6 +215,7 @@ module.exports = {
 
         if (!info) return cb(new Error(`Couldn't find group with id ${id}`))
 
+        console.log('get info', info)
         cb(null, {
           id,
           secret: info.key,
@@ -224,27 +225,7 @@ module.exports = {
     }
 
     function list(opts = {}) {
-      //return pull(
-      //  pullAsync((cb) => ssb.box2.listGroupIds({ live: !!opts.live }, cb)),
-      //  //pull.map((idStream) => {
-      //  //  console.log('idStream', idStream)
-      //  //  return pull(
-      //  //    idStream,
-      //  //    pull.map((id) => {
-      //  //      console.log('id', id)
-      //  //      return id
-      //  //    })
-      //  //  )
-      //  //}),
-      //  pull.flatten()
-      //)
-      return pull(
-        ssb.box2.listGroupIds({ live: !!opts.live }),
-        pull.map((id) => {
-          console.log('id', id)
-        }),
-        paraMap(get, 4)
-      )
+      return pull(ssb.box2.listGroupIds({ live: !!opts.live }), paraMap(get, 4))
     }
 
     function addMembers(groupId, feedIds, opts = {}, cb) {
@@ -430,7 +411,7 @@ module.exports = {
                 ssb.db.reindexEncrypted((err) => {
                   // prettier-ignore
                   if (err) cb(clarify(err, 'Failed to reindex encrypted messages when accepting an invite'))
-                  else cb()
+                  else cb(null, groupInfo)
                 })
               }
             )

@@ -204,7 +204,10 @@ test.only('live list groups', async (t) => {
   t.pass('bob accepted invite')
 
   await p(setTimeout)(2000)
-  t.deepEqual(groups, [group], 'bob now finds the group in the group list')
+  t.equal(groups.length, 1, 'bob now finds the group in the group list')
+  t.equal(groups[0].id, group.id, 'id matches')
+  t.equal(groups[0].root, group.root, 'root matches')
+  t.true(groups[0].secret.equals(group.secret), 'secret matches')
 
   await p(alice.close)(true)
   await p(bob.close)(true)
