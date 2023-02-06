@@ -40,7 +40,6 @@
     "lodash.get": "^4.4.2",
     "lodash.set": "^4.3.2",
     "private-group-spec": "^2.0.0",
-    "pull-async": "^1.0.0",
     "pull-paramap": "^1.2.2",
     "pull-stream": "^3.7.0",
     "ssb-bfe": "^3.7.0",

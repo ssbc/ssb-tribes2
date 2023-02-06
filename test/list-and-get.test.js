@@ -60,44 +60,15 @@ test('tribes.list + tribes.get', (t) => {
   })
 })
 
-test.skip('tribes.list (subtribes)', async (t) => {
-  const server = Server()
-
-  const { groupId } = await p(server.tribes.create)({})
-  const { groupId: subGroupId } = await p(server.tribes.subtribe.create)(
-    groupId,
-    {}
-  )
-
-  let list = await p(server.tribes.list)()
-
-  t.deepEqual(list, [groupId], 'excludes subtribes by default')
-
-  list = await p(server.tribes.list)({ subtribes: true })
-
-  t.deepEqual(
-    list,
-    [groupId, subGroupId],
-    '{ subtribes: true } includes subtribes'
-  )
-
-  server.close()
-  t.end()
-})
-
 test('get', async (t) => {
   const ssb = Testbot()
 
-  const { id, subfeed, secret, root } = await ssb.tribes2
-    .create()
-    .catch(t.error)
+  const { id, secret, root } = await ssb.tribes2.create().catch(t.error)
 
   const group = await ssb.tribes2.get(id)
 
-  //- `subfeed` *Keys* - the keys of the subfeed you should publish group data to
   t.equal(id, group.id)
   t.true(isIdentityGroupSSBURI(group.id))
-  //TODO: subfeed
   t.true(Buffer.isBuffer(group.secret))
   t.equal(secret, group.secret)
   t.true(isClassicMessageSSBURI(group.root), 'has root')
@@ -142,7 +113,7 @@ test('list', (t) => {
     .catch(t.error)
 })
 
-test.only('live list groups', async (t) => {
+test('live list groups', async (t) => {
   const alice = Testbot({
     keys: ssbKeys.generate(null, 'alice'),
     mfSeed: Buffer.from(
@@ -162,7 +133,7 @@ test.only('live list groups', async (t) => {
   await alice.tribes2.start()
   await bob.tribes2.start()
 
-  const aliceRoot = await p(alice.metafeeds.findOrCreate)()
+  await p(alice.metafeeds.findOrCreate)()
   const bobRoot = await p(bob.metafeeds.findOrCreate)()
 
   await replicate(alice, bob)
@@ -173,11 +144,9 @@ test.only('live list groups', async (t) => {
     bob.tribes2.list({ live: true }),
     pull.drain(
       (group) => {
-        console.log('pushing group', group)
         groups.push(group)
       },
       (err) => {
-        console.log('group stream finished')
         if (err) t.fail(err)
       }
     )
@@ -195,12 +164,9 @@ test.only('live list groups', async (t) => {
   t.pass('bob was added')
 
   await replicate(alice, bob).catch(t.fail)
-  console.log('finished replicating')
   t.pass('alice and bob replicated the invite')
 
-  console.log('about to accept', group)
-  const acceptedInvite = await bob.tribes2.acceptInvite(group.id).catch(t.fail)
-  console.log('accepted invite', acceptedInvite)
+  await bob.tribes2.acceptInvite(group.id).catch(t.fail)
   t.pass('bob accepted invite')
 
   await p(setTimeout)(2000)

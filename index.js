@@ -5,7 +5,6 @@
 const { promisify } = require('util')
 const pull = require('pull-stream')
 const paraMap = require('pull-paramap')
-const pullAsync = require('pull-async')
 const lodashGet = require('lodash.get')
 const clarify = require('clarify-error')
 const {
@@ -40,6 +39,7 @@ module.exports = {
     addMembers: 'async',
     start: 'async',
   },
+  // eslint-disable-next-line no-unused-vars
   init(ssb, config) {
     const addGroupTangle = AddGroupTangle(ssb)
 
@@ -215,7 +215,6 @@ module.exports = {
 
         if (!info) return cb(new Error(`Couldn't find group with id ${id}`))
 
-        console.log('get info', info)
         cb(null, {
           id,
           secret: info.key,
