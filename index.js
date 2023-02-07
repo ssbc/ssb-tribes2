@@ -166,6 +166,7 @@ module.exports = {
 
           const recps = [
             { key: secret.toBuffer(), scheme: keySchemes.private_group },
+            root.id,
           ]
 
           ssb.db.create(
