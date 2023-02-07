@@ -119,9 +119,9 @@ Gets information about a specific group.
 - `groupId` _CloakedId_ - the public-safe cipherlink which identifies the group
 - `cb` _Function_ - callback function of signature `(err, group)` where `group` is an object on the same format as the `group` object returned by #create
 
-### `ssb.tribes2.list() => source`
+### `ssb.tribes2.list({ live }) => source`
 
-Creates a pull-stream source which emits `group` data of each private group you're a part of.
+Creates a pull-stream source which emits `group` data of each private group you're a part of. If `live` is true then it also outputs all new groups you join.
 (Same format as `group` object returned by #create)
 
 ### `ssb.tribes2.addMembers(groupId, feedIds, cb)`
