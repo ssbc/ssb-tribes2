@@ -29,7 +29,7 @@ test('get added to a group', async (t) => {
   await bob.tribes2.start()
   t.pass('tribes2 started for both alice and bob')
 
-  const aliceRoot = await p(alice.metafeeds.findOrCreate)()
+  await p(alice.metafeeds.findOrCreate)()
   const bobRoot = await p(bob.metafeeds.findOrCreate)()
 
   await replicate(alice, bob)
@@ -37,7 +37,6 @@ test('get added to a group', async (t) => {
 
   const {
     id: groupId,
-    subfeed,
     secret,
     root,
   } = await alice.tribes2.create().catch(t.fail)

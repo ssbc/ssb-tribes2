@@ -1,6 +1,6 @@
 {
   "name": "ssb-tribes2",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "SSB private groups with ssb-db2",
   "repository": {
     "type": "git",
@@ -40,11 +40,10 @@
     "lodash.get": "^4.4.2",
     "lodash.set": "^4.3.2",
     "private-group-spec": "^2.0.0",
-    "pull-async": "^1.0.0",
     "pull-paramap": "^1.2.2",
     "pull-stream": "^3.7.0",
     "ssb-bfe": "^3.7.0",
-    "ssb-box2": "^4.2.0",
+    "ssb-box2": "^5.0.0",
     "ssb-crut": "^4.6.1",
     "ssb-db2": "^6.3.0",
     "ssb-meta-feeds": "0.38.1",

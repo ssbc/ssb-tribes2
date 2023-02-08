@@ -5,7 +5,6 @@
 const { promisify } = require('util')
 const pull = require('pull-stream')
 const paraMap = require('pull-paramap')
-const pullAsync = require('pull-async')
 const lodashGet = require('lodash.get')
 const clarify = require('clarify-error')
 const {
@@ -40,6 +39,7 @@ module.exports = {
     addMembers: 'async',
     start: 'async',
   },
+  // eslint-disable-next-line no-unused-vars
   init(ssb, config) {
     const addGroupTangle = AddGroupTangle(ssb)
 
@@ -224,13 +224,8 @@ module.exports = {
       })
     }
 
-    function list() {
-      return pull(
-        pullAsync((cb) => ssb.box2.listGroupIds(cb)),
-        pull.map((ids) => pull.values(ids)),
-        pull.flatten(),
-        paraMap(get, 4)
-      )
+    function list(opts = {}) {
+      return pull(ssb.box2.listGroupIds({ live: !!opts.live }), paraMap(get, 4))
     }
 
     function addMembers(groupId, feedIds, opts = {}, cb) {
@@ -343,38 +338,45 @@ module.exports = {
             // prettier-ignore
             if (err) return cb(clarify(err, 'Failed to get root metafeed when listing invites'))
 
-            ssb.box2.listGroupIds((err, groupIds) => {
-              // prettier-ignore
-              if (err) return cb(clarify(err, 'Failed to list group IDs when listing invites'))
+            pull(
+              ssb.box2.listGroupIds(),
+              pull.collect((err, groupIds) => {
+                // prettier-ignore
+                if (err) return cb(clarify(err, 'Failed to list group IDs when listing invites'))
 
-              const source = pull(
-                ssb.db.query(
-                  where(and(isDecrypted('box2'), type('group/add-member'))),
-                  toPullStream()
-                ),
-                pull.filter((msg) =>
-                  // it's an addition of us
-                  lodashGet(msg, 'value.content.recps', []).includes(myRoot.id)
-                ),
-                pull.filter(
-                  (msg) =>
-                    // we haven't already accepted the addition
-                    !groupIds.includes(lodashGet(msg, 'value.content.recps[0]'))
-                ),
-                pull.map((msg) => {
-                  return {
-                    id: lodashGet(msg, 'value.content.recps[0]'),
-                    secret: Buffer.from(
-                      lodashGet(msg, 'value.content.secret'),
-                      'base64'
-                    ),
-                    root: lodashGet(msg, 'value.content.root'),
-                  }
-                })
-              )
+                const source = pull(
+                  ssb.db.query(
+                    where(and(isDecrypted('box2'), type('group/add-member'))),
+                    toPullStream()
+                  ),
+                  pull.filter((msg) =>
+                    // it's an addition of us
+                    lodashGet(msg, 'value.content.recps', []).includes(
+                      myRoot.id
+                    )
+                  ),
+                  pull.filter(
+                    (msg) =>
+                      // we haven't already accepted the addition
+                      !groupIds.includes(
+                        lodashGet(msg, 'value.content.recps[0]')
+                      )
+                  ),
+                  pull.map((msg) => {
+                    return {
+                      id: lodashGet(msg, 'value.content.recps[0]'),
+                      secret: Buffer.from(
+                        lodashGet(msg, 'value.content.secret'),
+                        'base64'
+                      ),
+                      root: lodashGet(msg, 'value.content.root'),
+                    }
+                  })
+                )
 
-              return cb(null, source)
-            })
+                return cb(null, source)
+              })
+            )
           })
         }),
         pull.flatten()
@@ -404,7 +406,7 @@ module.exports = {
                 ssb.db.reindexEncrypted((err) => {
                   // prettier-ignore
                   if (err) cb(clarify(err, 'Failed to reindex encrypted messages when accepting an invite'))
-                  else cb()
+                  else cb(null, groupInfo)
                 })
               }
             )

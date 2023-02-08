@@ -6,7 +6,9 @@ const test = require('tape')
 const { promisify: p } = require('util')
 const pull = require('pull-stream')
 const { isClassicMessageSSBURI, isIdentityGroupSSBURI } = require('ssb-uri2')
+const ssbKeys = require('ssb-keys')
 const Testbot = require('./helpers/testbot')
+const replicate = require('./helpers/replicate')
 
 test('tribes.list + tribes.get', (t) => {
   const name = `list-and-get-groups-${Date.now()}`
@@ -58,44 +60,15 @@ test('tribes.list + tribes.get', (t) => {
   })
 })
 
-test.skip('tribes.list (subtribes)', async (t) => {
-  const server = Server()
-
-  const { groupId } = await p(server.tribes.create)({})
-  const { groupId: subGroupId } = await p(server.tribes.subtribe.create)(
-    groupId,
-    {}
-  )
-
-  let list = await p(server.tribes.list)()
-
-  t.deepEqual(list, [groupId], 'excludes subtribes by default')
-
-  list = await p(server.tribes.list)({ subtribes: true })
-
-  t.deepEqual(
-    list,
-    [groupId, subGroupId],
-    '{ subtribes: true } includes subtribes'
-  )
-
-  server.close()
-  t.end()
-})
-
 test('get', async (t) => {
   const ssb = Testbot()
 
-  const { id, subfeed, secret, root } = await ssb.tribes2
-    .create()
-    .catch(t.error)
+  const { id, secret, root } = await ssb.tribes2.create().catch(t.error)
 
   const group = await ssb.tribes2.get(id)
 
-  //- `subfeed` *Keys* - the keys of the subfeed you should publish group data to
   t.equal(id, group.id)
   t.true(isIdentityGroupSSBURI(group.id))
-  //TODO: subfeed
   t.true(Buffer.isBuffer(group.secret))
   t.equal(secret, group.secret)
   t.true(isClassicMessageSSBURI(group.root), 'has root')
@@ -138,4 +111,70 @@ test('list', (t) => {
       )
     })
     .catch(t.error)
+})
+
+test('live list groups', async (t) => {
+  const alice = Testbot({
+    keys: ssbKeys.generate(null, 'alice'),
+    mfSeed: Buffer.from(
+      '000000000000000000000000000000000000000000000000000000000000a1ce',
+      'hex'
+    ),
+  })
+
+  const bob = Testbot({
+    keys: ssbKeys.generate(null, 'bob'),
+    mfSeed: Buffer.from(
+      '0000000000000000000000000000000000000000000000000000000000000b0b',
+      'hex'
+    ),
+  })
+
+  await alice.tribes2.start()
+  await bob.tribes2.start()
+
+  await p(alice.metafeeds.findOrCreate)()
+  const bobRoot = await p(bob.metafeeds.findOrCreate)()
+
+  await replicate(alice, bob)
+  t.pass('alice and bob replicated their trees')
+
+  const groups = []
+  pull(
+    bob.tribes2.list({ live: true }),
+    pull.drain(
+      (group) => {
+        groups.push(group)
+      },
+      (err) => {
+        if (err) t.fail(err)
+      }
+    )
+  )
+
+  await p(setTimeout)(2000)
+  t.deepEqual(groups, [], 'only alice in the group so far')
+
+  const group = await p(alice.tribes2.create)(null).catch(t.fail)
+  t.pass('alice created a group')
+
+  await alice.tribes2
+    .addMembers(group.id, [bobRoot.id])
+    .catch((err) => t.fail(err))
+  t.pass('bob was added')
+
+  await replicate(alice, bob).catch(t.fail)
+  t.pass('alice and bob replicated the invite')
+
+  await bob.tribes2.acceptInvite(group.id).catch(t.fail)
+  t.pass('bob accepted invite')
+
+  await p(setTimeout)(2000)
+  t.equal(groups.length, 1, 'bob now finds the group in the group list')
+  t.equal(groups[0].id, group.id, 'id matches')
+  t.equal(groups[0].root, group.root, 'root matches')
+  t.true(groups[0].secret.equals(group.secret), 'secret matches')
+
+  await p(alice.close)(true)
+  await p(bob.close)(true)
 })
