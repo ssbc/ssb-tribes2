@@ -179,3 +179,82 @@ test('create reuses an unused group feed (because of an earlier crash or somethi
     })
   })
 })
+
+test("create reuses a group feed that hasn't had members yet (because of an earlier crash or something)", (t) => {
+  const server = Testbot()
+
+  server.metafeeds.findOrCreate((err, root) => {
+    if (err) t.fail(err)
+
+    t.pass('got root')
+
+    countGroupFeeds(server, (err, num) => {
+      if (err) t.fail(err)
+
+      t.equal(num, 0, 'there are no group feeds yet')
+
+      server.tribes2.create(null, (err) => {
+        if (err) t.fail(err)
+
+        countGroupFeeds(server, (err, num) => {
+          if (err) t.fail(err)
+          t.equal(num, 1, 'there is 1 group feed after we created a group')
+
+          createEmptyGroupFeed({ server, root }, (err, groupFeed) => {
+            if (err) t.fail(err)
+
+            const content = {
+              type: 'group/init',
+              tangles: {
+                group: { root: null, previous: null },
+              },
+            }
+            const secret = new SecretKey(
+              Buffer.from(groupFeed.purpose, 'base64')
+            )
+            const recps = [
+              { key: secret.toBuffer(), scheme: keySchemes.private_group },
+              root.id,
+            ]
+            server.db.create(
+              {
+                keys: groupFeed.keys,
+                content,
+                recps,
+                encryptionFormat: 'box2',
+              },
+              (err) => {
+                if (err) t.fail(err)
+
+                countGroupFeeds(server, (err, num) => {
+                  if (err) t.fail(err)
+                  t.equal(
+                    num,
+                    2,
+                    'there is 1 used group feed and 1 we created now with a root message but not ourselves as a member'
+                  )
+
+                  server.tribes2.create(null, (err) => {
+                    if (err) t.fail(err)
+
+                    countGroupFeeds(server, (err, num) => {
+                      if (err) t.fail(err)
+
+                      t.equal(
+                        num,
+                        2,
+                        'there are still only 2 group feeds after creating another group. the unused one got used by create()'
+                      )
+
+                      server.close(true, t.end)
+                    })
+                  })
+                })
+              }
+            )
+          })
+        })
+      })
+    })
+  })
+})
