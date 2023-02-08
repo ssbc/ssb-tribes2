@@ -340,13 +340,8 @@ module.exports = {
             pull(
               ssb.box2.listGroupIds(),
               pull.collect((err, groupIds) => {
-                if (err)
-                  return cb(
-                    clarify(
-                      err,
-                      'Failed to list group IDs when listing invites'
-                    )
-                  )
+                // prettier-ignore
+                if (err) return cb(clarify(err, 'Failed to list group IDs when listing invites'))
 
                 const source = pull(
                   ssb.db.query(
