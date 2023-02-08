@@ -119,9 +119,9 @@ Gets information about a specific group.
 - `groupId` _CloakedId_ - the public-safe cipherlink which identifies the group
 - `cb` _Function_ - callback function of signature `(err, group)` where `group` is an object on the same format as the `group` object returned by #create
 
-### `ssb.tribes2.list() => source`
+### `ssb.tribes2.list({ live }) => source`
 
-Creates a pull-stream source which emits `group` data of each private group you're a part of.
+Creates a pull-stream source which emits `group` data of each private group you're a part of. If `live` is true then it also outputs all new groups you join.
 (Same format as `group` object returned by #create)
 
 ### `ssb.tribes2.addMembers(groupId, feedIds, cb)`
@@ -141,7 +141,7 @@ Publishes any kind of message encrypted to the group. The function wraps `ssb.db
 
 ### `ssb.tribes2.listMembers(groupId) => source`
 
-Returns a pull stream source listing every known member of the group with id `groupId`.
+Returns a pull stream source listing every known member of the group with id `groupId`. Note: lists members whether or not they've accepted the invite.
 
 ### `ssb.tribes2.listInvites() => source`
 
@@ -149,7 +149,7 @@ Returns a pull stream source listing invites (another user sent you one with `ad
 
 ### `ssb.tribes2.acceptInvite(groupId, cb)`
 
-Accepts an invite (addition) for a group, if you've received one, and starts to replicate and decrypt it.
+Accepts an invite (addition) for a group, if you've received one, and starts to replicate and decrypt it. Does not publish any message.
 
 ### `ssb.tribes2.start(cb)`
 
