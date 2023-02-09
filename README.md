@@ -139,9 +139,9 @@ Publishes any kind of message encrypted to the group. The function wraps `ssb.db
 
 - `cb` _Function_ - a callback of signature `(err, msg)`
 
-### `ssb.tribes2.listMembers(groupId) => source`
+### `ssb.tribes2.listMembers(groupId, { live }) => source`
 
-Returns a pull stream source listing every known member of the group with id `groupId`. Note: lists members whether or not they've accepted the invite.
+Returns a pull stream source listing every known member of the group with id `groupId`. Note: lists members whether or not they've accepted the invite. If `live` is true, then it keeps the stream open and also outputs new members.
 
 ### `ssb.tribes2.listInvites() => source`
 
