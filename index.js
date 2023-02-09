@@ -143,9 +143,11 @@ module.exports = {
       })
     }
 
-    function create(opts = {}, cb) {
-      if (cb === undefined) return promisify(create)(opts)
+    function secretKeyFromPurpose(purpose) {
+      return new SecretKey(Buffer.from(purpose, 'base64'))
+    }
 
+    function createGroupWithoutMembers(myRoot, cb) {
       const content = {
         type: 'group/init',
         tangles: {
@@ -154,57 +156,138 @@ module.exports = {
       }
       if (!initSpec(content)) return cb(new Error(initSpec.errorsString))
 
-      ssb.metafeeds.findOrCreate(function gotRoot(err, root) {
+      findOrCreateGroupFeed(null, function gotGroupFeed(err, groupFeed) {
+        // prettier-ignore
+        if (err) return cb(clarify(err, 'Failed to find or create group feed when creating a group'))
+
+        const secret = secretKeyFromPurpose(groupFeed.purpose)
+
+        const recps = [
+          { key: secret.toBuffer(), scheme: keySchemes.private_group },
+          myRoot.id,
+        ]
+
+        ssb.db.create(
+          {
+            keys: groupFeed.keys,
+            content,
+            recps,
+            encryptionFormat: 'box2',
+          },
+          (err, groupInitMsg) => {
+            // prettier-ignore
+            if (err) return cb(clarify(err, "couldn't create group root message"))
+            return cb(null, { groupInitMsg, groupFeed, myRoot })
+          }
+        )
+      })
+    }
+
+    /** more specifically: a group that has never had any members. i.e. either
+     * 1. newly created but tribes2 crashed before we had time to add ourselves to it. in that case find and return it. if we can't find such a group then
+     * 2. freshly create a new group, and return */
+    function findOrCreateGroupWithoutMembers(cb) {
+      ssb.metafeeds.findOrCreate(function gotRoot(err, myRoot) {
         // prettier-ignore
         if (err) return cb(clarify(err, 'Failed to find or create root feed when creating a group'))
 
-        findOrCreateGroupFeed(null, function gotGroupFeed(err, groupFeed) {
-          // prettier-ignore
-          if (err) return cb(clarify(err, 'Failed to find or create group feed when creating a group'))
+        // find groups without any group/add-member messages
+        let foundMemberlessGroup = false
+        pull(
+          ssb.db.query(
+            where(and(isDecrypted('box2'), type('group/init'))),
+            toPullStream()
+          ),
+          pull.asyncMap((rootMsg, cb) => {
+            let foundMember = false
+            pull(
+              ssb.db.query(
+                where(and(isDecrypted('box2'), type('group/add-member'))),
+                toPullStream()
+              ),
+              pull.filter(
+                (msg) =>
+                  msg?.value?.content?.root === fromMessageSigil(rootMsg.key)
+              ),
+              pull.take(1),
+              pull.drain(
+                () => {
+                  foundMember = true
+                  return cb(null, false)
+                },
+                (err) => {
+                  if (err) return cb(err)
+                  else if (!foundMember) cb(null, rootMsg)
+                }
+              )
+            )
+          }),
+          pull.filter(Boolean),
+          pull.take(1),
+          pull.drain(
+            (rootMsg) => {
+              foundMemberlessGroup = true
+              ssb.metafeeds.advanced.findById(
+                rootMsg.value.author,
+                (err, groupFeed) => {
+                  // prettier-ignore
+                  if (err) return cb(clarify(err, "failed finding details of the memberless group feed"))
 
-          const secret = new SecretKey(Buffer.from(groupFeed.purpose, 'base64'))
-
-          const recps = [
-            { key: secret.toBuffer(), scheme: keySchemes.private_group },
-          ]
-
-          ssb.db.create(
-            {
-              keys: groupFeed.keys,
-              content,
-              recps,
-              encryptionFormat: 'box2',
+                  rootMsg.value.content = rootMsg.meta.originalContent
+                  return cb(null, {
+                    groupInitMsg: rootMsg,
+                    groupFeed,
+                    myRoot,
+                  })
+                }
+              )
             },
-            (err, groupInitMsg) => {
+            (err) => {
               // prettier-ignore
-              if (err) return cb(clarify(err, 'Failed to create group init message when creating a group'))
-
-              const data = {
-                id: buildGroupId({
-                  groupInitMsg,
-                  groupKey: secret.toBuffer(),
-                }),
-                secret: secret.toBuffer(),
-                root: fromMessageSigil(groupInitMsg.key),
-                subfeed: groupFeed.keys,
+              if (err) return cb(clarify(err, "errored trying to find potential memberless feed"))
+              else if (!foundMemberlessGroup) {
+                return createGroupWithoutMembers(myRoot, cb)
               }
-
-              ssb.box2.addGroupInfo(data.id, {
-                key: data.secret,
-                root: data.root,
-              })
-
-              // Adding myself for recovery reasons
-              addMembers(data.id, [root.id], {}, (err) => {
-                // prettier-ignore
-                if (err) return cb(clarify(err, 'Failed to add myself to the group when creating a group'))
-
-                return cb(null, data)
-              })
             }
           )
-        })
+        )
       })
+    }
+
+    function create(opts = {}, cb) {
+      if (cb === undefined) return promisify(create)(opts)
+
+      findOrCreateGroupWithoutMembers(
+        (err, { groupInitMsg, groupFeed, myRoot }) => {
+          // prettier-ignore
+          if (err) return cb(clarify(err, 'Failed to create group init message when creating a group'))
+
+          const secret = secretKeyFromPurpose(groupFeed.purpose)
+
+          const data = {
+            id: buildGroupId({
+              groupInitMsg,
+              groupKey: secret.toBuffer(),
+            }),
+            secret: secret.toBuffer(),
+            root: fromMessageSigil(groupInitMsg.key),
+            subfeed: groupFeed.keys,
+          }
+
+          ssb.box2.addGroupInfo(data.id, {
+            key: data.secret,
+            root: data.root,
+          })
+
+          // Adding myself for recovery reasons
+          addMembers(data.id, [myRoot.id], {}, (err) => {
+            // prettier-ignore
+            if (err) return cb(clarify(err, 'Failed to add myself to the group when creating a group'))
+
+            return cb(null, data)
+          })
+        }
+      )
     }
 
     function get(id, cb) {

@@ -97,43 +97,44 @@ test('root message is encrypted', async (t) => {
   await p(alice.close)(true)
 })
 
-//TODO
-test.skip('tribes.create (opts.addPOBox)', (t) => {
-  const server = Testbot()
+function countGroupFeeds(server, cb) {
+  pull(
+    server.metafeeds.branchStream({ old: true, live: false }),
+    pull.filter((branch) => branch.length === 4),
+    pull.map((branch) => branch[3]),
+    pull.filter((feed) => feed.recps),
+    pull.collect((err, feeds) => {
+      if (err) return cb(err)
+      return cb(null, feeds.length)
+    })
+  )
+}
 
-  // this is more of an integration test over the api
-  server.tribes.create({ addPOBox: true }, (err, data) => {
-    if (err) throw err
-
-    t.true(isPoBox(data.poBoxId), 'data.poBoxId')
-
-    server.close()
-    t.end()
-  })
-})
+function createEmptyGroupFeed({ server, root }, cb) {
+  const secret = new SecretKey()
+  server.metafeeds.findOrCreate(
+    {
+      purpose: secret.toString(),
+      feedFormat: 'classic',
+      recps: [
+        { key: secret.toBuffer(), scheme: keySchemes.private_group },
+        root.id,
+      ],
+      encryptionFormat: 'box2',
+    },
+    cb
+  )
+}
 
 test('create reuses an unused group feed (because of an earlier crash or something)', (t) => {
   const server = Testbot()
-
-  function countGroupFeeds(cb) {
-    pull(
-      server.metafeeds.branchStream({ old: true, live: false }),
-      pull.filter((branch) => branch.length === 4),
-      pull.map((branch) => branch[3]),
-      pull.filter((feed) => feed.recps),
-      pull.collect((err, feeds) => {
-        if (err) return cb(err)
-        return cb(null, feeds.length)
-      })
-    )
-  }
 
   server.metafeeds.findOrCreate((err, root) => {
     if (err) t.fail(err)
 
     t.pass('got root')
 
-    countGroupFeeds((err, num) => {
+    countGroupFeeds(server, (err, num) => {
       if (err) t.fail(err)
 
       t.equal(num, 0, 'there are no group feeds yet')
@@ -141,50 +142,117 @@ test('create reuses an unused group feed (because of an earlier crash or somethi
       server.tribes2.create(null, (err) => {
         if (err) t.fail(err)
 
-        countGroupFeeds((err, num) => {
+        countGroupFeeds(server, (err, num) => {
           if (err) t.fail(err)
           t.equal(num, 1, 'there is 1 group feed after we created a group')
 
-          const secret = new SecretKey()
-          server.metafeeds.findOrCreate(
-            {
-              purpose: secret.toString(),
-              feedFormat: 'classic',
-              recps: [
-                { key: secret.toBuffer(), scheme: keySchemes.private_group },
-                root.id,
-              ],
-              encryptionFormat: 'box2',
-            },
-            (err) => {
+          createEmptyGroupFeed({ server, root }, (err) => {
+            if (err) t.fail(err)
+
+            countGroupFeeds(server, (err, num) => {
               if (err) t.fail(err)
+              t.equal(
+                num,
+                2,
+                'there is 1 used group feed and 1 dummy one, the empty one we created now'
+              )
 
-              countGroupFeeds((err, num) => {
+              server.tribes2.create(null, (err) => {
                 if (err) t.fail(err)
-                t.equal(
-                  num,
-                  2,
-                  'there is 1 used group feed and 1 dummy one, the empty one we created now'
-                )
 
-                server.tribes2.create(null, (err) => {
+                countGroupFeeds(server, (err, num) => {
                   if (err) t.fail(err)
 
-                  countGroupFeeds((err, num) => {
-                    if (err) t.fail(err)
+                  t.equal(
+                    num,
+                    2,
+                    'there are still only 2 group feeds after creating another group. the empty one got used by create()'
+                  )
 
-                    t.equal(
-                      num,
-                      2,
-                      'there are still only 2 group feeds after creating another group. the empty one got used by create()'
-                    )
-
-                    server.close(true, t.end)
-                  })
+                  server.close(true, t.end)
                 })
               })
+            })
+          })
+        })
+      })
+    })
+  })
+})
+
+test("create reuses a group feed that hasn't had members yet (because of an earlier crash or something)", (t) => {
+  const server = Testbot()
+
+  server.metafeeds.findOrCreate((err, root) => {
+    if (err) t.fail(err)
+
+    t.pass('got root')
+
+    countGroupFeeds(server, (err, num) => {
+      if (err) t.fail(err)
+
+      t.equal(num, 0, 'there are no group feeds yet')
+
+      server.tribes2.create(null, (err) => {
+        if (err) t.fail(err)
+
+        countGroupFeeds(server, (err, num) => {
+          if (err) t.fail(err)
+          t.equal(num, 1, 'there is 1 group feed after we created a group')
+
+          createEmptyGroupFeed({ server, root }, (err, groupFeed) => {
+            if (err) t.fail(err)
+
+            const content = {
+              type: 'group/init',
+              tangles: {
+                group: { root: null, previous: null },
+              },
             }
-          )
+            const secret = new SecretKey(
+              Buffer.from(groupFeed.purpose, 'base64')
+            )
+            const recps = [
+              { key: secret.toBuffer(), scheme: keySchemes.private_group },
+              root.id,
+            ]
+            server.db.create(
+              {
+                keys: groupFeed.keys,
+                content,
+                recps,
+                encryptionFormat: 'box2',
+              },
+              (err) => {
+                if (err) t.fail(err)
+
+                countGroupFeeds(server, (err, num) => {
+                  if (err) t.fail(err)
+                  t.equal(
+                    num,
+                    2,
+                    'there is 1 used group feed and 1 we created now with a root message but not ourselves as a member'
+                  )
+
+                  server.tribes2.create(null, (err) => {
+                    if (err) t.fail(err)
+
+                    countGroupFeeds(server, (err, num) => {
+                      if (err) t.fail(err)
+
+                      t.equal(
+                        num,
+                        2,
+                        'there are still only 2 group feeds after creating another group. the unused one got used by create()'
+                      )
+
+                      server.close(true, t.end)
+                    })
+                  })
+                })
+              }
+            )
+          })
         })
       })
     })
