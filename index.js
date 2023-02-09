@@ -205,7 +205,10 @@ module.exports = {
                 where(and(isDecrypted('box2'), type('group/add-member'))),
                 toPullStream()
               ),
-              pull.filter((msg) => msg?.value?.content?.root === rootMsg.key),
+              pull.filter(
+                (msg) =>
+                  msg?.value?.content?.root === fromMessageSigil(rootMsg.key)
+              ),
               pull.take(1),
               pull.drain(
                 () => {
