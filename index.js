@@ -335,19 +335,7 @@ module.exports = {
                   // prettier-ignore
                   if (err) return cb(clarify(err, "couldn't find parent of shard feed"))
 
-                  console.log('v1Feed', v1Feed)
-
-                  ssb.metafeeds.advanced.findById(
-                    v1Feed.parent,
-                    (err, rootFeed) => {
-                      // prettier-ignore
-                      if (err) return cb(clarify(err, "couldn't find root feed from v1 feed"))
-
-                      console.log('supposed root feed', rootFeed)
-
-                      return cb(null, rootFeed.id)
-                    }
-                  )
+                  return cb(null, v1Feed.parent)
                 }
               )
             }
@@ -378,12 +366,11 @@ module.exports = {
           // prettier-ignore
           if (err) return cb(clarify(err, "couldn't get root id of author of root msg"))
 
-          console.log('rootAuthorId', rootAuthorId)
-
           const content = {
             type: 'group/add-member',
             version: 'v2',
             groupKey: secret.toString('base64'),
+            root,
             creator: rootAuthorId,
             tangles: {
               members: {
