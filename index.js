@@ -25,7 +25,11 @@ const {
   },
 } = require('private-group-spec')
 const { SecretKey } = require('ssb-private-group-keys')
-const { fromMessageSigil, isBendyButtV1FeedSSBURI } = require('ssb-uri2')
+const {
+  fromMessageSigil,
+  fromFeedSigil,
+  isBendyButtV1FeedSSBURI,
+} = require('ssb-uri2')
 const buildGroupId = require('./lib/build-group-id')
 const AddGroupTangle = require('./lib/add-group-tangle')
 const publishAndPrune = require('./lib/prune-publish')
@@ -310,6 +314,48 @@ module.exports = {
       return pull(ssb.box2.listGroupIds({ live: !!opts.live }), paraMap(get, 4))
     }
 
+    function getRootIdOfMsgAuthor(groupRootMsgId, cb) {
+      ssb.db.get(groupRootMsgId, (err, rootMsg) => {
+        // prettier-ignore
+        if (err) return cb(clarify(err, "couldn't get root msg for finding root feed"))
+
+        ssb.metafeeds.advanced.findById(rootMsg.author, (err, groupFeed) => {
+          // prettier-ignore
+          if (err) return cb(clarify(err, "couldn't get root msg for finding root feed"))
+
+          ssb.metafeeds.advanced.findById(
+            groupFeed.parent,
+            (err, shardFeed) => {
+              // prettier-ignore
+              if (err) return cb(clarify(err, "couldn't find parent of group feed"))
+
+              ssb.metafeeds.advanced.findById(
+                shardFeed.parent,
+                (err, v1Feed) => {
+                  // prettier-ignore
+                  if (err) return cb(clarify(err, "couldn't find parent of shard feed"))
+
+                  console.log('v1Feed', v1Feed)
+
+                  ssb.metafeeds.advanced.findById(
+                    v1Feed.parent,
+                    (err, rootFeed) => {
+                      // prettier-ignore
+                      if (err) return cb(clarify(err, "couldn't find root feed from v1 feed"))
+
+                      console.log('supposed root feed', rootFeed)
+
+                      return cb(null, rootFeed.id)
+                    }
+                  )
+                }
+              )
+            }
+          )
+        })
+      })
+    }
+
     function addMembers(groupId, feedIds, opts = {}, cb) {
       if (cb === undefined) return promisify(addMembers)(groupId, feedIds, opts)
 
@@ -328,41 +374,47 @@ module.exports = {
         // prettier-ignore
         if (err) return cb(clarify(err, `Failed to get group details when adding members`))
 
-        const content = {
-          type: 'group/add-member',
-          version: 'v2',
-          secret: secret.toString('base64'),
-          root,
-          tangles: {
-            members: {
-              root,
-              previous: [root], // TODO calculate previous for members tangle
-            },
-            // likely incorrect group tangle and this will be overwritten by
-            // publish(), we just add it here to make the spec pass
-            group: {
-              root,
-              previous: [root],
-            },
-          },
-          recps: [groupId, ...feedIds],
-        }
-
-        if (opts.text) content.text = opts.text
-
-        // TODO: this should accept bendybutt-v1 feed IDs
-        // if (!addMemberSpec(content))
-        //   return cb(new Error(addMemberSpec.errorsString))
-
-        findOrCreateAdditionsFeed((err, additionsFeed) => {
+        getRootIdOfMsgAuthor(root, (err, rootAuthorId) => {
           // prettier-ignore
-          if (err) return cb(clarify(err, 'Failed to find or create additions feed when adding members'))
+          if (err) return cb(clarify(err, "couldn't get root id of author of root msg"))
 
-          addGroupTangle(content, (err, content) => {
+          console.log('rootAuthorId', rootAuthorId)
+
+          const content = {
+            type: 'group/add-member',
+            version: 'v2',
+            groupKey: secret.toString('base64'),
+            creator: rootAuthorId,
+            tangles: {
+              members: {
+                root,
+                previous: [root], // TODO calculate previous for members tangle
+              },
+              // likely incorrect group tangle and this will be overwritten by
+              // publish(), we just add it here to make the spec pass
+              group: {
+                root,
+                previous: [root],
+              },
+            },
+            recps: [groupId, ...feedIds],
+          }
+
+          if (opts.text) content.text = opts.text
+
+          if (!addMemberSpec(content))
+            return cb(new Error(addMemberSpec.errorsString))
+
+          findOrCreateAdditionsFeed((err, additionsFeed) => {
             // prettier-ignore
-            if (err) return cb(clarify(err, 'Failed to add group tangle when adding members'))
+            if (err) return cb(clarify(err, 'Failed to find or create additions feed when adding members'))
 
-            publishAndPrune(ssb, content, additionsFeed.keys, cb)
+            addGroupTangle(content, (err, content) => {
+              // prettier-ignore
+              if (err) return cb(clarify(err, 'Failed to add group tangle when adding members'))
+
+              publishAndPrune(ssb, content, additionsFeed.keys, cb)
+            })
           })
         })
       })
