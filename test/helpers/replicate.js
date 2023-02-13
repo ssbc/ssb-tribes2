@@ -21,6 +21,14 @@ module.exports = async function replicate(person1, person2) {
     pull.flatten(),
     pull.map((feedDetails) => feedDetails.id),
     pull.unique(),
+    pull.asyncMap((feedId, cb) => {
+      // hack to make it look like we request feeds in the right order
+      // instead of just one big pile, ssb-meta-feeds operates under
+      // the assumption that we get messages in proper order
+      setTimeout(() => {
+        cb(null, feedId)
+      }, 200)
+    }, 1),
     (drain = pull.drain((feedId) => {
       person1.ebt.request(feedId, true)
       person2.ebt.request(feedId, true)
