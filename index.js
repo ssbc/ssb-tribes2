@@ -467,7 +467,7 @@ module.exports = {
                     return {
                       id: lodashGet(msg, 'value.content.recps[0]'),
                       secret: Buffer.from(
-                        lodashGet(msg, 'value.content.secret'),
+                        lodashGet(msg, 'value.content.groupKey'),
                         'base64'
                       ),
                       root: lodashGet(msg, 'value.content.root'),
