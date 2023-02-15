@@ -25,11 +25,7 @@ const {
   },
 } = require('private-group-spec')
 const { SecretKey } = require('ssb-private-group-keys')
-const {
-  fromMessageSigil,
-  fromFeedSigil,
-  isBendyButtV1FeedSSBURI,
-} = require('ssb-uri2')
+const { fromMessageSigil, isBendyButtV1FeedSSBURI } = require('ssb-uri2')
 const buildGroupId = require('./lib/build-group-id')
 const AddGroupTangle = require('./lib/add-group-tangle')
 const publishAndPrune = require('./lib/prune-publish')
@@ -319,27 +315,11 @@ module.exports = {
         // prettier-ignore
         if (err) return cb(clarify(err, "couldn't get root msg for finding root feed"))
 
-        ssb.metafeeds.advanced.findById(rootMsg.author, (err, groupFeed) => {
+        ssb.metafeeds.findRootFeedId(rootMsg.author, (err, rootFeedId) => {
           // prettier-ignore
-          if (err) return cb(clarify(err, "couldn't get root msg for finding root feed"))
+          if (err) return cb(clarify(err, "couldn't find root feed id from root msg author"))
 
-          ssb.metafeeds.advanced.findById(
-            groupFeed.parent,
-            (err, shardFeed) => {
-              // prettier-ignore
-              if (err) return cb(clarify(err, "couldn't find parent of group feed"))
-
-              ssb.metafeeds.advanced.findById(
-                shardFeed.parent,
-                (err, v1Feed) => {
-                  // prettier-ignore
-                  if (err) return cb(clarify(err, "couldn't find parent of shard feed"))
-
-                  return cb(null, v1Feed.parent)
-                }
-              )
-            }
-          )
+          return cb(null, rootFeedId)
         })
       })
     }
