@@ -33,6 +33,8 @@ test('create more', async (t) => {
 
   const group = await ssb.tribes2.create().catch(t.fail)
 
+  const rootFeed = await p(ssb.metafeeds.findOrCreate)().catch(t.fail)
+
   t.true(isIdentityGroupSSBURI(group.id), 'returns group identifier - groupId')
   t.true(
     Buffer.isBuffer(group.secret) && group.secret.length === 32,
@@ -64,7 +66,8 @@ test('create more', async (t) => {
     {
       type: 'group/add-member',
       version: 'v2',
-      secret: group.secret.toString('base64'),
+      groupKey: group.secret.toString('base64'),
+      creator: rootFeed.id,
       root: group.root,
       recps: [group.id, root.id], // me being added to the group
       tangles: {
