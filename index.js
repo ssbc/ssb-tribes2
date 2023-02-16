@@ -357,20 +357,11 @@ module.exports = {
                 root,
                 previous: [root], // TODO calculate previous for members tangle
               },
-              // likely incorrect group tangle and this will be overwritten by
-              // publish(), we just add it here to make the spec pass
-              group: {
-                root,
-                previous: [root],
-              },
             },
             recps: [groupId, ...feedIds],
           }
 
           if (opts.text) content.text = opts.text
-
-          if (!addMemberSpec(content))
-            return cb(new Error(addMemberSpec.errorsString))
 
           findOrCreateAdditionsFeed((err, additionsFeed) => {
             // prettier-ignore
@@ -379,6 +370,9 @@ module.exports = {
             addGroupTangle(content, (err, content) => {
               // prettier-ignore
               if (err) return cb(clarify(err, 'Failed to add group tangle when adding members'))
+
+              if (!addMemberSpec(content))
+                return cb(new Error(addMemberSpec.errorsString))
 
               publishAndPrune(ssb, content, additionsFeed.keys, cb)
             })
