@@ -21,7 +21,7 @@ const {
 const {
   keySchemes,
   validator: {
-    group: { init: initSpec, addMember: addMemberSpec, content: contentSpec },
+    group: { init: isInit, addMember: isAddMember, content: isContent },
   },
 } = require('private-group-spec')
 const { SecretKey } = require('ssb-private-group-keys')
@@ -154,7 +154,7 @@ module.exports = {
           group: { root: null, previous: null },
         },
       }
-      if (!initSpec(content)) return cb(new Error(initSpec.errorsString))
+      if (!isInit(content)) return cb(new Error(isInit.errorsString))
 
       findOrCreateGroupFeed(null, function gotGroupFeed(err, groupFeed) {
         // prettier-ignore
@@ -371,8 +371,8 @@ module.exports = {
               // prettier-ignore
               if (err) return cb(clarify(err, 'Failed to add group tangle when adding members'))
 
-              if (!addMemberSpec(content))
-                return cb(new Error(addMemberSpec.errorsString))
+              if (!isAddMember(content))
+                return cb(new Error(isAddMember.errorsString))
 
               publishAndPrune(ssb, content, additionsFeed.keys, cb)
             })
@@ -396,8 +396,7 @@ module.exports = {
         // prettier-ignore
         if (err) return cb(clarify(err, 'Failed to add group tangle when publishing to a group'))
 
-        if (!contentSpec(content))
-          return cb(new Error(contentSpec.errorsString))
+        if (!isContent(content)) return cb(new Error(isContent.errorsString))
 
         get(groupId, (err, { secret }) => {
           // prettier-ignore
