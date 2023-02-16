@@ -21,7 +21,7 @@ const {
 const {
   keySchemes,
   validator: {
-    group: { init: initSpec, addMember: addMemberSpec },
+    group: { init: initSpec, addMember: addMemberSpec, content: contentSpec },
   },
 } = require('private-group-spec')
 const { SecretKey } = require('ssb-private-group-keys')
@@ -401,6 +401,9 @@ module.exports = {
       addGroupTangle(content, (err, content) => {
         // prettier-ignore
         if (err) return cb(clarify(err, 'Failed to add group tangle when publishing to a group'))
+
+        if (!contentSpec(content))
+          return cb(new Error(contentSpec.errorsString))
 
         get(groupId, (err, { secret }) => {
           // prettier-ignore
