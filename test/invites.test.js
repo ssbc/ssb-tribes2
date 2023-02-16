@@ -25,10 +25,8 @@ test('lists correct group invite and accepting actually does something', async (
     ),
   })
 
-  await Promise.all([
-    alice.tribes2.start(),
-    bob.tribes2.start()
-  ])
+  alice.tribes2.start()
+  bob.tribes2.start()
   t.pass('tribes2 started')
 
   const bobRoot = await p(bob.metafeeds.findOrCreate)()

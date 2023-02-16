@@ -130,10 +130,8 @@ test('live list groups', async (t) => {
     ),
   })
 
-  await Promise.all([
-    alice.tribes2.start(),
-    bob.tribes2.start()
-  ])
+  alice.tribes2.start()
+  bob.tribes2.start()
 
   await p(alice.metafeeds.findOrCreate)()
   const bobRoot = await p(bob.metafeeds.findOrCreate)()
