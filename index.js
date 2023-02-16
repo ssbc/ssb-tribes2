@@ -310,7 +310,7 @@ module.exports = {
       return pull(ssb.box2.listGroupIds({ live: !!opts.live }), paraMap(get, 4))
     }
 
-    function getRootIdOfMsgAuthor(groupRootMsgId, cb) {
+    function getRootFeedIdFromMsgId(groupRootMsgId, cb) {
       ssb.db.get(groupRootMsgId, (err, rootMsg) => {
         // prettier-ignore
         if (err) return cb(clarify(err, "couldn't get root msg for finding root feed"))
@@ -342,7 +342,7 @@ module.exports = {
         // prettier-ignore
         if (err) return cb(clarify(err, `Failed to get group details when adding members`))
 
-        getRootIdOfMsgAuthor(root, (err, rootAuthorId) => {
+        getRootFeedIdFromMsgId(root, (err, rootAuthorId) => {
           // prettier-ignore
           if (err) return cb(clarify(err, "couldn't get root id of author of root msg"))
 
