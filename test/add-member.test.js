@@ -25,8 +25,10 @@ test('get added to a group', async (t) => {
     ),
   })
 
-  await alice.tribes2.start()
-  await bob.tribes2.start()
+  await Promise.all([
+    alice.tribes2.start(),
+    bob.tribes2.start()
+  ])
   t.pass('tribes2 started for both alice and bob')
 
   await p(alice.metafeeds.findOrCreate)()
