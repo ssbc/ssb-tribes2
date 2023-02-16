@@ -21,6 +21,7 @@ const AddGroupTangle = require('./lib/add-group-tangle')
 const MetaFeedHelpers = require('./lib/meta-feed-helpers')
 const buildGroupId = require('./lib/build-group-id')
 const publishAndPrune = require('./lib/prune-publish')
+const drainOne = require('./lib/drain-one')
 
 module.exports = {
   name: 'tribes2',
@@ -312,8 +313,4 @@ module.exports = {
       start,
     }
   },
-}
-
-function drainOne(handleErr, handleRes) {
-  return pull(pull.take(1), pull.drain(handleErr, handleRes))
 }
