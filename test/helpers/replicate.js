@@ -15,6 +15,8 @@ module.exports = async function replicate(person1, person2) {
   let drain
   pull(
     pullMany([
+      pull.values([[{ id: person1.id }, { id: person2.id } ]]),
+      // HACK to handle config.metafeeds.skipMainFeed
       person1.metafeeds.branchStream({ old: true, live: true }),
       person2.metafeeds.branchStream({ old: true, live: true }),
     ]),

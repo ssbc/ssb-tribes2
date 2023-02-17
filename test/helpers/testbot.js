@@ -41,6 +41,7 @@ module.exports = function createSbot(opts = {}) {
     },
     metafeeds: {
       seed: opts.mfSeed,
+      skipMainFeed: true
     },
   })
 
