@@ -27,7 +27,7 @@ const {
 const { SecretKey } = require('ssb-private-group-keys')
 const { fromMessageSigil, isBendyButtV1FeedSSBURI } = require('ssb-uri2')
 const buildGroupId = require('./lib/build-group-id')
-const AddGroupTangle = require('./lib/add-group-tangle')
+const AddGroupTangles = require('./lib/add-group-tangles')
 const publishAndPrune = require('./lib/prune-publish')
 
 module.exports = {
@@ -41,7 +41,7 @@ module.exports = {
   },
   // eslint-disable-next-line no-unused-vars
   init(ssb, config) {
-    const addGroupTangle = AddGroupTangle(ssb)
+    const addGroupTangles = AddGroupTangles(ssb)
 
     function findOrCreateAdditionsFeed(cb) {
       const details = {
@@ -358,9 +358,9 @@ module.exports = {
           // prettier-ignore
           if (err) return cb(clarify(err, 'Failed to find or create additions feed when adding members'))
 
-          addGroupTangle(content, (err, content) => {
+          addGroupTangles(content, ['group', 'member'], (err, content) => {
             // prettier-ignore
-            if (err) return cb(clarify(err, 'Failed to add group tangle when adding members'))
+            if (err) return cb(clarify(err, 'Failed to add group tangles when adding members'))
 
             publishAndPrune(ssb, content, additionsFeed.keys, cb)
           })
@@ -379,7 +379,7 @@ module.exports = {
       }
       const groupId = recps[0]
 
-      addGroupTangle(content, (err, content) => {
+      addGroupTangles(content, ['group'], (err, content) => {
         // prettier-ignore
         if (err) return cb(clarify(err, 'Failed to add group tangle when publishing to a group'))
 
