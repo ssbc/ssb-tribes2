@@ -30,7 +30,7 @@ test('get-group-tangle unit test', (t) => {
       server.tribes2.create(null, (err, group) => {
         t.error(err, 'no error')
 
-        const getGroupTangle = GetGroupTangle(server)
+        const getGroupTangle = GetGroupTangle(server, 'group')
 
         getGroupTangle(group.id, async (err, groupTangle) => {
           t.error(err, 'no error')
@@ -186,8 +186,8 @@ test('get-group-tangle with branch', async (t) => {
   const group = await p(alice.tribes2.create)(null).catch(t.fail)
   t.pass('alice created a group')
 
-  const getAliceGroupTangle = GetGroupTangle(alice)
-  const getBobGroupTangle = GetGroupTangle(bob)
+  const getAliceGroupTangle = GetGroupTangle(alice, 'group')
+  const getBobGroupTangle = GetGroupTangle(bob, 'group')
 
   const invite = await p(alice.tribes2.addMembers)(group.id, [bobRoot.id], {
     text: 'ahoy',

@@ -334,18 +334,7 @@ module.exports = {
           version: 'v2',
           secret: secret.toString('base64'),
           root,
-          tangles: {
-            members: {
-              root,
-              previous: [root], // TODO calculate previous for members tangle
-            },
-            // likely incorrect group tangle and this will be overwritten by
-            // publish(), we just add it here to make the spec pass
-            group: {
-              root,
-              previous: [root],
-            },
-          },
+          tangles: {}, //todo: remove this line?
           recps: [groupId, ...feedIds],
         }
 
@@ -359,7 +348,7 @@ module.exports = {
           // prettier-ignore
           if (err) return cb(clarify(err, 'Failed to find or create additions feed when adding members'))
 
-          addGroupTangles(content, ['group', 'member'], (err, content) => {
+          addGroupTangles(content, ['group', 'members'], (err, content) => {
             // prettier-ignore
             if (err) return cb(clarify(err, 'Failed to add group tangles when adding members'))
 
