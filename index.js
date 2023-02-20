@@ -334,7 +334,6 @@ module.exports = {
           version: 'v2',
           secret: secret.toString('base64'),
           root,
-          tangles: {}, //todo: remove this line?
           recps: [groupId, ...feedIds],
         }
 
