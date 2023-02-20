@@ -143,29 +143,30 @@ module.exports = {
       })
     }
 
-    function secretKeyFromPurpose(purpose) {
-      return new SecretKey(Buffer.from(purpose, 'base64'))
+    function secretKeyFromString(string) {
+      return new SecretKey(Buffer.from(string, 'base64'))
     }
 
     function createGroupWithoutMembers(myRoot, cb) {
-      const content = {
-        type: 'group/init',
-        tangles: {
-          group: { root: null, previous: null },
-        },
-      }
-      if (!initSpec(content)) return cb(new Error(initSpec.errorsString))
-
       findOrCreateGroupFeed(null, function gotGroupFeed(err, groupFeed) {
         // prettier-ignore
         if (err) return cb(clarify(err, 'Failed to find or create group feed when creating a group'))
 
-        const secret = secretKeyFromPurpose(groupFeed.purpose)
+        const secret = secretKeyFromString(groupFeed.purpose)
 
         const recps = [
           { key: secret.toBuffer(), scheme: keySchemes.private_group },
           myRoot.id,
         ]
+
+        const content = {
+          type: 'group/init',
+          groupKey: secret.toString('base64'),
+          tangles: {
+            group: { root: null, previous: null },
+          },
+        }
+        if (!initSpec(content)) return cb(new Error(initSpec.errorsString))
 
         ssb.db.create(
           {
@@ -257,37 +258,37 @@ module.exports = {
     function create(opts = {}, cb) {
       if (cb === undefined) return promisify(create)(opts)
 
-      findOrCreateGroupWithoutMembers(
-        (err, { groupInitMsg, groupFeed, myRoot }) => {
-          // prettier-ignore
-          if (err) return cb(clarify(err, 'Failed to create group init message when creating a group'))
+      findOrCreateGroupWithoutMembers((err, group) => {
+        // prettier-ignore
+        if (err) return cb(clarify(err, 'Failed to create group init message when creating a group'))
 
-          const secret = secretKeyFromPurpose(groupFeed.purpose)
+        const { groupInitMsg, groupFeed, myRoot } = group
 
-          const data = {
-            id: buildGroupId({
-              groupInitMsg,
-              groupKey: secret.toBuffer(),
-            }),
-            secret: secret.toBuffer(),
-            root: fromMessageSigil(groupInitMsg.key),
-            subfeed: groupFeed.keys,
-          }
+        const secret = secretKeyFromString(groupFeed.purpose)
 
-          ssb.box2.addGroupInfo(data.id, {
-            key: data.secret,
-            root: data.root,
-          })
-
-          // Adding myself for recovery reasons
-          addMembers(data.id, [myRoot.id], {}, (err) => {
-            // prettier-ignore
-            if (err) return cb(clarify(err, 'Failed to add myself to the group when creating a group'))
-
-            return cb(null, data)
-          })
+        const data = {
+          id: buildGroupId({
+            groupInitMsg,
+            groupKey: secret.toBuffer(),
+          }),
+          secret: secret.toBuffer(),
+          root: fromMessageSigil(groupInitMsg.key),
+          subfeed: groupFeed.keys,
         }
-      )
+
+        ssb.box2.addGroupInfo(data.id, {
+          key: data.secret,
+          root: data.root,
+        })
+
+        // Adding myself for recovery reasons
+        addMembers(data.id, [myRoot.id], {}, (err) => {
+          // prettier-ignore
+          if (err) return cb(clarify(err, 'Failed to add myself to the group when creating a group'))
+
+          return cb(null, data)
+        })
+      })
     }
 
     function get(id, cb) {
