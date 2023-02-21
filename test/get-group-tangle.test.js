@@ -233,7 +233,7 @@ test('get-group-tangle with branch', async (t) => {
   await p(bob.close)(true)
 })
 
-test.only('members tangle works', async (t) => {
+test('members tangle works', async (t) => {
   const alice = Testbot()
   const bob = Testbot()
   const carol = Testbot()

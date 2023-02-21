@@ -39,7 +39,10 @@ test('get added to a group', async (t) => {
     id: groupId,
     secret,
     root,
-  } = await alice.tribes2.create().catch(t.fail)
+  } = await alice.tribes2.create().catch((err) => {
+    console.error('alice failed to create group', err)
+    t.fail(err)
+  })
   t.pass('alice created a group')
 
   await alice.tribes2.addMembers(groupId, [bobRoot.id]).catch((err) => {

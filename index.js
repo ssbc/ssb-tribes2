@@ -164,6 +164,7 @@ module.exports = {
           groupKey: secret.toString('base64'),
           tangles: {
             group: { root: null, previous: null },
+            members: { root: null, previous: null },
           },
         }
         if (!initSpec(content)) return cb(new Error(initSpec.errorsString))
