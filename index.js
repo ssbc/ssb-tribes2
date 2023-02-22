@@ -369,6 +369,52 @@ module.exports = {
       })
     }
 
+    function excludeMembers(groupId, feedIds, opts = {}, cb) {
+      if (cb === undefined)
+        return promisify(excludeMembers)(groupId, feedIds, opts)
+
+      // TODO: should probably check this against a spec of its own
+      // TODO: should add members tangle to this. should we add opts to publish()? { spec, tangles, keys}
+      publish(
+        {
+          type: 'group/exclude',
+          excludes: feedIds,
+          recps: [groupId],
+        },
+        (err, exclusionMsg) => {
+          // prettier-ignore
+          if (err) return cb(clarify(err, 'Failed to publish exclude msg'))
+
+          pull(
+            listMembers(groupId),
+            pull.collect((err, beforeMembers) => {
+              const remainingMembers = beforeMembers.filter(
+                (member) => !feedIds.includes(member)
+              )
+
+              const newGroupKey = new SecretKey()
+              const newKeyContent = {
+                type: 'group/move-epoch',
+                secret: newGroupKey.toString('base64'),
+                recps: [groupId, ...remainingMembers],
+              }
+              // TODO: loop if many members
+              publish(newKeyContent, (err) => {
+                // prettier-ignore
+                if (err) return cb(clarify(err, 'Failed to tell people about new epoch'))
+
+                console.log('added people to new epoch')
+
+                // TODO: create feed for the new epoch
+                // either createGroupWithoutMembers(myRoot, cb) { but with an arg for the secret
+                // or findOrCreateGroupFeed(null, function gotGroupFeed(err, groupFeed) { but we need to duplicate more code (maybe premature to worry about tho)
+              })
+            })
+          )
+        }
+      )
+    }
+
     function publish(content, cb) {
       if (cb === undefined) return promisify(publish)(content)
 
@@ -522,6 +568,7 @@ module.exports = {
       get,
       list,
       addMembers,
+      excludeMembers,
       publish,
       listMembers,
       listInvites,
