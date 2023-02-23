@@ -14,7 +14,7 @@ const {
   where,
 } = require('ssb-db2/operators')
 
-const GetGroupTangle = require('../lib/get-group-tangle')
+const GetTangle = require('../lib/get-tangle')
 const Testbot = require('./helpers/testbot')
 const replicate = require('./helpers/replicate')
 
@@ -30,9 +30,9 @@ test('get-group-tangle unit test', (t) => {
       server.tribes2.create(null, (err, group) => {
         t.error(err, 'no error')
 
-        const getGroupTangle = GetGroupTangle(server, 'group')
+        const getTangle = GetTangle(server, 'group')
 
-        getGroupTangle(group.id, async (err, groupTangle) => {
+        getTangle(group.id, async (err, groupTangle) => {
           t.error(err, 'no error')
 
           const { root, previous } = groupTangle
@@ -66,7 +66,7 @@ test('get-group-tangle unit test', (t) => {
               server.tribes2.publish(content, (err, msg) => {
                 t.error(err, 'no error')
 
-                getGroupTangle(group.id, (err, { root, previous }) => {
+                getTangle(group.id, (err, { root, previous }) => {
                   t.error(err, 'no error')
                   t.deepEqual(
                     { root, previous },
@@ -77,7 +77,7 @@ test('get-group-tangle unit test', (t) => {
                   server.tribes2.publish(content, (err, msg) => {
                     t.error(err, 'no error')
 
-                    getGroupTangle(group.id, (err, { root, previous }) => {
+                    getTangle(group.id, (err, { root, previous }) => {
                       t.error(err, 'no error')
                       t.deepEqual(
                         { root, previous },
@@ -186,8 +186,8 @@ test('get-group-tangle with branch', async (t) => {
   const group = await p(alice.tribes2.create)(null).catch(t.fail)
   t.pass('alice created a group')
 
-  const getAliceGroupTangle = GetGroupTangle(alice, 'group')
-  const getBobGroupTangle = GetGroupTangle(bob, 'group')
+  const getAliceGroupTangle = GetTangle(alice, 'group')
+  const getBobGroupTangle = GetTangle(bob, 'group')
 
   const invite = await p(alice.tribes2.addMembers)(group.id, [bobRoot.id], {
     text: 'ahoy',
@@ -252,8 +252,8 @@ test('members tangle works', async (t) => {
   const group = await alice.tribes2.create().catch(t.fail)
   t.pass('alice created a group')
 
-  const getGroup = GetGroupTangle(alice, 'group')
-  const getMembers = GetGroupTangle(alice, 'members')
+  const getGroup = GetTangle(alice, 'group')
+  const getMembers = GetTangle(alice, 'members')
 
   const bobInvite = await p(alice.tribes2.addMembers)(group.id, [bobRoot.id], {
     text: 'ahoy',
