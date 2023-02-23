@@ -392,6 +392,7 @@ module.exports = {
                 (member) => !feedIds.includes(member)
               )
 
+              // TODO: add this key to ourselves. step 1. make sure we ourselves can post to the new feed. step 2 and later: other people can post on the new key
               const newGroupKey = new SecretKey()
               const newKeyContent = {
                 type: 'group/move-epoch',
