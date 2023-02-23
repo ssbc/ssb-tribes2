@@ -10,21 +10,16 @@ const clarify = require('clarify-error')
 const {
   where,
   and,
-  count,
   isDecrypted,
   type,
   live,
-  author,
-  toCallback,
   toPullStream,
 } = require('ssb-db2/operators')
 const {
-  keySchemes,
   validator: {
-    group: { init: initSpec, addMember: addMemberSpec, content: contentSpec },
+    group: { content: contentSpec },
   },
 } = require('private-group-spec')
-const { SecretKey } = require('ssb-private-group-keys')
 const { fromMessageSigil, isBendyButtV1FeedSSBURI } = require('ssb-uri2')
 const buildGroupId = require('./lib/build-group-id')
 const AddGroupTangle = require('./lib/add-group-tangle')
