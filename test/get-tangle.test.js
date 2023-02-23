@@ -18,7 +18,7 @@ const GetTangle = require('../lib/get-tangle')
 const Testbot = require('./helpers/testbot')
 const replicate = require('./helpers/replicate')
 
-test('get-group-tangle unit test', (t) => {
+test('get-tangle unit test', (t) => {
   const name = `get-group-tangle-${Date.now()}`
   const server = Testbot({ name })
 
@@ -98,7 +98,7 @@ test('get-group-tangle unit test', (t) => {
 })
 
 const n = 100
-test(`get-group-tangle-${n}-publishes`, (t) => {
+test(`get-tangle-${n}-publishes`, (t) => {
   const publishArray = new Array(n).fill().map((item, i) => i)
   const server = Testbot()
   let count = 0
@@ -133,7 +133,7 @@ test(`get-group-tangle-${n}-publishes`, (t) => {
   })
 })
 
-test('get-group-tangle', (t) => {
+test('get-tangle', (t) => {
   // this is an integration test, as get-group-tangle is used in ssb.tribes2.publish
   const ssb = Testbot()
 
@@ -169,7 +169,7 @@ test('get-group-tangle', (t) => {
   })
 })
 
-test('get-group-tangle with branch', async (t) => {
+test('get-tangle with branch', async (t) => {
   const alice = Testbot()
   alice.tribes2.start()
 
