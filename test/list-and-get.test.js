@@ -23,11 +23,7 @@ test('tribes.list + tribes.get', (t) => {
       pull.collect(async (err, list) => {
         t.error(err, 'no error')
 
-        const expectedGroup = {
-          secret: group.secret,
-          root: group.root,
-          id: group.id,
-        }
+        const expectedGroup = group
 
         t.deepEqual(list, [expectedGroup], 'lists group ids')
 
@@ -63,14 +59,18 @@ test('tribes.list + tribes.get', (t) => {
 test('get', async (t) => {
   const ssb = Testbot()
 
-  const { id, secret, root } = await ssb.tribes2.create().catch(t.error)
+  const { id, writeKey, readKeys, root } = await ssb.tribes2
+    .create()
+    .catch(t.error)
 
   const group = await ssb.tribes2.get(id)
 
   t.equal(id, group.id)
   t.true(isIdentityGroupSSBURI(group.id))
-  t.true(Buffer.isBuffer(group.secret))
-  t.equal(secret, group.secret)
+  t.true(Buffer.isBuffer(group.writeKey.key))
+  t.equal(writeKey.key, group.writeKey.key)
+  t.true(Buffer.isBuffer(group.readKeys[0].key))
+  t.equal(readKeys[0].key, group.readKeys[0].key)
   t.true(isClassicMessageSSBURI(group.root), 'has root')
   t.equal(root, group.root)
 
