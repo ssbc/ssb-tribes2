@@ -84,15 +84,14 @@ module.exports = {
     function get(id, cb) {
       if (cb === undefined) return promisify(get)(id)
 
-      ssb.box2.getGroupKeyInfo(id, (err, info) => {
+      ssb.box2.getGroupInfo(id, (err, info) => {
         if (err) return cb(clarify(err, 'Failed to get group details'))
 
         if (!info) return cb(new Error(`Couldn't find group with id ${id}`))
 
         cb(null, {
+          ...info,
           id,
-          secret: info.key,
-          root: info.root,
         })
       })
     }
