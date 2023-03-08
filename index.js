@@ -22,7 +22,7 @@ const {
 } = require('private-group-spec')
 const { fromMessageSigil, isBendyButtV1FeedSSBURI } = require('ssb-uri2')
 const buildGroupId = require('./lib/build-group-id')
-const AddGroupTangle = require('./lib/add-group-tangle')
+const AddTangles = require('./lib/add-tangles')
 const publishAndPrune = require('./lib/prune-publish')
 const MetaFeedHelpers = require('./lib/meta-feed-helpers')
 
@@ -37,7 +37,7 @@ module.exports = {
   },
   // eslint-disable-next-line no-unused-vars
   init(ssb, config) {
-    const addGroupTangle = AddGroupTangle(ssb)
+    const addTangles = AddTangles(ssb)
     const {
       secretKeyFromString,
       findOrCreateAdditionsFeed,
@@ -130,12 +130,6 @@ module.exports = {
             groupKey: secret.toString('base64'),
             root,
             creator: rootAuthorId,
-            tangles: {
-              members: {
-                root,
-                previous: [root], // TODO calculate previous for members tangle
-              },
-            },
             recps: [groupId, ...feedIds],
           }
 
@@ -145,9 +139,9 @@ module.exports = {
             // prettier-ignore
             if (err) return cb(clarify(err, 'Failed to find or create additions feed when adding members'))
 
-            addGroupTangle(content, (err, content) => {
+            addTangles(content, ['group', 'members'], (err, content) => {
               // prettier-ignore
-              if (err) return cb(clarify(err, 'Failed to add group tangle when adding members'))
+              if (err) return cb(clarify(err, 'Failed to add group tangles when adding members'))
 
               if (!isAddMember(content))
                 return cb(new Error(isAddMember.errorsString))
@@ -170,7 +164,7 @@ module.exports = {
       }
       const groupId = recps[0]
 
-      addGroupTangle(content, (err, content) => {
+      addTangles(content, ['group'], (err, content) => {
         // prettier-ignore
         if (err) return cb(clarify(err, 'Failed to add group tangle when publishing to a group'))
 

@@ -49,9 +49,11 @@ test('create more', async (t) => {
     msgVal.content,
     {
       type: 'group/init',
+      version: 'v2',
       groupKey: group.secret.toString('base64'),
       tangles: {
         group: { root: null, previous: null },
+        members: { root: null, previous: null },
       },
     },
     'can decrypt group/init'

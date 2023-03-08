@@ -40,7 +40,7 @@ test('get added to a group', async (t) => {
     secret,
     root,
   } = await alice.tribes2.create().catch((err) => {
-    console.error("couldn't create group", err)
+    console.error('alice failed to create group', err)
     t.fail(err)
   })
   t.pass('alice created a group')
@@ -136,7 +136,10 @@ test('add member', async (t) => {
           // we don't know the key of the last message, that was the admin adding themselves
           previous: invite.content.tangles.group.previous,
         },
-        members: { root: group.root, previous: [group.root] },
+        members: {
+          root: group.root,
+          previous: invite.content.tangles.group.previous,
+        },
       },
     }
     t.deepEqual(invite.content, expected, 'kaitiaki sent invite')
