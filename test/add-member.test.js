@@ -54,7 +54,10 @@ test('get added to a group', async (t) => {
   await replicate(alice, bob).catch(t.fail)
   t.pass('alice and bob replicate')
 
-  await bob.tribes2.acceptInvite(groupId)
+  await bob.tribes2.acceptInvite(groupId).catch((err) => {
+    console.error('failed to accept invite', err)
+    t.fail(err)
+  })
 
   t.pass('bob accepted invite')
 
@@ -95,6 +98,7 @@ test('add member', async (t) => {
   newPerson.tribes2.start()
   t.pass('they start up tribes2')
 
+  const kaitiakiRoot = await p(kaitiaki.metafeeds.findOrCreate)()
   const newPersonRoot = await p(newPerson.metafeeds.findOrCreate)()
 
   await replicate(kaitiaki, newPerson)
@@ -119,8 +123,9 @@ test('add member', async (t) => {
     const expected = {
       type: 'group/add-member',
       version: 'v2',
-      secret: group.secret.toString('base64'),
+      groupKey: group.secret.toString('base64'),
       root: group.root,
+      creator: kaitiakiRoot.id,
 
       text: 'welcome friends',
       recps: [group.id, ...newMembers],
