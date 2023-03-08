@@ -43,6 +43,7 @@ module.exports = {
       findOrCreateAdditionsFeed,
       findOrCreateGroupFeed,
       findOrCreateGroupWithoutMembers,
+      getRootFeedIdFromMsgId,
     } = MetaFeedHelpers(ssb)
 
     function create(opts = {}, cb) {
@@ -99,20 +100,6 @@ module.exports = {
 
     function list(opts = {}) {
       return pull(ssb.box2.listGroupIds({ live: !!opts.live }), paraMap(get, 4))
-    }
-
-    function getRootFeedIdFromMsgId(groupRootMsgId, cb) {
-      ssb.db.get(groupRootMsgId, (err, rootMsg) => {
-        // prettier-ignore
-        if (err) return cb(clarify(err, "couldn't get root msg for finding root feed"))
-
-        ssb.metafeeds.findRootFeedId(rootMsg.author, (err, rootFeedId) => {
-          // prettier-ignore
-          if (err) return cb(clarify(err, "couldn't find root feed id from root msg author"))
-
-          return cb(null, rootFeedId)
-        })
-      })
     }
 
     function addMembers(groupId, feedIds, opts = {}, cb) {
