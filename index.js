@@ -19,6 +19,7 @@ const {
   validator: {
     group: { addMember: isAddMember, content: isContent },
   },
+  keySchemes,
 } = require('private-group-spec')
 const { fromMessageSigil, isBendyButtV1FeedSSBURI } = require('ssb-uri2')
 const buildGroupId = require('./lib/build-group-id')
@@ -62,13 +63,19 @@ module.exports = {
             groupInitMsg,
             groupKey: secret.toBuffer(),
           }),
-          secret: secret.toBuffer(),
+          writeKey: {
+            key: secret.toBuffer(),
+            scheme: keySchemes.private_group,
+          },
+          readKeys: [
+            { key: secret.toBuffer(), scheme: keySchemes.private_group },
+          ],
           root: fromMessageSigil(groupInitMsg.key),
           subfeed: groupFeed.keys,
         }
 
         ssb.box2.addGroupInfo(data.id, {
-          key: data.secret,
+          key: data.writeKey.key,
           root: data.root,
         })
 
@@ -115,7 +122,7 @@ module.exports = {
         return cb(new Error('addMembers only supports bendybutt-v1 feed IDs'))
       }
 
-      get(groupId, (err, { secret, root }) => {
+      get(groupId, (err, { writeKey, root }) => {
         // prettier-ignore
         if (err) return cb(clarify(err, `Failed to get group details when adding members`))
 
@@ -126,7 +133,7 @@ module.exports = {
           const content = {
             type: 'group/add-member',
             version: 'v2',
-            groupKey: secret.toString('base64'),
+            groupKey: writeKey.key.toString('base64'),
             root,
             creator: rootAuthorId,
             recps: [groupId, ...feedIds],
@@ -231,12 +238,15 @@ module.exports = {
                       )
                   ),
                   pull.map((msg) => {
+                    const key = Buffer.from(
+                      lodashGet(msg, 'value.content.groupKey'),
+                      'base64'
+                    )
+                    const scheme = keySchemes.private_group
                     return {
                       id: lodashGet(msg, 'value.content.recps[0]'),
-                      secret: Buffer.from(
-                        lodashGet(msg, 'value.content.groupKey'),
-                        'base64'
-                      ),
+                      writeKey: { key, scheme },
+                      readKeys: [{ key, scheme }],
                       root: lodashGet(msg, 'value.content.root'),
                     }
                   })
@@ -265,7 +275,7 @@ module.exports = {
             ssb.box2.addGroupInfo(
               groupInfo.id,
               {
-                key: groupInfo.secret,
+                key: groupInfo.writeKey.key,
                 root: groupInfo.root,
               },
               (err) => {
