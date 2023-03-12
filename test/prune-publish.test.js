@@ -80,11 +80,11 @@ test('publish many messages that might need pruning', (t) => {
         })
     )
 
-    console.log('publishing', n)
-    console.time('publish')
+    //console.log('publishing', n)
+    //console.time('publish')
     Promise.all(publishes)
       .then(async () => {
-        console.timeEnd('publish')
+        //console.timeEnd('publish')
 
         t.pass('published all the messages')
 
