@@ -176,11 +176,11 @@ module.exports = {
 
         if (!isContent(content)) return cb(new Error(isContent.errorsString))
 
-        get(groupId, (err, { secret }) => {
+        get(groupId, (err, { writeKey }) => {
           // prettier-ignore
           if (err) return cb(clarify(err, 'Failed to get group details when publishing to a group'))
 
-          findOrCreateGroupFeed(secret, (err, groupFeed) => {
+          findOrCreateGroupFeed(writeKey.key, (err, groupFeed) => {
             // prettier-ignore
             if (err) return cb(clarify(err, 'Failed to find or create group feed when publishing to a group'))
 
