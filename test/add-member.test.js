@@ -37,9 +37,12 @@ test('get added to a group', async (t) => {
 
   const {
     id: groupId,
-    secret,
+    writeKey,
     root,
-  } = await alice.tribes2.create().catch(t.fail)
+  } = await alice.tribes2.create().catch((err) => {
+    console.error('alice failed to create group', err)
+    t.fail(err)
+  })
   t.pass('alice created a group')
 
   await alice.tribes2.addMembers(groupId, [bobRoot.id]).catch((err) => {
@@ -51,7 +54,10 @@ test('get added to a group', async (t) => {
   await replicate(alice, bob).catch(t.fail)
   t.pass('alice and bob replicate')
 
-  await bob.tribes2.acceptInvite(groupId)
+  await bob.tribes2.acceptInvite(groupId).catch((err) => {
+    console.error('failed to accept invite', err)
+    t.fail(err)
+  })
 
   t.pass('bob accepted invite')
 
@@ -61,8 +67,8 @@ test('get added to a group', async (t) => {
       pull.collect((err, bobList) => {
         t.equal(bobList.length, 1, 'bob is a member of a group now')
         const group = bobList[0]
-        t.equal(group.id, groupId)
-        t.true(group.secret.equals(secret))
+        t.equal(group.id, groupId, 'group id is correct')
+        t.true(group.writeKey.key.equals(writeKey.key))
         t.equal(group.root, root)
         res()
       })
@@ -92,6 +98,7 @@ test('add member', async (t) => {
   newPerson.tribes2.start()
   t.pass('they start up tribes2')
 
+  const kaitiakiRoot = await p(kaitiaki.metafeeds.findOrCreate)()
   const newPersonRoot = await p(newPerson.metafeeds.findOrCreate)()
 
   await replicate(kaitiaki, newPerson)
@@ -116,8 +123,9 @@ test('add member', async (t) => {
     const expected = {
       type: 'group/add-member',
       version: 'v2',
-      secret: group.secret.toString('base64'),
+      groupKey: group.writeKey.key.toString('base64'),
       root: group.root,
+      creator: kaitiakiRoot.id,
 
       text: 'welcome friends',
       recps: [group.id, ...newMembers],
@@ -128,7 +136,10 @@ test('add member', async (t) => {
           // we don't know the key of the last message, that was the admin adding themselves
           previous: invite.content.tangles.group.previous,
         },
-        members: { root: group.root, previous: [group.root] },
+        members: {
+          root: group.root,
+          previous: invite.content.tangles.group.previous,
+        },
       },
     }
     t.deepEqual(invite.content, expected, 'kaitiaki sent invite')

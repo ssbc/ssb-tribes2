@@ -23,7 +23,12 @@ test('tribes.list + tribes.get', (t) => {
       pull.collect(async (err, list) => {
         t.error(err, 'no error')
 
-        const expectedGroup = group
+        const expectedGroup = {
+          id: group.id,
+          writeKey: group.writeKey,
+          readKeys: group.readKeys,
+          root: group.root,
+        }
 
         t.deepEqual(list, [expectedGroup], 'lists group ids')
 
@@ -67,7 +72,7 @@ test('get', async (t) => {
 
   t.equal(id, group.id)
   t.true(isIdentityGroupSSBURI(group.id))
-  t.true(Buffer.isBuffer(group.writeKey.key))
+  t.true(Buffer.isBuffer(group.writeKey.key), 'writeKey has key buffer')
   t.equal(writeKey.key, group.writeKey.key)
   t.true(Buffer.isBuffer(group.readKeys[0].key))
   t.equal(readKeys[0].key, group.readKeys[0].key)
@@ -82,7 +87,7 @@ test('list', (t) => {
 
   ssb.tribes2
     .create()
-    .then(({ id: id1, secret: secret1 }) => {
+    .then(({ id: id1, writeKey: writeKey1 }) => {
       t.true(isIdentityGroupSSBURI(id1), 'has id')
 
       pull(
@@ -101,7 +106,7 @@ test('list', (t) => {
 
               t.equal(groups2.length, 2)
               t.equal(groups2[0].id, id1)
-              t.equal(groups2[0].secret, secret1)
+              t.equal(groups2[0].writeKey.key, writeKey1.key)
               t.equal(groups2[1].id, id2)
 
               ssb.close(true, t.end)
@@ -173,7 +178,7 @@ test('live list groups', async (t) => {
   t.equal(groups.length, 1, 'bob now finds the group in the group list')
   t.equal(groups[0].id, group.id, 'id matches')
   t.equal(groups[0].root, group.root, 'root matches')
-  t.true(groups[0].secret.equals(group.secret), 'secret matches')
+  t.true(groups[0].writeKey.key.equals(group.writeKey.key), 'secret matches')
 
   await p(alice.close)(true)
   await p(bob.close)(true)

@@ -50,7 +50,11 @@ test('lists correct group invite and accepting actually does something', async (
 
   const invite = invites[0]
   t.equal(invite.id, group.id, 'correct group id in invite')
-  t.true(invite.secret.equals(group.secret), 'correct secret')
+  t.true(invite.writeKey.key.equals(group.writeKey.key), 'correct writeKey')
+  t.true(
+    invite.readKeys[0].key.equals(group.readKeys[0].key),
+    'correct readKey'
+  )
   t.equal(invite.root, group.root, 'correct root')
 
   const msgEnc = await p(bob.db.get)(group.root).catch(t.fail)

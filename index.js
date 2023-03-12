@@ -17,13 +17,14 @@ const {
 } = require('ssb-db2/operators')
 const {
   validator: {
-    group: { content: contentSpec },
+    group: { addMember: isAddMember, content: isContent },
   },
+  keySchemes,
 } = require('private-group-spec')
 const { fromMessageSigil, isBendyButtV1FeedSSBURI } = require('ssb-uri2')
 const { SecretKey } = require('ssb-private-group-keys')
 const buildGroupId = require('./lib/build-group-id')
-const AddGroupTangle = require('./lib/add-group-tangle')
+const AddTangles = require('./lib/add-tangles')
 const publishAndPrune = require('./lib/prune-publish')
 const MetaFeedHelpers = require('./lib/meta-feed-helpers')
 
@@ -38,12 +39,13 @@ module.exports = {
   },
   // eslint-disable-next-line no-unused-vars
   init(ssb, config) {
-    const addGroupTangle = AddGroupTangle(ssb)
+    const addTangles = AddTangles(ssb)
     const {
       secretKeyFromString,
       findOrCreateAdditionsFeed,
       findOrCreateGroupFeed,
       findOrCreateEpochWithoutMembers,
+      getRootFeedIdFromMsgId,
     } = MetaFeedHelpers(ssb)
 
     function create(opts = {}, cb) {
@@ -62,14 +64,19 @@ module.exports = {
             groupInitMsg,
             groupKey: secret.toBuffer(),
           }),
-          writeKey: secret.toBuffer(),
-          readKeys: [secret.toBuffer()],
+          writeKey: {
+            key: secret.toBuffer(),
+            scheme: keySchemes.private_group,
+          },
+          readKeys: [
+            { key: secret.toBuffer(), scheme: keySchemes.private_group },
+          ],
           root: fromMessageSigil(groupInitMsg.key),
           subfeed: groupFeed.keys,
         }
 
         ssb.box2.addGroupInfo(data.id, {
-          key: data.secret,
+          key: data.writeKey.key,
           root: data.root,
         })
 
@@ -92,10 +99,8 @@ module.exports = {
         if (!info) return cb(new Error(`Couldn't find group with id ${id}`))
 
         cb(null, {
+          ...info,
           id,
-          writeKey: info.writeKey,
-          readKeys: info.readKeys,
-          root: info.root,
         })
       })
     }
@@ -122,41 +127,34 @@ module.exports = {
         // prettier-ignore
         if (err) return cb(clarify(err, `Failed to get group details when adding members`))
 
-        const content = {
-          type: 'group/add-member',
-          version: 'v2',
-          secret: writeKey.toString('base64'),
-          root,
-          tangles: {
-            members: {
-              root,
-              previous: [root], // TODO calculate previous for members tangle
-            },
-            // likely incorrect group tangle and this will be overwritten by
-            // publish(), we just add it here to make the spec pass
-            group: {
-              root,
-              previous: [root],
-            },
-          },
-          recps: [groupId, ...feedIds],
-        }
-
-        if (opts.text) content.text = opts.text
-
-        // TODO: this should accept bendybutt-v1 feed IDs
-        // if (!addMemberSpec(content))
-        //   return cb(new Error(addMemberSpec.errorsString))
-
-        findOrCreateAdditionsFeed((err, additionsFeed) => {
+        getRootFeedIdFromMsgId(root, (err, rootAuthorId) => {
           // prettier-ignore
-          if (err) return cb(clarify(err, 'Failed to find or create additions feed when adding members'))
+          if (err) return cb(clarify(err, "couldn't get root id of author of root msg"))
 
-          addGroupTangle(content, (err, content) => {
+          const content = {
+            type: 'group/add-member',
+            version: 'v2',
+            groupKey: writeKey.key.toString('base64'),
+            root,
+            creator: rootAuthorId,
+            recps: [groupId, ...feedIds],
+          }
+
+          if (opts.text) content.text = opts.text
+
+          findOrCreateAdditionsFeed((err, additionsFeed) => {
             // prettier-ignore
-            if (err) return cb(clarify(err, 'Failed to add group tangle when adding members'))
+            if (err) return cb(clarify(err, 'Failed to find or create additions feed when adding members'))
 
-            publishAndPrune(ssb, content, additionsFeed.keys, cb)
+            addTangles(content, ['group', 'members'], (err, content) => {
+              // prettier-ignore
+              if (err) return cb(clarify(err, 'Failed to add group tangles when adding members'))
+
+              if (!isAddMember(content))
+                return cb(new Error(isAddMember.errorsString))
+
+              publishAndPrune(ssb, content, additionsFeed.keys, cb)
+            })
           })
         })
       })
@@ -246,18 +244,17 @@ module.exports = {
       }
       const groupId = recps[0]
 
-      addGroupTangle(content, (err, content) => {
+      addTangles(content, ['group'], (err, content) => {
         // prettier-ignore
         if (err) return cb(clarify(err, 'Failed to add group tangle when publishing to a group'))
 
-        if (!contentSpec(content))
-          return cb(new Error(contentSpec.errorsString))
+        if (!isContent(content)) return cb(new Error(isContent.errorsString))
 
         get(groupId, (err, { writeKey }) => {
           // prettier-ignore
           if (err) return cb(clarify(err, 'Failed to get group details when publishing to a group'))
 
-          findOrCreateGroupFeed(writeKey, (err, groupFeed) => {
+          findOrCreateGroupFeed(writeKey.key, (err, groupFeed) => {
             // prettier-ignore
             if (err) return cb(clarify(err, 'Failed to find or create group feed when publishing to a group'))
 
@@ -315,12 +312,15 @@ module.exports = {
                       )
                   ),
                   pull.map((msg) => {
+                    const key = Buffer.from(
+                      lodashGet(msg, 'value.content.groupKey'),
+                      'base64'
+                    )
+                    const scheme = keySchemes.private_group
                     return {
                       id: lodashGet(msg, 'value.content.recps[0]'),
-                      secret: Buffer.from(
-                        lodashGet(msg, 'value.content.secret'),
-                        'base64'
-                      ),
+                      writeKey: { key, scheme },
+                      readKeys: [{ key, scheme }],
                       root: lodashGet(msg, 'value.content.root'),
                     }
                   })
@@ -349,7 +349,7 @@ module.exports = {
             ssb.box2.addGroupInfo(
               groupInfo.id,
               {
-                key: groupInfo.secret,
+                key: groupInfo.writeKey.key,
                 root: groupInfo.root,
               },
               (err) => {
