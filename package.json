@@ -43,7 +43,7 @@
     "pull-paramap": "^1.2.2",
     "pull-stream": "^3.7.0",
     "ssb-bfe": "^3.7.0",
-    "ssb-box2": "^5.0.0",
+    "ssb-box2": "^6.0.0",
     "ssb-crut": "^4.6.1",
     "ssb-db2": "^6.3.0",
     "ssb-meta-feeds": "^0.39.0",

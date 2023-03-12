@@ -15,12 +15,13 @@ const Testbot = require('./helpers/testbot')
 test('create', async (t) => {
   const ssb = Testbot()
 
-  const { id, subfeed, secret, root } = await ssb.tribes2
+  const { id, subfeed, writeKey, readKeys, root } = await ssb.tribes2
     .create()
     .catch(t.error)
 
   t.true(isIdentityGroupSSBURI(id), 'has group id')
-  t.true(Buffer.isBuffer(secret), 'has secret')
+  t.true(Buffer.isBuffer(writeKey.key), 'has writeKey')
+  t.true(Buffer.isBuffer(readKeys[0].key), 'has readKey')
   t.true(isClassicMessageSSBURI(root), 'has root')
   t.true(Ref.isFeed(subfeed.id), 'has subfeed')
 
@@ -37,7 +38,7 @@ test('create more', async (t) => {
 
   t.true(isIdentityGroupSSBURI(group.id), 'returns group identifier - groupId')
   t.true(
-    Buffer.isBuffer(group.secret) && group.secret.length === 32,
+    Buffer.isBuffer(group.writeKey.key) && group.writeKey.key.length === 32,
     'returns group symmetric key - groupKey'
   )
 
@@ -50,7 +51,7 @@ test('create more', async (t) => {
     {
       type: 'group/init',
       version: 'v2',
-      groupKey: group.secret.toString('base64'),
+      groupKey: group.writeKey.key.toString('base64'),
       tangles: {
         group: { root: null, previous: null },
         members: { root: null, previous: null },
@@ -69,7 +70,7 @@ test('create more', async (t) => {
     {
       type: 'group/add-member',
       version: 'v2',
-      groupKey: group.secret.toString('base64'),
+      groupKey: group.writeKey.key.toString('base64'),
       creator: rootFeed.id,
       root: group.root,
       recps: [group.id, root.id], // me being added to the group

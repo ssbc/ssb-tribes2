@@ -65,6 +65,8 @@ test('publish many messages that might need pruning', (t) => {
   const publishArray = new Array(n).fill().map((item, i) => i)
 
   ssb.tribes2.create(null, (err, group) => {
+    if (err) t.fail(err)
+
     const publishes = publishArray.map(
       (value) =>
         new Promise((res, rej) => {
@@ -78,10 +80,13 @@ test('publish many messages that might need pruning', (t) => {
         })
     )
 
+    //console.log('publishing', n)
     //console.time('publish')
     Promise.all(publishes)
       .then(async () => {
         //console.timeEnd('publish')
+
+        t.pass('published all the messages')
 
         ssb.close(true, t.end)
       })

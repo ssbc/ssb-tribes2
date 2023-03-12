@@ -37,7 +37,7 @@ test('get added to a group', async (t) => {
 
   const {
     id: groupId,
-    secret,
+    writeKey,
     root,
   } = await alice.tribes2.create().catch((err) => {
     console.error('alice failed to create group', err)
@@ -67,8 +67,8 @@ test('get added to a group', async (t) => {
       pull.collect((err, bobList) => {
         t.equal(bobList.length, 1, 'bob is a member of a group now')
         const group = bobList[0]
-        t.equal(group.id, groupId)
-        t.true(group.secret.equals(secret))
+        t.equal(group.id, groupId, 'group id is correct')
+        t.true(group.writeKey.key.equals(writeKey.key))
         t.equal(group.root, root)
         res()
       })
@@ -123,7 +123,7 @@ test('add member', async (t) => {
     const expected = {
       type: 'group/add-member',
       version: 'v2',
-      groupKey: group.secret.toString('base64'),
+      groupKey: group.writeKey.key.toString('base64'),
       root: group.root,
       creator: kaitiakiRoot.id,
 
