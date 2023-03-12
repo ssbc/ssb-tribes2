@@ -22,7 +22,6 @@ const {
   keySchemes,
 } = require('private-group-spec')
 const { fromMessageSigil, isBendyButtV1FeedSSBURI } = require('ssb-uri2')
-const { SecretKey } = require('ssb-private-group-keys')
 const buildGroupId = require('./lib/build-group-id')
 const AddTangles = require('./lib/add-tangles')
 const publishAndPrune = require('./lib/prune-publish')
@@ -164,73 +163,82 @@ module.exports = {
       if (cb === undefined)
         return promisify(excludeMembers)(groupId, feedIds, opts)
 
+      const excludeContent = {
+        type: 'group/exclude',
+        excludes: feedIds,
+        recps: [groupId],
+      }
+
       // TODO: should probably check this against a spec of its own
       // TODO: should add members tangle to this. should we add opts to publish()? { spec, tangles, keys}
-      publish(
-        {
-          type: 'group/exclude',
-          excludes: feedIds,
-          recps: [groupId],
-        },
-        (err, exclusionMsg) => {
-          // prettier-ignore
-          if (err) return cb(clarify(err, 'Failed to publish exclude msg'))
+      publish(excludeContent, (err, exclusionMsg) => {
+        // prettier-ignore
+        if (err) return cb(clarify(err, 'Failed to publish exclude msg'))
 
-          pull(
-            listMembers(groupId),
-            pull.collect((err, beforeMembers) => {
-              const remainingMembers = beforeMembers.filter(
-                (member) => !feedIds.includes(member)
-              )
+        pull(
+          listMembers(groupId),
+          pull.collect((err, beforeMembers) => {
+            const remainingMembers = beforeMembers.filter(
+              (member) => !feedIds.includes(member)
+            )
 
-              findOrCreateEpochWithoutMembers((err, group) => {
-                // prettier-ignore
-                if (err) return cb(clarify(err, 'Failed to create group init message when creating a group'))
+            findOrCreateEpochWithoutMembers((err, group) => {
+              // prettier-ignore
+              if (err) return cb(clarify(err, 'Failed to create group init message when creating a group'))
 
-                const { groupInitMsg, groupFeed, myRoot } = group
+              const { groupInitMsg, groupFeed, myRoot } = group
 
-                const newGroupKey = secretKeyFromString(groupFeed.purpose)
+              const newGroupKey = secretKeyFromString(groupFeed.purpose)
 
-                const data = {
-                  id: buildGroupId({
-                    groupInitMsg,
-                    groupKey: newGroupKey.toBuffer(),
-                  }),
-                  root: fromMessageSigil(groupInitMsg.key),
-                  subfeed: groupFeed.keys,
-                }
+              const data = {
+                id: buildGroupId({
+                  groupInitMsg,
+                  groupKey: newGroupKey.toBuffer(),
+                }),
+                root: fromMessageSigil(groupInitMsg.key),
+                subfeed: groupFeed.keys,
+              }
 
-                // TODO: shouldn't be add, should be update or something
-                ssb.box2.addGroupInfo(data.id, {
+              ssb.box2.addGroupInfo(
+                data.id,
+                {
                   key: newGroupKey,
                   root: data.root,
-                })
+                },
+                (err) => {
+                  ssb.box2.pickGroupWriteKey(
+                    data.id,
+                    {
+                      key: newGroupKey,
+                      scheme: keySchemes.private_group,
+                    },
+                    (err) => {
+                      const newKeyContent = {
+                        type: 'group/move-epoch',
+                        secret: newGroupKey.toString('base64'),
+                        exclusion: fromMessageSigil(exclusionMsg.key),
+                        // TODO: maybe we should create the new feed first :thinking: then we'll have the key safely saved there
+                        recps: [groupId, ...remainingMembers],
+                      }
+                      // TODO: loop if many members
+                      publish(newKeyContent, (err) => {
+                        // prettier-ignore
+                        if (err) return cb(clarify(err, 'Failed to tell people about new epoch'))
 
-                // TODO: add this key to ourselves. step 1. make sure we ourselves can post to the new feed. step 2 and later: other people can post on the new key
-                const newKeyContent = {
-                  type: 'group/move-epoch',
-                  secret: newGroupKey.toString('base64'),
-                  exclusion: fromMessageSigil(exclusionMsg.key),
-                  // TODO: how to have the group id in the recps but encrypt to the new key. do we need to put the new key in box2 before this?
-                  // maybe we should create the new feed first :thinking: then we'll have the key safely saved there
-                  recps: [groupId, ...remainingMembers],
+                        console.log('added people to new epoch')
+
+                        // TODO: create feed for the new epoch
+                        // either createGroupWithoutMembers(myRoot, cb) { but with an arg for the secret
+                        // or findOrCreateGroupFeed(null, function gotGroupFeed(err, groupFeed) { but we need to duplicate more code (maybe premature to worry about tho)
+                      })
+                    }
+                  )
                 }
-                // TODO: loop if many members
-                publish(newKeyContent, (err) => {
-                  // prettier-ignore
-                  if (err) return cb(clarify(err, 'Failed to tell people about new epoch'))
-
-                  console.log('added people to new epoch')
-
-                  // TODO: create feed for the new epoch
-                  // either createGroupWithoutMembers(myRoot, cb) { but with an arg for the secret
-                  // or findOrCreateGroupFeed(null, function gotGroupFeed(err, groupFeed) { but we need to duplicate more code (maybe premature to worry about tho)
-                })
-              })
+              )
             })
-          )
-        }
-      )
+          })
+        )
+      })
     }
 
     function publish(content, cb) {
