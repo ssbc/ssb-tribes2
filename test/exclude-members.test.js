@@ -3,11 +3,11 @@
 // SPDX-License-Identifier: CC0-1.0
 
 const test = require('tape')
-const pull = require('pull-stream')
 const { promisify: p } = require('util')
 const ssbKeys = require('ssb-keys')
 const Testbot = require('./helpers/testbot')
 const replicate = require('./helpers/replicate')
+const countGroupFeeds = require('./helpers/count-group-feeds')
 
 test('add and remove a person, post on the new feed', async (t) => {
   const alice = Testbot({
@@ -47,10 +47,23 @@ test('add and remove a person, post on the new feed', async (t) => {
   })
   t.pass('alice added bob to the group')
 
+  t.equals(
+    await p(countGroupFeeds)(alice),
+    1,
+    'before exclude alice has 1 group feed'
+  )
+
   await alice.tribes2.excludeMembers(groupId, [bobRoot.id]).catch((err) => {
     console.error('remove member fail', err)
     t.fail(err)
   })
+
+  // TODO: will be 2 if we post an init message on the new group feed
+  t.equals(
+    await p(countGroupFeeds)(alice),
+    1,
+    'after exclude alice has some number of group feeds?'
+  )
 
   await alice.tribes2
     .publish({
@@ -59,6 +72,12 @@ test('add and remove a person, post on the new feed', async (t) => {
       recps: [groupId],
     })
     .catch(t.fail)
+
+  t.equals(
+    await p(countGroupFeeds)(alice),
+    2,
+    'alice has 2 group feeds after publishing on the new feed'
+  )
 
   // TODO: verify that message was published on the new feed
 

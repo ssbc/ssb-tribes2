@@ -9,8 +9,8 @@ const { keySchemes } = require('private-group-spec')
 const Ref = require('ssb-ref')
 const { promisify: p } = require('util')
 const { where, type, toPromise } = require('ssb-db2/operators')
-const pull = require('pull-stream')
 const Testbot = require('./helpers/testbot')
+const countGroupFeeds = require('./helpers/count-group-feeds')
 
 test('create', async (t) => {
   const ssb = Testbot()
@@ -103,19 +103,6 @@ test('root message is encrypted', async (t) => {
 
   await p(alice.close)(true)
 })
-
-function countGroupFeeds(server, cb) {
-  pull(
-    server.metafeeds.branchStream({ old: true, live: false }),
-    pull.filter((branch) => branch.length === 4),
-    pull.map((branch) => branch[3]),
-    pull.filter((feed) => feed.recps),
-    pull.collect((err, feeds) => {
-      if (err) return cb(err)
-      return cb(null, feeds.length)
-    })
-  )
-}
 
 function createEmptyGroupFeed({ server, root }, cb) {
   const secret = new SecretKey()

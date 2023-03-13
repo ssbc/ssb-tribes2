@@ -21,6 +21,7 @@ const {
   },
   keySchemes,
 } = require('private-group-spec')
+const { SecretKey } = require('ssb-private-group-keys')
 const { fromMessageSigil, isBendyButtV1FeedSSBURI } = require('ssb-uri2')
 const buildGroupId = require('./lib/build-group-id')
 const AddTangles = require('./lib/add-tangles')
@@ -177,60 +178,42 @@ module.exports = {
         pull(
           listMembers(groupId),
           pull.collect((err, beforeMembers) => {
+            if (err) return cb(err)
+
             const remainingMembers = beforeMembers.filter(
               (member) => !feedIds.includes(member)
             )
+            const newGroupKey = new SecretKey()
+            const addInfo = { key: newGroupKey.toBuffer() }
 
-            findOrCreateEpochWithoutMembers((err, group) => {
-              // prettier-ignore
-              if (err) return cb(clarify(err, 'Failed to create group init message when creating a group'))
+            ssb.box2.addGroupInfo(groupId, addInfo, (err) => {
+              if (err) return cb(err)
 
-              const { groupInitMsg, groupFeed, myRoot } = group
-
-              const newGroupKey = secretKeyFromString(groupFeed.purpose)
-
-              const data = {
-                id: buildGroupId({
-                  groupInitMsg,
-                  groupKey: newGroupKey.toBuffer(),
-                }),
-                root: fromMessageSigil(groupInitMsg.key),
-                subfeed: groupFeed.keys,
+              const newKey = {
+                key: newGroupKey.toBuffer(),
+                scheme: keySchemes.private_group,
               }
+              ssb.box2.pickGroupWriteKey(groupId, newKey, (err) => {
+                if (err) return cb(err)
 
-              const addInfo = {
-                key: newGroupKey,
-                root: data.root,
-              }
-              ssb.box2.addGroupInfo(data.id, addInfo, (err) => {
-                const newKey = {
-                  key: newGroupKey,
-                  scheme: keySchemes.private_group,
+                const newKeyContent = {
+                  type: 'group/move-epoch',
+                  secret: newGroupKey.toString('base64'),
+                  exclusion: fromMessageSigil(exclusionMsg.key),
+                  recps: [groupId, ...remainingMembers],
                 }
-                ssb.box2.pickGroupWriteKey(data.id, newKey, (err) => {
-                  const newKeyContent = {
-                    type: 'group/move-epoch',
-                    secret: newGroupKey.toString('base64'),
-                    exclusion: fromMessageSigil(exclusionMsg.key),
-                    recps: [groupId, ...remainingMembers],
-                  }
-                  // TODO: loop if many members
-                  // TODO: spec
-                  publish(newKeyContent, { spec: () => true }, (err) => {
-                    // prettier-ignore
-                    if (err) return cb(clarify(err, 'Failed to tell people about new epoch'))
+                // TODO: loop if many members
+                // TODO: spec
+                // TODO: post this on old feed
+                publish(newKeyContent, { spec: () => true }, (err) => {
+                  // prettier-ignore
+                  if (err) return cb(clarify(err, 'Failed to tell people about new epoch'))
 
-                    console.log('added people to new epoch')
-
-                    // TODO: create feed for the new epoch
-                    // either createGroupWithoutMembers(myRoot, cb) { but with an arg for the secret
-                    // or findOrCreateGroupFeed(null, function gotGroupFeed(err, groupFeed) { but we need to duplicate more code (maybe premature to worry about tho)
-
-                    return cb()
-                  })
+                  return cb()
                 })
               })
             })
+            //})
           })
         )
       })
@@ -260,6 +243,7 @@ module.exports = {
           // prettier-ignore
           if (err) return cb(clarify(err, 'Failed to get group details when publishing to a group'))
 
+          console.log('posting using', writeKey.key)
           findOrCreateGroupFeed(writeKey.key, (err, groupFeed) => {
             // prettier-ignore
             if (err) return cb(clarify(err, 'Failed to find or create group feed when publishing to a group'))
