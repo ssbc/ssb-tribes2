@@ -211,7 +211,6 @@ module.exports = {
                 })
               })
             })
-            //})
           })
         )
       })
@@ -241,7 +240,6 @@ module.exports = {
           // prettier-ignore
           if (err) return cb(clarify(err, 'Failed to get group details when publishing to a group'))
 
-          console.log('posting using', writeKey.key)
           findOrCreateGroupFeed(writeKey.key, (err, groupFeed) => {
             // prettier-ignore
             if (err) return cb(clarify(err, 'Failed to find or create group feed when publishing to a group'))
