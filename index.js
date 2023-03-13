@@ -199,42 +199,36 @@ module.exports = {
                 subfeed: groupFeed.keys,
               }
 
-              ssb.box2.addGroupInfo(
-                data.id,
-                {
+              const addInfo = {
+                key: newGroupKey,
+                root: data.root,
+              }
+              ssb.box2.addGroupInfo(data.id, addInfo, (err) => {
+                const newKey = {
                   key: newGroupKey,
-                  root: data.root,
-                },
-                (err) => {
-                  ssb.box2.pickGroupWriteKey(
-                    data.id,
-                    {
-                      key: newGroupKey,
-                      scheme: keySchemes.private_group,
-                    },
-                    (err) => {
-                      const newKeyContent = {
-                        type: 'group/move-epoch',
-                        secret: newGroupKey.toString('base64'),
-                        exclusion: fromMessageSigil(exclusionMsg.key),
-                        // TODO: maybe we should create the new feed first :thinking: then we'll have the key safely saved there
-                        recps: [groupId, ...remainingMembers],
-                      }
-                      // TODO: loop if many members
-                      publish(newKeyContent, (err) => {
-                        // prettier-ignore
-                        if (err) return cb(clarify(err, 'Failed to tell people about new epoch'))
-
-                        console.log('added people to new epoch')
-
-                        // TODO: create feed for the new epoch
-                        // either createGroupWithoutMembers(myRoot, cb) { but with an arg for the secret
-                        // or findOrCreateGroupFeed(null, function gotGroupFeed(err, groupFeed) { but we need to duplicate more code (maybe premature to worry about tho)
-                      })
-                    }
-                  )
+                  scheme: keySchemes.private_group,
                 }
-              )
+                ssb.box2.pickGroupWriteKey(data.id, newKey, (err) => {
+                  const newKeyContent = {
+                    type: 'group/move-epoch',
+                    secret: newGroupKey.toString('base64'),
+                    exclusion: fromMessageSigil(exclusionMsg.key),
+                    // TODO: maybe we should create the new feed first :thinking: then we'll have the key safely saved there
+                    recps: [groupId, ...remainingMembers],
+                  }
+                  // TODO: loop if many members
+                  publish(newKeyContent, (err) => {
+                    // prettier-ignore
+                    if (err) return cb(clarify(err, 'Failed to tell people about new epoch'))
+
+                    console.log('added people to new epoch')
+
+                    // TODO: create feed for the new epoch
+                    // either createGroupWithoutMembers(myRoot, cb) { but with an arg for the secret
+                    // or findOrCreateGroupFeed(null, function gotGroupFeed(err, groupFeed) { but we need to duplicate more code (maybe premature to worry about tho)
+                  })
+                })
+              })
             })
           })
         )
