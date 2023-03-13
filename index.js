@@ -169,7 +169,6 @@ module.exports = {
         excludes: feedIds,
         recps: [groupId],
       }
-      // TODO: spec
       const excludeOpts = { tangles: ['group', 'members'], spec: () => true }
       publish(excludeContent, excludeOpts, (err, exclusionMsg) => {
         // prettier-ignore
@@ -203,7 +202,6 @@ module.exports = {
                   recps: [groupId, ...remainingMembers],
                 }
                 // TODO: loop if many members
-                // TODO: spec
                 // TODO: post this on old feed
                 publish(newKeyContent, { spec: () => true }, (err) => {
                   // prettier-ignore
