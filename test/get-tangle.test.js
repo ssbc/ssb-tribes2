@@ -63,7 +63,7 @@ test('get-tangle unit test', (t) => {
                 recps: [group.id],
               }
 
-              server.tribes2.publish(content, (err, msg) => {
+              server.tribes2.publish(content, null, (err, msg) => {
                 t.error(err, 'no error')
 
                 getTangle(group.id, (err, { root, previous }) => {
@@ -74,7 +74,7 @@ test('get-tangle unit test', (t) => {
                     'adding message to root'
                   )
 
-                  server.tribes2.publish(content, (err, msg) => {
+                  server.tribes2.publish(content, null, (err, msg) => {
                     t.error(err, 'no error')
 
                     getTangle(group.id, (err, { root, previous }) => {
@@ -110,7 +110,11 @@ test(`get-tangle-${n}-publishes`, (t) => {
       pull.values(publishArray),
       paraMap(
         (value, cb) =>
-          server.tribes2.publish({ type: 'memo', value, recps: [groupId] }, cb),
+          server.tribes2.publish(
+            { type: 'memo', value, recps: [groupId] },
+            null,
+            cb
+          ),
         4
       ),
       paraMap((msg, cb) => server.db.getMsg(msg.key, cb), 10),
@@ -149,7 +153,7 @@ test('get-tangle', (t) => {
     }
 
     ssb.db.onMsgAdded((lastMsgAfterCreate) => {
-      ssb.tribes2.publish(content, (err, msg) => {
+      ssb.tribes2.publish(content, null, (err, msg) => {
         t.error(err, 'publish a message')
 
         ssb.db.get(msg.key, (err, A) => {

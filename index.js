@@ -168,10 +168,9 @@ module.exports = {
         excludes: feedIds,
         recps: [groupId],
       }
-
-      // TODO: should probably check this against a spec of its own
-      // TODO: should add members tangle to this. should we add opts to publish()? { spec, tangles, keys}
-      publish(excludeContent, (err, exclusionMsg) => {
+      // TODO: spec
+      const excludeOpts = { tangles: ['group', 'members'], spec: () => true }
+      publish(excludeContent, excludeOpts, (err, exclusionMsg) => {
         // prettier-ignore
         if (err) return cb(clarify(err, 'Failed to publish exclude msg'))
 
@@ -213,11 +212,11 @@ module.exports = {
                     type: 'group/move-epoch',
                     secret: newGroupKey.toString('base64'),
                     exclusion: fromMessageSigil(exclusionMsg.key),
-                    // TODO: maybe we should create the new feed first :thinking: then we'll have the key safely saved there
                     recps: [groupId, ...remainingMembers],
                   }
                   // TODO: loop if many members
-                  publish(newKeyContent, (err) => {
+                  // TODO: spec
+                  publish(newKeyContent, { spec: () => true }, (err) => {
                     // prettier-ignore
                     if (err) return cb(clarify(err, 'Failed to tell people about new epoch'))
 
@@ -226,6 +225,8 @@ module.exports = {
                     // TODO: create feed for the new epoch
                     // either createGroupWithoutMembers(myRoot, cb) { but with an arg for the secret
                     // or findOrCreateGroupFeed(null, function gotGroupFeed(err, groupFeed) { but we need to duplicate more code (maybe premature to worry about tho)
+
+                    return cb()
                   })
                 })
               })
@@ -235,10 +236,13 @@ module.exports = {
       })
     }
 
-    function publish(content, cb) {
-      if (cb === undefined) return promisify(publish)(content)
+    function publish(content, opts, cb) {
+      if (cb === undefined) return promisify(publish)(content, opts)
 
       if (!content) return cb(new Error('Missing content'))
+
+      const isSpec = opts?.spec ?? isContent
+      const tangles = opts?.tangles ?? ['group']
 
       const recps = content.recps
       if (!recps || !Array.isArray(recps) || recps.length < 1) {
@@ -246,11 +250,11 @@ module.exports = {
       }
       const groupId = recps[0]
 
-      addTangles(content, ['group'], (err, content) => {
+      addTangles(content, tangles, (err, content) => {
         // prettier-ignore
         if (err) return cb(clarify(err, 'Failed to add group tangle when publishing to a group'))
 
-        if (!isContent(content)) return cb(new Error(isContent.errorsString))
+        if (!isSpec(content)) return cb(new Error(isSpec.errorsString))
 
         get(groupId, (err, { writeKey }) => {
           // prettier-ignore
