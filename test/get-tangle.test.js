@@ -218,10 +218,10 @@ test('get-tangle with branch', async (t) => {
     recps: [group.id],
   })
 
-  await p(alice.tribes2.publish)(content()).catch(t.fail)
+  await alice.tribes2.publish(content()).catch(t.fail)
   t.pass('alice published a message')
 
-  await p(bob.tribes2.publish)(content()).catch(t.fail)
+  await bob.tribes2.publish(content()).catch(t.fail)
   t.pass('bob published a message')
 
   // Then Bob shares his message with Alice
