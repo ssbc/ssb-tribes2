@@ -5,11 +5,26 @@
 const test = require('tape')
 const { promisify: p } = require('util')
 const ssbKeys = require('ssb-keys')
+const {
+  where,
+  and,
+  count,
+  isDecrypted,
+  type,
+  author,
+  toCallback,
+  toPullStream,
+  toPromise,
+} = require('ssb-db2/operators')
+const pull = require('pull-stream')
 const Testbot = require('./helpers/testbot')
 const replicate = require('./helpers/replicate')
 const countGroupFeeds = require('./helpers/count-group-feeds')
 
 test('add and remove a person, post on the new feed', async (t) => {
+  // feeds should look like
+  // first: initGroup->addAlice->addBob->excludeBob->reAddAlice
+  // second: initEpoch->post
   const alice = Testbot({
     keys: ssbKeys.generate(null, 'alice'),
     mfSeed: Buffer.from(
@@ -35,7 +50,11 @@ test('add and remove a person, post on the new feed', async (t) => {
   await replicate(alice, bob)
   t.pass('alice and bob replicate their trees')
 
-  const { id: groupId } = await alice.tribes2.create().catch((err) => {
+  const {
+    id: groupId,
+    writeKey: writeKey1,
+    subfeed: { id: firstFeedId },
+  } = await alice.tribes2.create().catch((err) => {
     console.error('alice failed to create group', err)
     t.fail(err)
   })
@@ -64,7 +83,9 @@ test('add and remove a person, post on the new feed', async (t) => {
     'after exclude alice has 2 group feeds'
   )
 
-  await alice.tribes2
+  const {
+    value: { author: secondFeedId },
+  } = await alice.tribes2
     .publish({
       type: 'test',
       text: 'post',
@@ -78,7 +99,64 @@ test('add and remove a person, post on the new feed', async (t) => {
     'alice still has 2 group feeds after publishing on the new feed'
   )
 
-  // TODO: verify that message was published on the new feed
+  t.notEquals(
+    secondFeedId,
+    firstFeedId,
+    'feed for publish is different to initial feed'
+  )
+
+  const { writeKey: writeKey2 } = await alice.tribes2.get(groupId)
+
+  t.false(writeKey1.key.equals(writeKey2.key), "there's a new key for writing")
+
+  const msgsFromFirst = await alice.db.query(
+    where(author(firstFeedId)),
+    toPromise()
+  )
+
+  const firstContents = msgsFromFirst.map((msg) => msg.value.content)
+
+  t.equal(firstContents.length, 5, '5 messages on first feed')
+
+  const firstInit = firstContents[0]
+
+  t.equal(firstInit.type, 'group/init')
+  t.equal(firstInit.groupKey, writeKey1.key.toString('base64'))
+
+  //const addAlice = firstContents[1]
+  //TODO
+
+  //const addBob = firstContents[2]
+  //TODO
+
+  //const excludeMsg = firstContents[3]
+
+  // TODO: test excludeMsg once we use the correct format
+
+  //const reinviteMsg = firstContents[4]
+
+  // TODO: test reinviteMsg once we use the correct format (add-member)
+
+  const msgsFromSecond = await alice.db.query(
+    where(author(secondFeedId)),
+    toPromise()
+  )
+
+  const secondContents = msgsFromSecond.map((msg) => msg.value.content)
+  console.log({ firstContents, secondContents })
+
+  t.equal(secondContents.length, 2, '2 messages on second (new) feed')
+
+  const secondInit = secondContents[0]
+
+  t.equal(secondInit.type, 'group/init')
+  t.equal(secondInit.version, 'v2')
+  t.equal(secondInit.groupKey, writeKey2.key.toString('base64'))
+  // TODO: test epoch tangle
+
+  const post = secondContents[1]
+
+  t.equal(post.text, 'post', 'found post on second feed')
 
   await p(alice.close)(true)
   await p(bob.close)(true)
