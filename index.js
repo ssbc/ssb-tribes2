@@ -164,55 +164,76 @@ module.exports = {
       if (cb === undefined)
         return promisify(excludeMembers)(groupId, feedIds, opts)
 
-      const excludeContent = {
-        type: 'group/exclude',
-        excludes: feedIds,
-        recps: [groupId],
-      }
-      const excludeOpts = { tangles: ['group', 'members'], spec: () => true }
-      publish(excludeContent, excludeOpts, (err, exclusionMsg) => {
-        // prettier-ignore
-        if (err) return cb(clarify(err, 'Failed to publish exclude msg'))
+      ssb.metafeeds.findOrCreate(function gotRoot(err, myRoot) {
+        if (err) return cb(err)
 
-        pull(
-          listMembers(groupId),
-          pull.collect((err, beforeMembers) => {
-            if (err) return cb(err)
+        const excludeContent = {
+          type: 'group/exclude',
+          excludes: feedIds,
+          recps: [groupId],
+        }
+        const excludeOpts = { tangles: ['group', 'members'], spec: () => true }
+        publish(excludeContent, excludeOpts, (err, exclusionMsg) => {
+          // prettier-ignore
+          if (err) return cb(clarify(err, 'Failed to publish exclude msg'))
 
-            const remainingMembers = beforeMembers.filter(
-              (member) => !feedIds.includes(member)
-            )
-            const newGroupKey = new SecretKey()
-            const addInfo = { key: newGroupKey.toBuffer() }
-
-            ssb.box2.addGroupInfo(groupId, addInfo, (err) => {
+          pull(
+            listMembers(groupId),
+            pull.collect((err, beforeMembers) => {
               if (err) return cb(err)
 
-              const newKey = {
-                key: newGroupKey.toBuffer(),
-                scheme: keySchemes.private_group,
-              }
-              ssb.box2.pickGroupWriteKey(groupId, newKey, (err) => {
+              const remainingMembers = beforeMembers.filter(
+                (member) => !feedIds.includes(member)
+              )
+              const newGroupKey = new SecretKey()
+              const addInfo = { key: newGroupKey.toBuffer() }
+
+              ssb.box2.addGroupInfo(groupId, addInfo, (err) => {
                 if (err) return cb(err)
 
-                const newKeyContent = {
-                  type: 'group/move-epoch',
-                  secret: newGroupKey.toString('base64'),
-                  exclusion: fromMessageSigil(exclusionMsg.key),
-                  recps: [groupId, ...remainingMembers],
+                const newKey = {
+                  key: newGroupKey.toBuffer(),
+                  scheme: keySchemes.private_group,
                 }
-                // TODO: loop if many members
-                // TODO: post this on old feed
-                publish(newKeyContent, { spec: () => true }, (err) => {
-                  // prettier-ignore
-                  if (err) return cb(clarify(err, 'Failed to tell people about new epoch'))
+                ssb.box2.pickGroupWriteKey(groupId, newKey, (err) => {
+                  if (err) return cb(err)
 
-                  return cb()
+                  const newEpochContent = {
+                    type: 'group/init',
+                    version: 'v2',
+                    groupKey: newGroupKey.toString('base64'),
+                    tangles: {
+                      members: { root: null, previous: null },
+                    },
+                    recps: [groupId, myRoot.id],
+                  }
+                  const newTangleOpts = {
+                    tangles: ['group', 'epoch'],
+                    spec: () => true,
+                  }
+                  publish(newEpochContent, newTangleOpts, (err) => {
+                    if (err) return cb(err)
+
+                    const newKeyContent = {
+                      type: 'group/move-epoch',
+                      secret: newGroupKey.toString('base64'),
+                      exclusion: fromMessageSigil(exclusionMsg.key),
+                      recps: [groupId, ...remainingMembers],
+                    }
+                    // TODO: loop if many members
+                    // TODO: post this on old feed
+                    publish(newKeyContent, { spec: () => true }, (err) => {
+                      // prettier-ignore
+                      if (err) return cb(clarify(err, 'Failed to tell people about new epoch'))
+
+                      return cb()
+                    })
+                  })
                 })
               })
             })
-          })
-        )
+          )
+        })
       })
     }
 

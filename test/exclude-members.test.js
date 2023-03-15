@@ -58,11 +58,10 @@ test('add and remove a person, post on the new feed', async (t) => {
     t.fail(err)
   })
 
-  // TODO: will be 2 if we post an init message on the new group feed
   t.equals(
     await p(countGroupFeeds)(alice),
-    1,
-    'after exclude alice has some number of group feeds?'
+    2,
+    'after exclude alice has 2 group feeds'
   )
 
   await alice.tribes2
@@ -76,7 +75,7 @@ test('add and remove a person, post on the new feed', async (t) => {
   t.equals(
     await p(countGroupFeeds)(alice),
     2,
-    'alice has 2 group feeds after publishing on the new feed'
+    'alice still has 2 group feeds after publishing on the new feed'
   )
 
   // TODO: verify that message was published on the new feed
