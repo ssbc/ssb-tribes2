@@ -146,21 +146,15 @@ module.exports = {
             // prettier-ignore
             if (err) return cb(clarify(err, 'Failed to find or create additions feed when adding members'))
 
-            addTangles(content, ['group', 'members'], (err, content) => {
-              // prettier-ignore
-              if (err) return cb(clarify(err, 'Failed to add group tangles when adding members'))
-
-              if (!isAddMember(content))
-                return cb(new Error(isAddMember.errorsString))
-
-              // TODO: use publish for this whole section instead?
-              publishAndPrune(
-                ssb,
-                content,
-                opts.feedKeys ?? additionsFeed.keys,
-                cb
-              )
-            })
+            publish(
+              content,
+              {
+                spec: isAddMember,
+                tangles: ['group', 'members'],
+                feedKeys: opts.feedKeys ?? additionsFeed.keys,
+              },
+              cb
+            )
           })
         })
       })
