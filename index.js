@@ -167,72 +167,90 @@ module.exports = {
       ssb.metafeeds.findOrCreate(function gotRoot(err, myRoot) {
         if (err) return cb(err)
 
-        const excludeContent = {
-          type: 'group/exclude',
-          excludes: feedIds,
-          recps: [groupId],
-        }
-        const excludeOpts = { tangles: ['group', 'members'], spec: () => true }
-        publish(excludeContent, excludeOpts, (err, exclusionMsg) => {
+        get(groupId, (err, { writeKey: oldWriteKey }) => {
           // prettier-ignore
-          if (err) return cb(clarify(err, 'Failed to publish exclude msg'))
+          if (err) return cb(err)
 
-          pull(
-            listMembers(groupId),
-            pull.collect((err, beforeMembers) => {
-              if (err) return cb(err)
+          findOrCreateGroupFeed(oldWriteKey.key, (err, oldGroupFeed) => {
+            // prettier-ignore
+            if (err) return cb(err)
 
-              const remainingMembers = beforeMembers.filter(
-                (member) => !feedIds.includes(member)
-              )
-              const newGroupKey = new SecretKey()
-              const addInfo = { key: newGroupKey.toBuffer() }
+            const excludeContent = {
+              type: 'group/exclude',
+              excludes: feedIds,
+              recps: [groupId],
+            }
+            const excludeOpts = {
+              tangles: ['group', 'members'],
+              spec: () => true,
+            }
+            publish(excludeContent, excludeOpts, (err, exclusionMsg) => {
+              // prettier-ignore
+              if (err) return cb(clarify(err, 'Failed to publish exclude msg'))
 
-              ssb.box2.addGroupInfo(groupId, addInfo, (err) => {
-                if (err) return cb(err)
-
-                const newKey = {
-                  key: newGroupKey.toBuffer(),
-                  scheme: keySchemes.private_group,
-                }
-                ssb.box2.pickGroupWriteKey(groupId, newKey, (err) => {
+              pull(
+                listMembers(groupId),
+                pull.collect((err, beforeMembers) => {
                   if (err) return cb(err)
 
-                  const newEpochContent = {
-                    type: 'group/init',
-                    version: 'v2',
-                    groupKey: newGroupKey.toString('base64'),
-                    tangles: {
-                      members: { root: null, previous: null },
-                    },
-                    recps: [groupId, myRoot.id],
-                  }
-                  const newTangleOpts = {
-                    tangles: ['group', 'epoch'],
-                    spec: () => true,
-                  }
-                  publish(newEpochContent, newTangleOpts, (err) => {
+                  const remainingMembers = beforeMembers.filter(
+                    (member) => !feedIds.includes(member)
+                  )
+                  const newGroupKey = new SecretKey()
+                  const addInfo = { key: newGroupKey.toBuffer() }
+
+                  ssb.box2.addGroupInfo(groupId, addInfo, (err) => {
                     if (err) return cb(err)
 
-                    const newKeyContent = {
-                      type: 'group/move-epoch',
-                      secret: newGroupKey.toString('base64'),
-                      exclusion: fromMessageSigil(exclusionMsg.key),
-                      recps: [groupId, ...remainingMembers],
+                    const newKey = {
+                      key: newGroupKey.toBuffer(),
+                      scheme: keySchemes.private_group,
                     }
-                    // TODO: loop if many members
-                    // TODO: post this on old feed
-                    publish(newKeyContent, { spec: () => true }, (err) => {
-                      // prettier-ignore
-                      if (err) return cb(clarify(err, 'Failed to tell people about new epoch'))
+                    ssb.box2.pickGroupWriteKey(groupId, newKey, (err) => {
+                      if (err) return cb(err)
 
-                      return cb()
+                      const newEpochContent = {
+                        type: 'group/init',
+                        version: 'v2',
+                        groupKey: newGroupKey.toString('base64'),
+                        tangles: {
+                          members: { root: null, previous: null },
+                        },
+                        recps: [groupId, myRoot.id],
+                      }
+                      const newTangleOpts = {
+                        tangles: ['group', 'epoch'],
+                        spec: () => true,
+                      }
+                      publish(newEpochContent, newTangleOpts, (err) => {
+                        if (err) return cb(err)
+
+                        const reAddContent = {
+                          type: 'group/move-epoch',
+                          secret: newGroupKey.toString('base64'),
+                          exclusion: fromMessageSigil(exclusionMsg.key),
+                          recps: [groupId, ...remainingMembers],
+                        }
+                        const reAddOpts = {
+                          // the re-adding needs to be published on the old
+                          // feed so that the additions feed is not spammed,
+                          // while people need to still be able to find it
+                          feedKeys: oldGroupFeed.keys,
+                          spec: () => true,
+                        }
+                        publish(reAddContent, reAddOpts, (err) => {
+                          // prettier-ignore
+                          if (err) return cb(clarify(err, 'Failed to tell people about new epoch'))
+
+                          return cb()
+                        })
+                      })
                     })
                   })
                 })
-              })
+              )
             })
-          )
+          })
         })
       })
     }
@@ -265,7 +283,7 @@ module.exports = {
             // prettier-ignore
             if (err) return cb(clarify(err, 'Failed to find or create group feed when publishing to a group'))
 
-            publishAndPrune(ssb, content, groupFeed.keys, cb)
+            publishAndPrune(ssb, content, opts?.feedKeys ?? groupFeed.keys, cb)
           })
         })
       })
