@@ -113,9 +113,12 @@ test('add and remove a person, post on the new feed', async (t) => {
   t.equal(firstInit.type, 'group/init')
   t.equal(firstInit.groupKey, writeKey1.key.toString('base64'))
 
-  //const excludeMsg = firstContents[1]
+  const excludeMsg = firstContents[1]
 
-  // TODO: test excludeMsg once we use the correct format
+  t.equal(excludeMsg.type, 'group/exclude')
+  t.deepEqual(excludeMsg.excludes, [bobRoot.id])
+  t.deepEqual(excludeMsg.recps, [groupId])
+  // TODO: check members tangle
 
   const reinviteMsg = firstContents[2]
 
@@ -137,6 +140,7 @@ test('add and remove a person, post on the new feed', async (t) => {
   t.equal(secondInit.type, 'group/init')
   t.equal(secondInit.version, 'v2')
   t.equal(secondInit.groupKey, writeKey2.key.toString('base64'))
+  t.deepEqual(secondInit.tangles.members, { root: null, previous: null })
   // TODO: test epoch tangle
 
   const post = secondContents[1]
