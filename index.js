@@ -150,7 +150,7 @@ module.exports = {
               content,
               {
                 spec: isAddMember,
-                tangles: ['group', 'members'],
+                tangles: ['members'],
                 feedKeys: opts.feedKeys ?? additionsFeed.keys,
               },
               cb
@@ -181,7 +181,7 @@ module.exports = {
               recps: [groupId],
             }
             const excludeOpts = {
-              tangles: ['group', 'members'],
+              tangles: ['members'],
               spec: () => true,
             }
             publish(excludeContent, excludeOpts, (err) => {
@@ -219,7 +219,7 @@ module.exports = {
                         recps: [groupId, myRoot.id],
                       }
                       const newTangleOpts = {
-                        tangles: ['group', 'epoch'],
+                        tangles: ['epoch'],
                         spec: () => true,
                       }
                       publish(newEpochContent, newTangleOpts, (err) => {
@@ -257,7 +257,7 @@ module.exports = {
       if (!content) return cb(new Error('Missing content'))
 
       const isSpec = opts?.spec ?? isContent
-      const tangles = opts?.tangles ?? ['group']
+      const tangles = ['group', ...(opts?.tangles ?? [])]
 
       const recps = content.recps
       if (!recps || !Array.isArray(recps) || recps.length < 1) {
