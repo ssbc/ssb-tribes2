@@ -153,7 +153,13 @@ module.exports = {
               if (!isAddMember(content))
                 return cb(new Error(isAddMember.errorsString))
 
-              publishAndPrune(ssb, content, additionsFeed.keys, cb)
+              // TODO: use publish for this whole section instead?
+              publishAndPrune(
+                ssb,
+                content,
+                opts.feedKeys ?? additionsFeed.keys,
+                cb
+              )
             })
           })
         })
@@ -184,7 +190,7 @@ module.exports = {
               tangles: ['group', 'members'],
               spec: () => true,
             }
-            publish(excludeContent, excludeOpts, (err, exclusionMsg) => {
+            publish(excludeContent, excludeOpts, (err) => {
               // prettier-ignore
               if (err) return cb(clarify(err, 'Failed to publish exclude msg'))
 
@@ -225,25 +231,21 @@ module.exports = {
                       publish(newEpochContent, newTangleOpts, (err) => {
                         if (err) return cb(err)
 
-                        const reAddContent = {
-                          type: 'group/move-epoch',
-                          secret: newGroupKey.toString('base64'),
-                          exclusion: fromMessageSigil(exclusionMsg.key),
-                          recps: [groupId, ...remainingMembers],
-                        }
                         const reAddOpts = {
                           // the re-adding needs to be published on the old
                           // feed so that the additions feed is not spammed,
                           // while people need to still be able to find it
                           feedKeys: oldGroupFeed.keys,
-                          spec: () => true,
                         }
-                        publish(reAddContent, reAddOpts, (err) => {
-                          // prettier-ignore
-                          if (err) return cb(clarify(err, 'Failed to tell people about new epoch'))
-
-                          return cb()
-                        })
+                        addMembers(
+                          groupId,
+                          remainingMembers,
+                          reAddOpts,
+                          (err) => {
+                            if (err) return cb(err)
+                            return cb()
+                          }
+                        )
                       })
                     })
                   })

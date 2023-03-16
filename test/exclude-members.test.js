@@ -5,18 +5,7 @@
 const test = require('tape')
 const { promisify: p } = require('util')
 const ssbKeys = require('ssb-keys')
-const {
-  where,
-  and,
-  count,
-  isDecrypted,
-  type,
-  author,
-  toCallback,
-  toPullStream,
-  toPromise,
-} = require('ssb-db2/operators')
-const pull = require('pull-stream')
+const { where, author, toPromise } = require('ssb-db2/operators')
 const Testbot = require('./helpers/testbot')
 const replicate = require('./helpers/replicate')
 const countGroupFeeds = require('./helpers/count-group-feeds')
@@ -45,7 +34,7 @@ test('add and remove a person, post on the new feed', async (t) => {
   await bob.tribes2.start()
   t.pass('tribes2 started for both alice and bob')
 
-  await p(alice.metafeeds.findOrCreate)()
+  const aliceRoot = await p(alice.metafeeds.findOrCreate)()
   const bobRoot = await p(bob.metafeeds.findOrCreate)()
 
   await replicate(alice, bob)
@@ -128,9 +117,11 @@ test('add and remove a person, post on the new feed', async (t) => {
 
   // TODO: test excludeMsg once we use the correct format
 
-  //const reinviteMsg = firstContents[2]
+  const reinviteMsg = firstContents[2]
 
-  // TODO: test reinviteMsg once we use the correct format (add-member)
+  t.equal(reinviteMsg.type, 'group/add-member')
+  t.deepEqual(reinviteMsg.recps, [groupId, aliceRoot.id])
+  // TODO: check members tangle
 
   const msgsFromSecond = await alice.db.query(
     where(author(secondFeedId)),
