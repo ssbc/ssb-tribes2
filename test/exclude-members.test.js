@@ -23,8 +23,9 @@ const countGroupFeeds = require('./helpers/count-group-feeds')
 
 test('add and remove a person, post on the new feed', async (t) => {
   // feeds should look like
-  // first: initGroup->addAlice->addBob->excludeBob->reAddAlice
+  // first: initGroup->excludeBob->reAddAlice
   // second: initEpoch->post
+  // additions: addAlice->addBob (not checking this here)
   const alice = Testbot({
     keys: ssbKeys.generate(null, 'alice'),
     mfSeed: Buffer.from(
@@ -116,24 +117,18 @@ test('add and remove a person, post on the new feed', async (t) => {
 
   const firstContents = msgsFromFirst.map((msg) => msg.value.content)
 
-  t.equal(firstContents.length, 5, '5 messages on first feed')
+  t.equal(firstContents.length, 3, '3 messages on first feed')
 
   const firstInit = firstContents[0]
 
   t.equal(firstInit.type, 'group/init')
   t.equal(firstInit.groupKey, writeKey1.key.toString('base64'))
 
-  //const addAlice = firstContents[1]
-  //TODO
-
-  //const addBob = firstContents[2]
-  //TODO
-
-  //const excludeMsg = firstContents[3]
+  //const excludeMsg = firstContents[1]
 
   // TODO: test excludeMsg once we use the correct format
 
-  //const reinviteMsg = firstContents[4]
+  //const reinviteMsg = firstContents[2]
 
   // TODO: test reinviteMsg once we use the correct format (add-member)
 
@@ -143,7 +138,6 @@ test('add and remove a person, post on the new feed', async (t) => {
   )
 
   const secondContents = msgsFromSecond.map((msg) => msg.value.content)
-  console.log({ firstContents, secondContents })
 
   t.equal(secondContents.length, 2, '2 messages on second (new) feed')
 
