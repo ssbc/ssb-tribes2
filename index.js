@@ -153,7 +153,11 @@ module.exports = {
                 tangles: ['members'],
                 feedKeys: opts.feedKeys ?? additionsFeed.keys,
               },
-              cb
+              (err, msg) => {
+                // prettier-ignore
+                if (err) return cb(clarify(err, 'Failed to publish add-member message'))
+                return cb(null, msg)
+              }
             )
           })
         })
@@ -165,15 +169,16 @@ module.exports = {
         return promisify(excludeMembers)(groupId, feedIds, opts)
 
       ssb.metafeeds.findOrCreate(function gotRoot(err, myRoot) {
-        if (err) return cb(err)
+        // prettier-ignore
+        if (err) return cb(clarify(err, "Couldn't get own root when excluding members"))
 
         get(groupId, (err, { writeKey: oldWriteKey }) => {
           // prettier-ignore
-          if (err) return cb(err)
+          if (err) return cb(clarify(err, "Couldn't get old key when excluding members"))
 
           findOrCreateGroupFeed(oldWriteKey.key, (err, oldGroupFeed) => {
             // prettier-ignore
-            if (err) return cb(err)
+            if (err) return cb(clarify(err, "Couldn't get the old group feed when excluding members"))
 
             const excludeContent = {
               type: 'group/exclude',
@@ -191,7 +196,8 @@ module.exports = {
               pull(
                 listMembers(groupId),
                 pull.collect((err, beforeMembers) => {
-                  if (err) return cb(err)
+                  // prettier-ignore
+                  if (err) return cb(clarify(err, "Couldn't get old member list when excluding members"))
 
                   const remainingMembers = beforeMembers.filter(
                     (member) => !feedIds.includes(member)
@@ -200,14 +206,16 @@ module.exports = {
                   const addInfo = { key: newGroupKey.toBuffer() }
 
                   ssb.box2.addGroupInfo(groupId, addInfo, (err) => {
-                    if (err) return cb(err)
+                    // prettier-ignore
+                    if (err) return cb(clarify(err, "Couldn't store new key when excluding members"))
 
                     const newKey = {
                       key: newGroupKey.toBuffer(),
                       scheme: keySchemes.private_group,
                     }
                     ssb.box2.pickGroupWriteKey(groupId, newKey, (err) => {
-                      if (err) return cb(err)
+                      // prettier-ignore
+                      if (err) return cb(clarify(err, "Couldn't switch to new key for writing when excluding members"))
 
                       const newEpochContent = {
                         type: 'group/init',
@@ -223,7 +231,8 @@ module.exports = {
                         spec: () => true,
                       }
                       publish(newEpochContent, newTangleOpts, (err) => {
-                        if (err) return cb(err)
+                        // prettier-ignore
+                        if (err) return cb(clarify(err, "Couldn't post init msg on new epoch when excluding members"))
 
                         const reAddOpts = {
                           // the re-adding needs to be published on the old
@@ -236,7 +245,8 @@ module.exports = {
                           remainingMembers,
                           reAddOpts,
                           (err) => {
-                            if (err) return cb(err)
+                            // prettier-ignore
+                            if (err) return cb(clarify(err, "Couldn't re-add remaining members when excluding members"))
                             return cb()
                           }
                         )
@@ -279,7 +289,16 @@ module.exports = {
             // prettier-ignore
             if (err) return cb(clarify(err, 'Failed to find or create group feed when publishing to a group'))
 
-            publishAndPrune(ssb, content, opts?.feedKeys ?? groupFeed.keys, cb)
+            publishAndPrune(
+              ssb,
+              content,
+              opts?.feedKeys ?? groupFeed.keys,
+              (err, msg) => {
+                // prettier-ignore
+                if (err) return cb(clarify(err, 'Failed to publishAndPrune when publishing a group message'))
+                return cb(null, msg)
+              }
+            )
           })
         })
       })
