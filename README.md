@@ -107,16 +107,23 @@ NOTE: If `create` finds an empty (i.e. seemingly unused) group feed, it will sta
 
 - `opts` _Object_ - currently empty, but will be used in the future to specify details like whether the group has an admin subgroup, etc.
 - `cb` _Function_ - callback function of signature `(err, group)` where `group` is an object containing:
-  - `id` _CloakedId_ - a cipherlink that's safe to use publicly to name the group, and is used in `recps` to trigger encrypting messages to that group, encoded as an ssb-uri
+
+  - `id` _GroupUri_ - a cipherlink that's safe to use publicly to name the group, and is used in `recps` to trigger encrypting messages to that group, encoded as an ssb-uri
   - `subfeed` _Keys_ - the keys of the subfeed you should publish group data to
-  - `secret` _Buffer_ - the symmetric key used by the group for encryption
+  - `writeKey` _GroupKey_ - the current key used for publishing new messages to the group. It is one of the `readKeys`.
+  - `readKeys` _[GroupKey]_ - an array of all keys used to read messages for this group.
   - `root` _MessagedId_ - the MessageId of the `group/init` message of the group, encoded as an ssb-uri.
+
+  where _GroupKey_ is an object on the format
+
+  - `key` _Buffer_ - the symmetric key used by the group for encryption
+  - `scheme` _String_ - the scheme for this key
 
 ### `ssb.tribes2.get(groupId, cb)`
 
 Gets information about a specific group.
 
-- `groupId` _CloakedId_ - the public-safe cipherlink which identifies the group
+- `groupId` _GroupUri_ - the public-safe cipherlink which identifies the group
 - `cb` _Function_ - callback function of signature `(err, group)` where `group` is an object on the same format as the `group` object returned by #create
 
 ### `ssb.tribes2.list({ live }) => source`
@@ -124,19 +131,34 @@ Gets information about a specific group.
 Creates a pull-stream source which emits `group` data of each private group you're a part of. If `live` is true then it also outputs all new groups you join.
 (Same format as `group` object returned by #create)
 
-### `ssb.tribes2.addMembers(groupId, feedIds, cb)`
+### `ssb.tribes2.addMembers(groupId, feedIds, opts, cb)`
 
-Publish `group/add-member` messages to a group of peers, which gives them all the details they need
-to join the group.
+Publish `group/add-member` messages to a group of peers, which gives them all the details they need to join the group. Newly added members will need to accept the invite using `acceptInvite()` before they start replicating the group.
 
-- `groupId` _CloakedId_ - the public-safe cipherlink which identifies the group (same as in #create)
-- `feedIds` _[FeedId]_ - an Array of 1-16 different ids for peers (accepts ssb-uri or sigil feed ids)
+- `groupId` _GroupUri_ - the public-safe cipherlink which identifies the group (same as in #create)
+- `feedIds` _[FeedId]_ - an Array of 1-15 different ids for peers (accepts ssb-uri or sigil feed ids)
+- `opts` _Object_ - with the options:
+  - `text` _String_ - A piece of text attached to the addition. Visible to the whole group and the newly added people.
+  - `feedKeys` _Keys_ - By default the addition is published to the feed with the purpose "group/additions" but using this option you can provide keys for another feed to publish on. Note that this doesn't affect the encryption used.
 - `cb` _Function_ - a callback of signature `(err, msg)`
 
-### `ssb.tribes2.publish(content, cb)`
+### `ssb.tribes2.excludeMembers(groupId, feedIds, opts, cb)
+
+Excludes some current members of the group, by creating a new key and group feed and reinviting everyone to that key except for the excluded members.
+
+- `groupId` _GroupUri_ - the public-safe cipherlink which identifies the group (same as in #create)
+- `feedIds` _[FeedId]_ - an Array of 1-15 different ids for peers (accepts ssb-uri or sigil feed ids)
+- `opts` _Object_ - placeholder for future options.
+- `cb` _Function_ - a callback of signature `(err)`
+
+### `ssb.tribes2.publish(content, opts, cb)`
 
 Publishes any kind of message encrypted to the group. The function wraps `ssb.db.create()` but handles adding tangles and using the correct encryption for the `content.recps` that you've provided. Mutates `content`.
 
+- `opts` _Object_ - with the options:
+  - `spec` _Function_ - the `is-my-ssb-valid`/`is-my-json-valid`-based validator that you want to check this message against before publishing. By default uses the `content` validator from `private-group-spec`.
+  - `tangles` _[String]_ - by default `publish` always adds the `group` tangle to messages, but using this option you can ask it to add additional tangles. Currently only supports a few tangles that are core to groups.
+  - `feedKeys` _Keys_ - By default the message is published to the currently used group feed (current epoch) but using this option you can provide keys for another feed to publish on. Note that this doesn't affect the encryption used.
 - `cb` _Function_ - a callback of signature `(err, msg)`
 
 ### `ssb.tribes2.listMembers(groupId, { live }) => source`
