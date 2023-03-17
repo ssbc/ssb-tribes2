@@ -6,6 +6,7 @@ const test = require('tape')
 const { promisify: p } = require('util')
 const ssbKeys = require('ssb-keys')
 const { where, author, toPromise } = require('ssb-db2/operators')
+const { fromMessageSigil } = require('ssb-uri2')
 const Testbot = require('./helpers/testbot')
 const replicate = require('./helpers/replicate')
 const countGroupFeeds = require('./helpers/count-group-feeds')
@@ -42,6 +43,7 @@ test('add and remove a person, post on the new feed', async (t) => {
 
   const {
     id: groupId,
+    root,
     writeKey: writeKey1,
     subfeed: { id: firstFeedId },
   } = await alice.tribes2.create().catch((err) => {
@@ -50,10 +52,12 @@ test('add and remove a person, post on the new feed', async (t) => {
   })
   t.pass('alice created a group')
 
-  await alice.tribes2.addMembers(groupId, [bobRoot.id]).catch((err) => {
-    console.error('add member fail', err)
-    t.fail(err)
-  })
+  const addBobMsg = await alice.tribes2
+    .addMembers(groupId, [bobRoot.id])
+    .catch((err) => {
+      console.error('add member fail', err)
+      t.fail(err)
+    })
   t.pass('alice added bob to the group')
 
   t.equals(
@@ -118,7 +122,10 @@ test('add and remove a person, post on the new feed', async (t) => {
   t.equal(excludeMsg.type, 'group/exclude')
   t.deepEqual(excludeMsg.excludes, [bobRoot.id])
   t.deepEqual(excludeMsg.recps, [groupId])
-  // TODO: check members tangle
+  t.deepEqual(excludeMsg.tangles.members, {
+    root,
+    previous: [fromMessageSigil(addBobMsg.key)],
+  })
 
   const reinviteMsg = firstContents[2]
 
