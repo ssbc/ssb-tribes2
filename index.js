@@ -271,7 +271,7 @@ module.exports = {
       })
     }
 
-    function publish(content, opts = {}, cb) {
+    function publish(content, opts, cb) {
       if (cb === undefined) return promisify(publish)(content, opts)
 
       if (!content) return cb(new Error('Missing content'))
@@ -295,7 +295,7 @@ module.exports = {
           // prettier-ignore
           if (err) return cb(clarify(err, 'Failed to get group details when publishing to a group'))
 
-          if (opts.feedKeys) {
+          if (opts?.feedKeys) {
             publishAndPrune(ssb, content, opts.feedKeys, (err, msg) => {
               // prettier-ignore
               if (err) return cb(clarify(err, 'Failed to publishAndPrune when publishing a group message'))
