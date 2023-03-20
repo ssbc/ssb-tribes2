@@ -44,14 +44,14 @@ module.exports = {
       secretKeyFromString,
       findOrCreateAdditionsFeed,
       findOrCreateGroupFeed,
-      findOrCreateEpochWithoutMembers,
+      findOrCreateGroupWithoutMembers,
       getRootFeedIdFromMsgId,
     } = MetaFeedHelpers(ssb)
 
     function create(opts = {}, cb) {
       if (cb === undefined) return promisify(create)(opts)
 
-      findOrCreateEpochWithoutMembers((err, group) => {
+      findOrCreateGroupWithoutMembers((err, group) => {
         // prettier-ignore
         if (err) return cb(clarify(err, 'Failed to create group init message when creating a group'))
 
