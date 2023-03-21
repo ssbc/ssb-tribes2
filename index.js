@@ -173,7 +173,7 @@ module.exports = {
         // prettier-ignore
         if (err) return cb(clarify(err, "Couldn't get own root when excluding members"))
 
-        get(groupId, (err, { writeKey: oldWriteKey }) => {
+        get(groupId, (err, { writeKey: oldWriteKey } = {}) => {
           // prettier-ignore
           if (err) return cb(clarify(err, "Couldn't get old key when excluding members"))
 
