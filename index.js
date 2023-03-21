@@ -193,7 +193,7 @@ module.exports = {
             }
             const excludeOpts = {
               tangles: ['members'],
-              spec: () => true,
+              spec: isExclude,
             }
             publish(excludeContent, excludeOpts, (err) => {
               // prettier-ignore
