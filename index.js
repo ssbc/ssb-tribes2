@@ -280,7 +280,10 @@ module.exports = {
         // prettier-ignore
         if (err) return cb(clarify(err, 'Failed to add group tangle when publishing to a group'))
 
-        if (!isValid(content)) return cb(new Error(isValid.errorsString))
+        if (!isValid(content))
+          return cb(
+            new Error(isValid.errorsString ?? 'content failed validation')
+          )
 
         get(groupId, (err, { writeKey }) => {
           // prettier-ignore
