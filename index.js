@@ -234,7 +234,7 @@ module.exports = {
                       }
                       const newTangleOpts = {
                         tangles: ['epoch'],
-                        spec: () => true,
+                        spec: isInit,
                       }
                       publish(newEpochContent, newTangleOpts, (err) => {
                         // prettier-ignore
