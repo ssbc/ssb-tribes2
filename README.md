@@ -156,7 +156,7 @@ Excludes some current members of the group, by creating a new key and group feed
 Publishes any kind of message encrypted to the group. The function wraps `ssb.db.create()` but handles adding tangles and using the correct encryption for the `content.recps` that you've provided. Mutates `content`.
 
 - `opts` _Object_ - with the options:
-  - `spec` _Function_ - the `is-my-ssb-valid`/`is-my-json-valid`-based validator that you want to check this message against before publishing. By default uses the `content` validator from `private-group-spec`.
+  - `isValid` _Function_ - a validator (typically `is-my-ssb-valid`/`is-my-json-valid`-based) that you want to check this message against before publishing. Have the function return false if the message is invalid and the message won't be published. By default uses the `content` validator from `private-group-spec`.
   - `tangles` _[String]_ - by default `publish` always adds the `group` tangle to messages, but using this option you can ask it to add additional tangles. Currently only supports a few tangles that are core to groups.
   - `feedKeys` _Keys_ - By default the message is published to the currently used group feed (current epoch) but using this option you can provide keys for another feed to publish on. Note that this doesn't affect the encryption used.
 - `cb` _Function_ - a callback of signature `(err, msg)`

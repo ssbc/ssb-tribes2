@@ -151,7 +151,7 @@ module.exports = {
             if (err) return cb(clarify(err, 'Failed to find or create additions feed when adding members'))
 
             const options = {
-              spec: isAddMember,
+              isValid: isAddMember,
               tangles: ['members'],
               feedKeys: opts?.feedKeys ?? additionsFeed.keys,
             }
@@ -188,7 +188,7 @@ module.exports = {
             }
             const excludeOpts = {
               tangles: ['members'],
-              spec: () => true,
+              isValid: () => true,
             }
             publish(excludeContent, excludeOpts, (err) => {
               // prettier-ignore
@@ -229,7 +229,7 @@ module.exports = {
                       }
                       const newTangleOpts = {
                         tangles: ['epoch'],
-                        spec: () => true,
+                        isValid: () => true,
                       }
                       publish(newEpochContent, newTangleOpts, (err) => {
                         // prettier-ignore
@@ -267,7 +267,7 @@ module.exports = {
 
       if (!content) return cb(new Error('Missing content'))
 
-      const isSpec = opts?.spec ?? isContent
+      const isValid = opts?.isValid ?? isContent
       const tangles = ['group', ...(opts?.tangles ?? [])]
 
       const recps = content.recps
@@ -280,7 +280,7 @@ module.exports = {
         // prettier-ignore
         if (err) return cb(clarify(err, 'Failed to add group tangle when publishing to a group'))
 
-        if (!isSpec(content)) return cb(new Error(isSpec.errorsString))
+        if (!isValid(content)) return cb(new Error(isValid.errorsString))
 
         get(groupId, (err, { writeKey }) => {
           // prettier-ignore
