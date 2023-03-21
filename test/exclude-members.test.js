@@ -60,9 +60,9 @@ test('add and remove a person, post on the new feed', async (t) => {
     'before exclude alice has 1 group feed'
   )
 
-  await alice.tribes2.excludeMembers(groupId, [bobRoot.id]).catch((err) => {
-    t.error(err, 'remove member fail')
-  })
+  await alice.tribes2
+    .excludeMembers(groupId, [bobRoot.id])
+    .catch((err) => t.error(err, 'remove member fail'))
 
   t.equals(
     await p(countGroupFeeds)(alice),
