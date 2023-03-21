@@ -143,7 +143,7 @@ module.exports = {
           if (opts.text) content.text = opts.text
 
           const getFeed = opts?.feedKeys
-            ? (cb) => cb()
+            ? (cb) => cb(null, { keys: opts.feedKeys })
             : findOrCreateAdditionsFeed
 
           getFeed((err, additionsFeed) => {
@@ -153,7 +153,7 @@ module.exports = {
             const options = {
               isValid: isAddMember,
               tangles: ['members'],
-              feedKeys: opts?.feedKeys ?? additionsFeed.keys,
+              feedKeys: additionsFeed.keys,
             }
             publish(content, options, (err, msg) => {
               // prettier-ignore
@@ -290,23 +290,18 @@ module.exports = {
           if (err) return cb(clarify(err, 'Failed to get group details when publishing to a group'))
 
           const getFeed = opts?.feedKeys
-            ? (_, cb) => cb()
+            ? (_, cb) => cb(null, { keys: opts.feedKeys })
             : findOrCreateGroupFeed
 
           getFeed(writeKey.key, (err, groupFeed) => {
             // prettier-ignore
             if (err) return cb(clarify(err, 'Failed to find or create group feed when publishing to a group'))
 
-            publishAndPrune(
-              ssb,
-              content,
-              opts?.feedKeys ?? groupFeed.keys,
-              (err, msg) => {
-                // prettier-ignore
-                if (err) return cb(clarify(err, 'Failed to publishAndPrune when publishing a group message'))
-                return cb(null, msg)
-              }
-            )
+            publishAndPrune(ssb, content, groupFeed.keys, (err, msg) => {
+              // prettier-ignore
+              if (err) return cb(clarify(err, 'Failed to publishAndPrune when publishing a group message'))
+              return cb(null, msg)
+            })
           })
         })
       })
