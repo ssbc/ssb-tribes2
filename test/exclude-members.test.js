@@ -46,19 +46,13 @@ test('add and remove a person, post on the new feed', async (t) => {
     root,
     writeKey: writeKey1,
     subfeed: { id: firstFeedId },
-  } = await alice.tribes2.create().catch((err) => {
-    console.error('alice failed to create group', err)
-    t.fail(err)
-  })
-  t.pass('alice created a group')
+  } = await alice.tribes2
+    .create()
+    .catch((err) => t.error(err, 'alice failed to create group'))
 
   const addBobMsg = await alice.tribes2
     .addMembers(groupId, [bobRoot.id])
-    .catch((err) => {
-      console.error('add member fail', err)
-      t.fail(err)
-    })
-  t.pass('alice added bob to the group')
+    .catch((err) => t.error(err, 'add member fail'))
 
   t.equals(
     await p(countGroupFeeds)(alice),
@@ -67,8 +61,7 @@ test('add and remove a person, post on the new feed', async (t) => {
   )
 
   await alice.tribes2.excludeMembers(groupId, [bobRoot.id]).catch((err) => {
-    console.error('remove member fail', err)
-    t.fail(err)
+    t.error(err, 'remove member fail')
   })
 
   t.equals(
