@@ -141,7 +141,11 @@ test('add and remove a person, post on the new feed', async (t) => {
   t.equal(secondInit.version, 'v2')
   t.equal(secondInit.groupKey, writeKey2.key.toString('base64'))
   t.deepEqual(secondInit.tangles.members, { root: null, previous: null })
-  // TODO: test epoch tangle
+  t.deepEqual(
+    secondInit.tangles.epoch,
+    { root, previous: [root] },
+    'epoch tangle is correct on new epoch init'
+  )
 
   const post = secondContents[1]
 
