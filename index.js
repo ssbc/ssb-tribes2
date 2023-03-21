@@ -17,7 +17,12 @@ const {
 } = require('ssb-db2/operators')
 const {
   validator: {
-    group: { addMember: isAddMember, content: isContent },
+    group: {
+      addMember: isAddMember,
+      content: isContent,
+      exclude: isExclude,
+      init: isInit,
+    },
   },
   keySchemes,
 } = require('private-group-spec')
