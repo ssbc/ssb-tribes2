@@ -12,7 +12,7 @@ const replicate = require('./helpers/replicate')
 const countGroupFeeds = require('./helpers/count-group-feeds')
 
 test('add and remove a person, post on the new feed', async (t) => {
-  // feeds should look like
+  // Alice's feeds should look like
   // first: initGroup->excludeBob->reAddAlice
   // second: initEpoch->post
   // additions: addAlice->addBob (not checking this here)
