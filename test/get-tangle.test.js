@@ -118,6 +118,9 @@ test(`get-tangle-${n}-publishes`, (t) => {
     t.error(err, 'no error creating group')
 
     const groupId = data.id
+
+    //console.time('getTangles')
+
     pull(
       pull.values(publishArray),
       paraMap(
@@ -136,6 +139,8 @@ test(`get-tangle-${n}-publishes`, (t) => {
         },
         (err) => {
           t.error(err, 'no error publishing')
+
+          //console.timeEnd('getTangles')
 
           t.true(
             count < n * 8,
