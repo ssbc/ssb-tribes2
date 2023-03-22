@@ -114,7 +114,7 @@ NOTE: If `create` finds an empty (i.e. seemingly unused) group feed, it will sta
   - `readKeys` _[GroupKey]_ - an array of all keys used to read messages for this group.
   - `root` _MessagedId_ - the MessageId of the `group/init` message of the group, encoded as an ssb-uri.
 
-  where _GroupKey_ is an object on the format
+  where _GroupKey_ is an object of the format
 
   - `key` _Buffer_ - the symmetric key used by the group for encryption
   - `scheme` _String_ - the scheme for this key
@@ -123,7 +123,7 @@ NOTE: If `create` finds an empty (i.e. seemingly unused) group feed, it will sta
 
 Gets information about a specific group.
 
-- `groupId` _GroupUri_ - the public-safe cipherlink which identifies the group
+- `groupId` _GroupUri_ - the public-safe SSB URI which identifies the group
 - `cb` _Function_ - callback function of signature `(err, group)` where `group` is an object on the same format as the `group` object returned by #create
 
 ### `ssb.tribes2.list({ live }) => source`
@@ -135,7 +135,7 @@ Creates a pull-stream source which emits `group` data of each private group you'
 
 Publish `group/add-member` messages to a group of peers, which gives them all the details they need to join the group. Newly added members will need to accept the invite using `acceptInvite()` before they start replicating the group.
 
-- `groupId` _GroupUri_ - the public-safe cipherlink which identifies the group (same as in #create)
+- `groupId` _GroupUri_ - the public-safe SSB URI which identifies the group (same as in #create)
 - `feedIds` _[FeedId]_ - an Array of 1-15 different ids for peers (accepts ssb-uri or sigil feed ids)
 - `opts` _Object_ - with the options:
   - `text` _String_ - A piece of text attached to the addition. Visible to the whole group and the newly added people.
@@ -146,7 +146,7 @@ Publish `group/add-member` messages to a group of peers, which gives them all th
 
 Excludes some current members of the group, by creating a new key and group feed and reinviting everyone to that key except for the excluded members.
 
-- `groupId` _GroupUri_ - the public-safe cipherlink which identifies the group (same as in #create)
+- `groupId` _GroupUri_ - the public-safe SSB URI which identifies the group (same as in #create)
 - `feedIds` _[FeedId]_ - an Array of 1-15 different ids for peers (accepts ssb-uri or sigil feed ids)
 - `opts` _Object_ - placeholder for future options.
 - `cb` _Function_ - a callback of signature `(err)`
