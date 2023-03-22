@@ -116,7 +116,7 @@ test(`get-tangle-${n}-publishes`, (t) => {
         (value, cb) =>
           server.tribes2.publish(
             { type: 'memo', value, recps: [groupId] },
-            null,
+            { tangles: ['members', 'epoch'] },
             cb
           ),
         4
