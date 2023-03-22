@@ -13,6 +13,7 @@ const {
   toPullStream,
   where,
 } = require('ssb-db2/operators')
+const { fromMessageSigil } = require('ssb-uri2')
 
 const GetTangle = require('../lib/get-tangle')
 const Testbot = require('./helpers/testbot')
@@ -44,7 +45,7 @@ test('get-tangle unit test', (t) => {
               descending(),
               toPullStream()
             ),
-            pull.map((m) => m.key),
+            pull.map((m) => fromMessageSigil(m.key)),
             pull.take(1),
             pull.collect((err, keys) => {
               t.error(err, 'no error')
@@ -63,25 +64,28 @@ test('get-tangle unit test', (t) => {
                 recps: [group.id],
               }
 
-              server.tribes2.publish(content, (err, msg) => {
+              server.tribes2.publish(content, null, (err, msg) => {
                 t.error(err, 'no error')
 
                 getTangle(group.id, (err, { root, previous }) => {
                   t.error(err, 'no error')
                   t.deepEqual(
                     { root, previous },
-                    { root: rootKey, previous: [msg.key] },
+                    { root: rootKey, previous: [fromMessageSigil(msg.key)] },
                     'adding message to root'
                   )
 
-                  server.tribes2.publish(content, (err, msg) => {
+                  server.tribes2.publish(content, null, (err, msg) => {
                     t.error(err, 'no error')
 
                     getTangle(group.id, (err, { root, previous }) => {
                       t.error(err, 'no error')
                       t.deepEqual(
                         { root, previous },
-                        { root: rootKey, previous: [msg.key] },
+                        {
+                          root: rootKey,
+                          previous: [fromMessageSigil(msg.key)],
+                        },
                         'adding message to tip'
                       )
                       server.close(true, t.end)
@@ -110,7 +114,11 @@ test(`get-tangle-${n}-publishes`, (t) => {
       pull.values(publishArray),
       paraMap(
         (value, cb) =>
-          server.tribes2.publish({ type: 'memo', value, recps: [groupId] }, cb),
+          server.tribes2.publish(
+            { type: 'memo', value, recps: [groupId] },
+            null,
+            cb
+          ),
         4
       ),
       paraMap((msg, cb) => server.db.getMsg(msg.key, cb), 10),
@@ -149,7 +157,7 @@ test('get-tangle', (t) => {
     }
 
     ssb.db.onMsgAdded((lastMsgAfterCreate) => {
-      ssb.tribes2.publish(content, (err, msg) => {
+      ssb.tribes2.publish(content, null, (err, msg) => {
         t.error(err, 'publish a message')
 
         ssb.db.get(msg.key, (err, A) => {
@@ -158,7 +166,10 @@ test('get-tangle', (t) => {
           t.deepEqual(
             A.content.tangles.group, // actual
             // last message is the admin adding themselves to the group they just created i.e. not the root msg
-            { root: groupRoot, previous: [lastMsgAfterCreate.kvt.key] }, // expected
+            {
+              root: groupRoot,
+              previous: [fromMessageSigil(lastMsgAfterCreate.kvt.key)],
+            }, // expected
             'auto adds group tangle (auto added tangles.group)'
           )
 
@@ -205,7 +216,11 @@ test('get-tangle with branch', async (t) => {
   const bobTangle = await p(getBobGroupTangle)(group.id).catch(t.fail)
   t.deepEqual(aliceTangle, bobTangle, 'tangles should match')
   t.deepEqual(aliceTangle.root, group.root, 'the root is the groupId')
-  t.deepEqual(aliceTangle.previous, [invite.key], 'previous is the invite key')
+  t.deepEqual(
+    aliceTangle.previous,
+    [fromMessageSigil(invite.key)],
+    'previous is the invite key'
+  )
 
   // Alice and Bob will both publish a message
   const content = () => ({
@@ -214,10 +229,10 @@ test('get-tangle with branch', async (t) => {
     recps: [group.id],
   })
 
-  await p(alice.tribes2.publish)(content()).catch(t.fail)
+  await alice.tribes2.publish(content()).catch(t.fail)
   t.pass('alice published a message')
 
-  await p(bob.tribes2.publish)(content()).catch(t.fail)
+  await bob.tribes2.publish(content()).catch(t.fail)
   t.pass('bob published a message')
 
   // Then Bob shares his message with Alice
@@ -271,8 +286,14 @@ test('members tangle works', async (t) => {
   const groupTangle = await p(getGroup)(group.id)
   const membersTangle = await p(getMembers)(group.id)
 
-  const expectedGroupTangle = { root: group.root, previous: [bobPost.key] }
-  const expectedMembersTangle = { root: group.root, previous: [bobInvite.key] }
+  const expectedGroupTangle = {
+    root: group.root,
+    previous: [fromMessageSigil(bobPost.key)],
+  }
+  const expectedMembersTangle = {
+    root: group.root,
+    previous: [fromMessageSigil(bobInvite.key)],
+  }
   t.deepEquals(groupTangle, expectedGroupTangle, 'group tangle is correct')
   t.deepEquals(
     membersTangle,
@@ -310,7 +331,7 @@ test('members tangle works', async (t) => {
     newGroupTangle,
     {
       root: group.root,
-      previous: [carolInviteEnc.key],
+      previous: [fromMessageSigil(carolInviteEnc.key)],
     },
     'got correct updated group tangle'
   )
@@ -318,7 +339,7 @@ test('members tangle works', async (t) => {
     newMembersTangle,
     {
       root: group.root,
-      previous: [carolInviteEnc.key],
+      previous: [fromMessageSigil(carolInviteEnc.key)],
     },
     'got correct updated members tangle'
   )

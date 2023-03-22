@@ -72,6 +72,7 @@ test('publish many messages that might need pruning', (t) => {
         new Promise((res, rej) => {
           ssb.tribes2.publish(
             { type: 'potato', content: value, recps: [group.id] },
+            null,
             (err, msg) => {
               if (err) return rej(err)
               return res(msg)

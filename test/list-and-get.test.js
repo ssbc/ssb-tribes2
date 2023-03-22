@@ -74,6 +74,7 @@ test('get', async (t) => {
   t.true(isIdentityGroupSSBURI(group.id))
   t.true(Buffer.isBuffer(group.writeKey.key), 'writeKey has key buffer')
   t.equal(writeKey.key, group.writeKey.key)
+  t.true(Buffer.isBuffer(group.readKeys[0].key))
   t.equal(readKeys[0].key, group.readKeys[0].key)
   t.true(isClassicMessageSSBURI(group.root), 'has root')
   t.equal(root, group.root)

@@ -21,6 +21,7 @@ const {
   },
   keySchemes,
 } = require('private-group-spec')
+const { SecretKey } = require('ssb-private-group-keys')
 const { fromMessageSigil, isBendyButtV1FeedSSBURI } = require('ssb-uri2')
 const buildGroupId = require('./lib/build-group-id')
 const AddTangles = require('./lib/add-tangles')
@@ -141,28 +142,133 @@ module.exports = {
 
           if (opts.text) content.text = opts.text
 
-          findOrCreateAdditionsFeed((err, additionsFeed) => {
+          const getFeed = opts?._feedKeys
+            ? (cb) => cb(null, { keys: opts._feedKeys })
+            : findOrCreateAdditionsFeed
+
+          getFeed((err, additionsFeed) => {
             // prettier-ignore
             if (err) return cb(clarify(err, 'Failed to find or create additions feed when adding members'))
 
-            addTangles(content, ['group', 'members'], (err, content) => {
+            const options = {
+              isValid: isAddMember,
+              tangles: ['members'],
+              feedKeys: additionsFeed.keys,
+            }
+            publish(content, options, (err, msg) => {
               // prettier-ignore
-              if (err) return cb(clarify(err, 'Failed to add group tangles when adding members'))
-
-              if (!isAddMember(content))
-                return cb(new Error(isAddMember.errorsString))
-
-              publishAndPrune(ssb, content, additionsFeed.keys, cb)
+              if (err) return cb(clarify(err, 'Failed to publish add-member message'))
+              return cb(null, msg)
             })
           })
         })
       })
     }
 
-    function publish(content, cb) {
-      if (cb === undefined) return promisify(publish)(content)
+    function excludeMembers(groupId, feedIds, opts = {}, cb) {
+      if (cb === undefined)
+        return promisify(excludeMembers)(groupId, feedIds, opts)
+
+      ssb.metafeeds.findOrCreate(function gotRoot(err, myRoot) {
+        // prettier-ignore
+        if (err) return cb(clarify(err, "Couldn't get own root when excluding members"))
+
+        get(groupId, (err, { writeKey: oldWriteKey } = {}) => {
+          // prettier-ignore
+          if (err) return cb(clarify(err, "Couldn't get old key when excluding members"))
+
+          findOrCreateGroupFeed(oldWriteKey.key, (err, oldGroupFeed) => {
+            // prettier-ignore
+            if (err) return cb(clarify(err, "Couldn't get the old group feed when excluding members"))
+
+            const excludeContent = {
+              type: 'group/exclude',
+              excludes: feedIds,
+              recps: [groupId],
+            }
+            const excludeOpts = {
+              tangles: ['members'],
+              isValid: () => true,
+            }
+            publish(excludeContent, excludeOpts, (err) => {
+              // prettier-ignore
+              if (err) return cb(clarify(err, 'Failed to publish exclude msg'))
+
+              pull(
+                listMembers(groupId),
+                pull.collect((err, beforeMembers) => {
+                  // prettier-ignore
+                  if (err) return cb(clarify(err, "Couldn't get old member list when excluding members"))
+
+                  const remainingMembers = beforeMembers.filter(
+                    (member) => !feedIds.includes(member)
+                  )
+                  const newGroupKey = new SecretKey()
+                  const addInfo = { key: newGroupKey.toBuffer() }
+
+                  ssb.box2.addGroupInfo(groupId, addInfo, (err) => {
+                    // prettier-ignore
+                    if (err) return cb(clarify(err, "Couldn't store new key when excluding members"))
+
+                    const newKey = {
+                      key: newGroupKey.toBuffer(),
+                      scheme: keySchemes.private_group,
+                    }
+                    ssb.box2.pickGroupWriteKey(groupId, newKey, (err) => {
+                      // prettier-ignore
+                      if (err) return cb(clarify(err, "Couldn't switch to new key for writing when excluding members"))
+
+                      const newEpochContent = {
+                        type: 'group/init',
+                        version: 'v2',
+                        groupKey: newGroupKey.toString('base64'),
+                        tangles: {
+                          members: { root: null, previous: null },
+                        },
+                        recps: [groupId, myRoot.id],
+                      }
+                      const newTangleOpts = {
+                        tangles: ['epoch'],
+                        isValid: () => true,
+                      }
+                      publish(newEpochContent, newTangleOpts, (err) => {
+                        // prettier-ignore
+                        if (err) return cb(clarify(err, "Couldn't post init msg on new epoch when excluding members"))
+
+                        const reAddOpts = {
+                          // the re-adding needs to be published on the old
+                          // feed so that the additions feed is not spammed,
+                          // while people need to still be able to find it
+                          _feedKeys: oldGroupFeed.keys,
+                        }
+                        addMembers(
+                          groupId,
+                          remainingMembers,
+                          reAddOpts,
+                          (err) => {
+                            // prettier-ignore
+                            if (err) return cb(clarify(err, "Couldn't re-add remaining members when excluding members"))
+                            return cb()
+                          }
+                        )
+                      })
+                    })
+                  })
+                })
+              )
+            })
+          })
+        })
+      })
+    }
+
+    function publish(content, opts, cb) {
+      if (cb === undefined) return promisify(publish)(content, opts)
 
       if (!content) return cb(new Error('Missing content'))
+
+      const isValid = opts?.isValid ?? isContent
+      const tangles = ['group', ...(opts?.tangles ?? [])]
 
       const recps = content.recps
       if (!recps || !Array.isArray(recps) || recps.length < 1) {
@@ -170,21 +276,32 @@ module.exports = {
       }
       const groupId = recps[0]
 
-      addTangles(content, ['group'], (err, content) => {
+      addTangles(content, tangles, (err, content) => {
         // prettier-ignore
         if (err) return cb(clarify(err, 'Failed to add group tangle when publishing to a group'))
 
-        if (!isContent(content)) return cb(new Error(isContent.errorsString))
+        if (!isValid(content))
+          return cb(
+            new Error(isValid.errorsString ?? 'content failed validation')
+          )
 
         get(groupId, (err, { writeKey }) => {
           // prettier-ignore
           if (err) return cb(clarify(err, 'Failed to get group details when publishing to a group'))
 
-          findOrCreateGroupFeed(writeKey.key, (err, groupFeed) => {
+          const getFeed = opts?.feedKeys
+            ? (_, cb) => cb(null, { keys: opts.feedKeys })
+            : findOrCreateGroupFeed
+
+          getFeed(writeKey.key, (err, groupFeed) => {
             // prettier-ignore
             if (err) return cb(clarify(err, 'Failed to find or create group feed when publishing to a group'))
 
-            publishAndPrune(ssb, content, groupFeed.keys, cb)
+            publishAndPrune(ssb, content, groupFeed.keys, (err, msg) => {
+              // prettier-ignore
+              if (err) return cb(clarify(err, 'Failed to publishAndPrune when publishing a group message'))
+              return cb(null, msg)
+            })
           })
         })
       })
@@ -314,6 +431,7 @@ module.exports = {
       get,
       list,
       addMembers,
+      excludeMembers,
       publish,
       listMembers,
       listInvites,
