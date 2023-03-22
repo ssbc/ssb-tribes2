@@ -142,8 +142,8 @@ module.exports = {
 
           if (opts.text) content.text = opts.text
 
-          const getFeed = opts?.feedKeys
-            ? (cb) => cb(null, { keys: opts.feedKeys })
+          const getFeed = opts?._feedKeys
+            ? (cb) => cb(null, { keys: opts._feedKeys })
             : findOrCreateAdditionsFeed
 
           getFeed((err, additionsFeed) => {
@@ -239,7 +239,7 @@ module.exports = {
                           // the re-adding needs to be published on the old
                           // feed so that the additions feed is not spammed,
                           // while people need to still be able to find it
-                          feedKeys: oldGroupFeed.keys,
+                          _feedKeys: oldGroupFeed.keys,
                         }
                         addMembers(
                           groupId,

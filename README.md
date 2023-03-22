@@ -139,7 +139,6 @@ Publish `group/add-member` messages to a group of peers, which gives them all th
 - `feedIds` _[FeedId]_ - an Array of 1-15 different ids for peers (accepts ssb-uri or sigil feed ids)
 - `opts` _Object_ - with the options:
   - `text` _String_ - A piece of text attached to the addition. Visible to the whole group and the newly added people.
-  - `feedKeys` _Keys_ - By default the addition is published to the feed with the purpose "group/additions" but using this option you can provide keys for another feed to publish on. Note that this doesn't affect the encryption used.
 - `cb` _Function_ - a callback of signature `(err, msg)`
 
 ### `ssb.tribes2.excludeMembers(groupId, feedIds, opts, cb)
