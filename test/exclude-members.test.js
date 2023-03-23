@@ -12,7 +12,7 @@ const replicate = require('./helpers/replicate')
 const countGroupFeeds = require('./helpers/count-group-feeds')
 
 test('add and remove a person, post on the new feed', async (t) => {
-  // feeds should look like
+  // Alice's feeds should look like
   // first: initGroup->excludeBob->reAddAlice
   // second: initEpoch->post
   // additions: addAlice->addBob (not checking this here)
@@ -46,19 +46,13 @@ test('add and remove a person, post on the new feed', async (t) => {
     root,
     writeKey: writeKey1,
     subfeed: { id: firstFeedId },
-  } = await alice.tribes2.create().catch((err) => {
-    console.error('alice failed to create group', err)
-    t.fail(err)
-  })
-  t.pass('alice created a group')
+  } = await alice.tribes2
+    .create()
+    .catch((err) => t.error(err, 'alice failed to create group'))
 
   const addBobMsg = await alice.tribes2
     .addMembers(groupId, [bobRoot.id])
-    .catch((err) => {
-      console.error('add member fail', err)
-      t.fail(err)
-    })
-  t.pass('alice added bob to the group')
+    .catch((err) => t.error(err, 'add member fail'))
 
   t.equals(
     await p(countGroupFeeds)(alice),
@@ -66,10 +60,9 @@ test('add and remove a person, post on the new feed', async (t) => {
     'before exclude alice has 1 group feed'
   )
 
-  await alice.tribes2.excludeMembers(groupId, [bobRoot.id]).catch((err) => {
-    console.error('remove member fail', err)
-    t.fail(err)
-  })
+  await alice.tribes2
+    .excludeMembers(groupId, [bobRoot.id])
+    .catch((err) => t.error(err, 'remove member fail'))
 
   t.equals(
     await p(countGroupFeeds)(alice),
@@ -148,7 +141,11 @@ test('add and remove a person, post on the new feed', async (t) => {
   t.equal(secondInit.version, 'v2')
   t.equal(secondInit.groupKey, writeKey2.key.toString('base64'))
   t.deepEqual(secondInit.tangles.members, { root: null, previous: null })
-  // TODO: test epoch tangle
+  t.deepEqual(
+    secondInit.tangles.epoch,
+    { root, previous: [root] },
+    'epoch tangle is correct on new epoch init'
+  )
 
   const post = secondContents[1]
 

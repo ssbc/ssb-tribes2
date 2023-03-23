@@ -147,8 +147,8 @@ module.exports = {
 
           if (opts.text) content.text = opts.text
 
-          const getFeed = opts?.feedKeys
-            ? (cb) => cb()
+          const getFeed = opts?._feedKeys
+            ? (cb) => cb(null, { keys: opts._feedKeys })
             : findOrCreateAdditionsFeed
 
           getFeed((err, additionsFeed) => {
@@ -156,9 +156,9 @@ module.exports = {
             if (err) return cb(clarify(err, 'Failed to find or create additions feed when adding members'))
 
             const options = {
-              spec: isAddMember,
+              isValid: isAddMember,
               tangles: ['members'],
-              feedKeys: opts?.feedKeys ?? additionsFeed.keys,
+              feedKeys: additionsFeed.keys,
             }
             publish(content, options, (err, msg) => {
               // prettier-ignore
@@ -178,7 +178,7 @@ module.exports = {
         // prettier-ignore
         if (err) return cb(clarify(err, "Couldn't get own root when excluding members"))
 
-        get(groupId, (err, { writeKey: oldWriteKey }) => {
+        get(groupId, (err, { writeKey: oldWriteKey } = {}) => {
           // prettier-ignore
           if (err) return cb(clarify(err, "Couldn't get old key when excluding members"))
 
@@ -193,7 +193,7 @@ module.exports = {
             }
             const excludeOpts = {
               tangles: ['members'],
-              spec: isExclude,
+              isValid: isExclude,
             }
             publish(excludeContent, excludeOpts, (err) => {
               // prettier-ignore
@@ -234,7 +234,7 @@ module.exports = {
                       }
                       const newTangleOpts = {
                         tangles: ['epoch'],
-                        spec: isInit,
+                        isValid: isInit,
                       }
                       publish(newEpochContent, newTangleOpts, (err) => {
                         // prettier-ignore
@@ -244,7 +244,7 @@ module.exports = {
                           // the re-adding needs to be published on the old
                           // feed so that the additions feed is not spammed,
                           // while people need to still be able to find it
-                          feedKeys: oldGroupFeed.keys,
+                          _feedKeys: oldGroupFeed.keys,
                         }
                         addMembers(
                           groupId,
@@ -272,7 +272,7 @@ module.exports = {
 
       if (!content) return cb(new Error('Missing content'))
 
-      const isSpec = opts?.spec ?? isContent
+      const isValid = opts?.isValid ?? isContent
       const tangles = ['group', ...(opts?.tangles ?? [])]
 
       const recps = content.recps
@@ -285,30 +285,28 @@ module.exports = {
         // prettier-ignore
         if (err) return cb(clarify(err, 'Failed to add group tangle when publishing to a group'))
 
-        if (!isSpec(content)) return cb(new Error(isSpec.errorsString))
+        if (!isValid(content))
+          return cb(
+            new Error(isValid.errorsString ?? 'content failed validation')
+          )
 
         get(groupId, (err, { writeKey }) => {
           // prettier-ignore
           if (err) return cb(clarify(err, 'Failed to get group details when publishing to a group'))
 
           const getFeed = opts?.feedKeys
-            ? (_, cb) => cb()
+            ? (_, cb) => cb(null, { keys: opts.feedKeys })
             : findOrCreateGroupFeed
 
           getFeed(writeKey.key, (err, groupFeed) => {
             // prettier-ignore
             if (err) return cb(clarify(err, 'Failed to find or create group feed when publishing to a group'))
 
-            publishAndPrune(
-              ssb,
-              content,
-              opts?.feedKeys ?? groupFeed.keys,
-              (err, msg) => {
-                // prettier-ignore
-                if (err) return cb(clarify(err, 'Failed to publishAndPrune when publishing a group message'))
-                return cb(null, msg)
-              }
-            )
+            publishAndPrune(ssb, content, groupFeed.keys, (err, msg) => {
+              // prettier-ignore
+              if (err) return cb(clarify(err, 'Failed to publishAndPrune when publishing a group message'))
+              return cb(null, msg)
+            })
           })
         })
       })
