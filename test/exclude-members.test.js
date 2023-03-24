@@ -222,6 +222,8 @@ test("If you're not the excluder nor the excludee then you should still be in th
     })
     .catch((err) => t.error(err, 'carol failed to publish on first feed'))
 
+  await replicate(alice, carol)
+
   await alice.tribes2
     .excludeMembers(groupId, [bobRoot.id])
     .catch((err) => t.error(err, 'remove member fail'))
@@ -248,7 +250,7 @@ test("If you're not the excluder nor the excludee then you should still be in th
 
   const branches = await pull(
     carol.metafeeds.branchStream({ root: carolRoot, old: true, live: false }),
-    pull.toPromise()
+    pull.collectAsPromise()
   )
 
   const groupFeedPurposes = branches
