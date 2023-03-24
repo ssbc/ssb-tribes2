@@ -230,6 +230,9 @@ test("If you're not the excluder nor the excludee then you should still be in th
 
   await replicate(alice, carol)
 
+  // TODO: maybe remove?
+  await p(setTimeout)(5000)
+
   const {
     value: { author: secondFeedId },
   } = await carol.tribes2

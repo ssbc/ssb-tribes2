@@ -424,6 +424,70 @@ module.exports = {
         if (err) return cb(clarify(err, 'Error finding or creating additions feed when starting ssb-tribes2'))
         return cb()
       })
+
+      // look for new epochs that we're added to
+      ssb.metafeeds.findOrCreate((err, myRoot) => {
+        // prettier-ignore
+        if (err) return cb(clarify(err, 'todo'))
+
+        pull(
+          ssb.db.query(
+            // TODO: does this output new stuff if we accept an invite to an old epoch and then find additions to newer epochs?
+            where(and(isDecrypted('box2'), type('group/add-member'))),
+            live({ old: true }),
+            toPullStream()
+          ),
+          // groups/epochs we're added to
+          pull.filter((msg) => msg.value?.content?.recps?.includes(myRoot.id)),
+          // to find new epochs we only check groups we've accepted the invite to
+          paraMap((msg, cb) => {
+            pull(
+              ssb.box2.listGroupIds(),
+              pull.collect((err, groupIds) => {
+                // prettier-ignore
+                if (err) return cb(clarify(err, 'todo'))
+
+                if (groupIds.includes(msg.value?.content?.recps?.[0])) {
+                  return cb(null, msg)
+                } else {
+                  return cb()
+                }
+              })
+            )
+          }),
+          pull.filter(Boolean),
+          pull.drain(
+            (msg) => {
+              const groupId = msg.value?.content?.recps?.[0]
+
+              const newKey = Buffer.from(msg.value?.content?.groupKey, 'base64')
+              ssb.box2.addGroupInfo(groupId, { key: newKey }, (err) => {
+                // prettier-ignore
+                if (err) return cb(clarify(err, 'todo'))
+
+                const newKeyPick = {
+                  key: newKey,
+                  scheme: keySchemes.private_group,
+                }
+                // TODO: naively guessing that this is the latest key for now
+                ssb.box2.pickGroupWriteKey(groupId, newKeyPick, (err) => {
+                  // prettier-ignore
+                  if (err) return cb(clarify(err, "todo"))
+
+                  ssb.db.reindexEncrypted((err) => {
+                    // prettier-ignore
+                    if (err) cb(clarify(err, 'todo'))
+                  })
+                })
+              })
+            },
+            (err) => {
+              // prettier-ignore
+              if (err) return cb(clarify(err, 'todo'))
+            }
+          )
+        )
+      })
     }
 
     return {
