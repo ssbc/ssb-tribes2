@@ -29,6 +29,7 @@
     "*.js"
   ],
   "dependencies": {
+    "@tangle/graph": "^3.0.2",
     "@tangle/reduce": "^5.0.4",
     "@tangle/strategy": "^4.1.2",
     "base64-url": "^2.3.3",
