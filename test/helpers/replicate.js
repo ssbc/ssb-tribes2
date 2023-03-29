@@ -11,6 +11,9 @@ const deepEqual = require('fast-deep-equal')
  * Fully replicates person1's metafeed tree to person2 and vice versa
  */
 module.exports = async function replicate(person1, person2) {
+  // Establish a network connection
+  const conn = await p(person1.connect)(person2.getAddress())
+
   // persons replicate all the trees in their forests, from top to bottom
   let drain
   pull(
@@ -35,9 +38,6 @@ module.exports = async function replicate(person1, person2) {
     }))
   )
 
-  // Establish a network connection
-  const conn = await p(person1.connect)(person2.getAddress())
-
   // Wait until both have replicated all feeds in full
   await retryUntil(async () => {
     const newClock1 = await p(person1.getVectorClock)()
@@ -50,12 +50,13 @@ module.exports = async function replicate(person1, person2) {
   await p(conn.close)(true)
 }
 
-async function retryUntil(fn) {
-  let result = false
+async function retryUntil(checkIsDone) {
+  let isDone = false
   for (let i = 0; i < 100; i++) {
-    result = await fn()
-    if (result) return
-    else await p(setTimeout)(100)
+    result = await checkIsDone()
+    if (isDone) return
+
+    await p(setTimeout)(100)
   }
   if (!result) throw new Error('retryUntil timed out')
 }
