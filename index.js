@@ -21,7 +21,7 @@ const {
       addMember: isAddMember,
       content: isContent,
       exclude: isExclude,
-      init: isInit,
+      initEpoch: isInitEpoch,
     },
   },
   keySchemes,
@@ -234,7 +234,7 @@ module.exports = {
                       }
                       const newTangleOpts = {
                         tangles: ['epoch'],
-                        isValid: isInit,
+                        isValid: isInitEpoch,
                       }
                       publish(newEpochContent, newTangleOpts, (err) => {
                         // prettier-ignore
