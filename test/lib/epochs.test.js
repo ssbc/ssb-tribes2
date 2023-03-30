@@ -2,10 +2,12 @@ const test = require('tape')
 const { promisify: p } = require('util')
 
 const Server = require('../helpers/testbot')
-const replicate  = require('../helpers/replicate')
+const replicate = require('../helpers/replicate')
 
 function Run (t) {
-  return async function run (label, promise, runTimer = true) {
+  return async function run (label, promise, opts = {}) {
+    const { runTimer = true } = opts
+
     if (runTimer) console.time(label)
     return promise
       .then(res => {
@@ -18,13 +20,14 @@ function Run (t) {
 }
 
 test.only('lib/epochs', async t => {
-  t.plan(5)
+  t.plan(7)
   const run = Run(t)
 
-  const peers = [Server(), Server(), Server()] 
+  const peers = [Server(), Server(), Server()]
   t.teardown(() => peers.forEach(peer => peer.close(true)))
 
-  const [alice, bob, oscar] = peers
+  const [alice, ...others] = peers
+  // const [bob, oscar] = others
 
   await run(
     'start tribes',
@@ -39,41 +42,49 @@ test.only('lib/epochs', async t => {
   )
 
   await run(
-   'alice replicates peers (to get Additions feeds)',
+    'alice replicates peers (to get Additions feeds)',
     Promise.all(
-      peers.slice(1).map(peer => replicate(alice, peer))
+      others.map(peer => replicate(alice, peer))
     )
   )
 
+  // alice invites peers
   const rootFeeds = await Promise.all(
-    peers.map(peer => p(peer.metafeeds.findOrCreate)())
+    others.map(peer => p(peer.metafeeds.findOrCreate)())
   )
   const rootIds = rootFeeds.map(feed => feed.id)
-
   await run(
-    'alice adds other peers to group',
-    alice.tribes2.addMembers(group.id, rootIds.slice(1), {})
+    'alice invites other peers to group',
+    alice.tribes2.addMembers(group.id, rootIds, {})
   )
 
   await run(
-   'alice replicates peers (to propogate invites)',
+    'alice replicates peers (to propogate invites)',
     Promise.all(
-      peers.slice(1).map(peer => replicate(alice, peer))
+      others.map(peer => replicate(alice, peer))
     )
   )
 
   await run(
-   'peers accept invites',
+    'peers accept invites',
     Promise.all(
-      peers.slice(1).map(peer => peer.tribes2.acceptInvite(group.id))
+      others.map(peer => peer.tribes2.acceptInvite(group.id))
+    )
+  )
+
+  // await p(setTimeout)(1000)
+
+  await run(
+    'alice replicates peers (to see acceptance)',
+    Promise.all(
+      others.map(peer => replicate(alice, peer))
     )
   )
 
   await run(
-   'alice replicates peers (to see acceptance)',
+    'alice replicates peers (to see acceptance)',
     Promise.all(
-      peers.slice(1).map(peer => replicate(alice, peer))
+      others.map(peer => replicate(alice, peer))
     )
   )
-
 })
