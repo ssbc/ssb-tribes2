@@ -42,6 +42,8 @@ module.exports = async function replicate(person1, person2) {
   await retryUntil(async () => {
     const newClock1 = await p(person1.getVectorClock)()
     const newClock2 = await p(person2.getVectorClock)()
+    //console.log('newClock1', newClock1)
+    //console.log('newClock2', newClock2)
     return deepEqual(newClock1, newClock2)
   })
 

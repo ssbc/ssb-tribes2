@@ -221,17 +221,26 @@ test("If you're not the excluder nor the excludee then you should still be in th
       recps: [groupId],
     })
     .catch((err) => t.error(err, 'carol failed to publish on first feed'))
+  if (firstFeedId) t.pass('carol posted first post')
 
-  await replicate(alice, carol)
+  await replicate(alice, carol).catch(t.error)
 
-  await alice.tribes2
+  const excludeMsg = await alice.tribes2
     .excludeMembers(groupId, [bobRoot.id])
+    .then((res) => {
+      t.pass('alice excluded bob')
+      return res
+    })
     .catch((err) => t.error(err, 'remove member fail'))
 
-  await replicate(alice, carol)
+  await replicate(alice, carol).catch(t.error)
 
   // TODO: maybe remove?
-  await p(setTimeout)(5000)
+  await p(setTimeout)(10000)
+
+  const carolHasExcludeMsg = await p(carol.db.getMsg)(excludeMsg.key)
+
+  console.log('carol has exclude', carolHasExcludeMsg)
 
   const {
     value: { author: secondFeedId },
@@ -242,6 +251,7 @@ test("If you're not the excluder nor the excludee then you should still be in th
       recps: [groupId],
     })
     .catch(t.fail)
+  if (secondFeedId) t.pass('carol posted second post')
 
   t.notEquals(
     secondFeedId,
@@ -273,4 +283,5 @@ test("If you're not the excluder nor the excludee then you should still be in th
 
   await p(alice.close)(true)
   await p(bob.close)(true)
+  await p(carol.close)(true)
 })

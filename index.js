@@ -245,10 +245,11 @@ module.exports = {
                           groupId,
                           remainingMembers,
                           reAddOpts,
-                          (err) => {
+                          (err, reAddMsg) => {
                             // prettier-ignore
                             if (err) return cb(clarify(err, "Couldn't re-add remaining members when excluding members"))
-                            return cb()
+                            //TODO: we probably don't want to return this exactly
+                            return cb(null, reAddMsg)
                           }
                         )
                       })
@@ -438,9 +439,14 @@ module.exports = {
             toPullStream()
           ),
           // groups/epochs we're added to
-          pull.filter((msg) => msg.value?.content?.recps?.includes(myRoot.id)),
+          pull.filter((msg) => {
+            console.log('found an addition', myRoot.id, msg.value.content.recps)
+            return msg.value?.content?.recps?.includes(myRoot.id)
+          }),
           // to find new epochs we only check groups we've accepted the invite to
           paraMap((msg, cb) => {
+            console.log('i am', myRoot.id)
+            console.log('found an addition of me', msg.value)
             pull(
               ssb.box2.listGroupIds(),
               pull.collect((err, groupIds) => {
@@ -458,6 +464,7 @@ module.exports = {
           pull.filter(Boolean),
           pull.drain(
             (msg) => {
+              console.log("addition was for a group i've already joined")
               const groupId = msg.value?.content?.recps?.[0]
 
               const newKey = Buffer.from(msg.value?.content?.groupKey, 'base64')
@@ -473,6 +480,8 @@ module.exports = {
                 ssb.box2.pickGroupWriteKey(groupId, newKeyPick, (err) => {
                   // prettier-ignore
                   if (err) return cb(clarify(err, "todo"))
+
+                  console.log('picked new key')
 
                   ssb.db.reindexEncrypted((err) => {
                     // prettier-ignore
