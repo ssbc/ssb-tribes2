@@ -15,11 +15,11 @@ const {
 } = require('ssb-db2/operators')
 const { fromMessageSigil } = require('ssb-uri2')
 
-const getTangle = require('../lib/get-tangle')
-const Testbot = require('./helpers/testbot')
-const replicate = require('./helpers/replicate')
+const getTangle = require('../../../lib/tangles/get-tangle-data')
+const Testbot = require('../../helpers/testbot')
+const replicate = require('../../helpers/replicate')
 
-test('get-tangle unit test', (t) => {
+test('get-tangle-data unit test', (t) => {
   const name = `get-group-tangle-${Date.now()}`
   const server = Testbot({ name })
 
