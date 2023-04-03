@@ -6,34 +6,47 @@ const replicate = require('../helpers/replicate')
 
 function Run (t) {
   return async function run (label, promise, opts = {}) {
-    const { runTimer = true } = opts
+    const {
+      isTest = true,
+      timer = false,
+      logError = false
+    } = opts
 
-    if (runTimer) console.time(label)
+    if (timer) console.time('> ' + label)
     return promise
       .then(res => {
-        t.pass(label)
+        if (isTest) t.pass(label)
+        else console.log(' ', label)
         return res
       })
-      .catch(err => t.error(err, label))
-      .finally(() => runTimer && console.timeEnd(label))
+      .catch(err => {
+        t.error(err, label)
+        if (logError) console.error(err)
+      })
+      .finally(() => timer && console.timeEnd('> ' + label))
   }
 }
 
 test.only('lib/epochs', async t => {
-  t.plan(7)
   const run = Run(t)
 
   const peers = [Server(), Server(), Server()]
   t.teardown(() => peers.forEach(peer => peer.close(true)))
 
   const [alice, ...others] = peers
-  // const [bob, oscar] = others
+  const [bob, oscar] = others
+
+  async function sync (label) {
+    return run(
+      label,
+      Promise.all(others.map(peer => replicate(alice, peer))),
+      { isTest: false }
+    )
+  }
 
   await run(
     'start tribes',
-    Promise.all(
-      peers.map(peer => p(peer.tribes2.start)())
-    )
+    Promise.all(peers.map(peer => p(peer.tribes2.start)())),
   )
 
   let group = await run(
@@ -41,14 +54,15 @@ test.only('lib/epochs', async t => {
     p(alice.tribes2.create)({})
   )
 
-  await run(
-    'alice replicates peers (to get Additions feeds)',
-    Promise.all(
-      others.map(peer => replicate(alice, peer))
-    )
+  let epochGraph = await run(
+    'alice gets epochs',
+    alice.tribes2.getEpochGraph(group.id)
   )
+  console.log(JSON.stringify(epochGraph, null, 2))
 
-  // alice invites peers
+  await sync('replication (to get Additions feeds)')
+
+  // alice adds peers
   const rootFeeds = await Promise.all(
     others.map(peer => p(peer.metafeeds.findOrCreate)())
   )
@@ -57,34 +71,27 @@ test.only('lib/epochs', async t => {
     'alice invites other peers to group',
     alice.tribes2.addMembers(group.id, rootIds, {})
   )
-
+  await sync('replication (to propogate invites)')
   await run(
-    'alice replicates peers (to propogate invites)',
-    Promise.all(
-      others.map(peer => replicate(alice, peer))
-    )
-  )
-
-  await run(
-    'peers accept invites',
+    'others accept invites',
     Promise.all(
       others.map(peer => peer.tribes2.acceptInvite(group.id))
     )
   )
+  await sync('replication (to see acceptance)')
 
-  // await p(setTimeout)(1000)
-
+  // alice removes oscar
   await run(
-    'alice replicates peers (to see acceptance)',
-    Promise.all(
-      others.map(peer => replicate(alice, peer))
-    )
+    'alice excludes oscar',
+    alice.tribes2.excludeMembers(group.id, [rootIds[1]], {})
   )
+  await sync('replication (exclusion)')
 
-  await run(
-    'alice replicates peers (to see acceptance)',
-    Promise.all(
-      others.map(peer => replicate(alice, peer))
-    )
+  epochGraph = await run(
+    'alice gets epochs',
+    alice.tribes2.getEpochGraph(group.id)
   )
+  console.log(JSON.stringify(epochGraph, null, 2))
+
+  t.end()
 })

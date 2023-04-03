@@ -32,6 +32,7 @@ const buildGroupId = require('./lib/build-group-id')
 const addTangles = require('./lib/tangles/add-tangles')
 const publishAndPrune = require('./lib/prune-publish')
 const MetaFeedHelpers = require('./lib/meta-feed-helpers')
+const Epochs = require('./lib/epochs')
 
 module.exports = {
   name: 'tribes2',
@@ -41,6 +42,7 @@ module.exports = {
     list: 'source',
     addMembers: 'async',
     start: 'async',
+    // TODO add other methods exported?
   },
   // eslint-disable-next-line no-unused-vars
   init(ssb, config) {
@@ -51,6 +53,7 @@ module.exports = {
       findOrCreateGroupWithoutMembers,
       getRootFeedIdFromMsgId,
     } = MetaFeedHelpers(ssb)
+    const { getEpochGraph } = Epochs(ssb)
 
     function create(opts = {}, cb) {
       if (cb === undefined) return promisify(create)(opts)
@@ -441,6 +444,8 @@ module.exports = {
       listInvites,
       acceptInvite,
       start,
+
+      getEpochGraph,
     }
   },
 }

@@ -30,6 +30,7 @@
   ],
   "dependencies": {
     "@tangle/graph": "^3.0.2",
+    "@tangle/overwrite-fields": "^2.0.3",
     "@tangle/reduce": "^5.0.4",
     "@tangle/strategy": "^4.1.2",
     "base64-url": "^2.3.3",
@@ -70,8 +71,9 @@
     "tape": "^5.6.3"
   },
   "scripts": {
-    "test": "npm run test:raw | tap-arc --bail",
     "test:raw": "tape 'test/**/*.test.js'",
+    "test": "npm run test:raw | tap-arc",
+    "test:bail": "npm run test:raw | tap-arc --bail",
     "format-code": "prettier --write \"*.js\"",
     "format-code-staged": "pretty-quick --staged --pattern \"*.js\"",
     "coverage": "c8 --reporter=lcov npm run test"
