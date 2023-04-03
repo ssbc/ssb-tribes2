@@ -51,8 +51,13 @@ test('get added to a group', async (t) => {
   })
   t.pass('alice added bob to the group')
 
-  await replicate(alice, bob).catch(t.fail)
-  t.pass('alice and bob replicate')
+  await replicate(alice, bob)
+    .then(() =>
+      t.pass('alice and bob replicate after bob getting added to the group')
+    )
+    .catch((err) =>
+      t.error(err, 'failed to replicate after adding bob to the group')
+    )
 
   await bob.tribes2.acceptInvite(groupId).catch((err) => {
     console.error('failed to accept invite', err)
