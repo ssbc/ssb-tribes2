@@ -15,7 +15,7 @@ const {
 } = require('ssb-db2/operators')
 const { fromMessageSigil } = require('ssb-uri2')
 
-const GetTangle = require('../lib/get-tangle')
+const getTangle = require('../lib/get-tangle')
 const Testbot = require('./helpers/testbot')
 const replicate = require('./helpers/replicate')
 
@@ -31,9 +31,7 @@ test('get-tangle unit test', (t) => {
       server.tribes2.create(null, (err, group) => {
         t.error(err, 'no error')
 
-        const getTangle = GetTangle(server, 'group')
-
-        getTangle(group.id, async (err, groupTangle) => {
+        getTangle(server, 'group', group.id, async (err, groupTangle) => {
           t.error(err, 'no error')
 
           const { root, previous } = groupTangle
@@ -67,31 +65,41 @@ test('get-tangle unit test', (t) => {
               server.tribes2.publish(content, null, (err, msg) => {
                 t.error(err, 'no error')
 
-                getTangle(group.id, (err, { root, previous }) => {
-                  t.error(err, 'no error')
-                  t.deepEqual(
-                    { root, previous },
-                    { root: rootKey, previous: [fromMessageSigil(msg.key)] },
-                    'adding message to root'
-                  )
-
-                  server.tribes2.publish(content, null, (err, msg) => {
+                getTangle(
+                  server,
+                  'group',
+                  group.id,
+                  (err, { root, previous }) => {
                     t.error(err, 'no error')
+                    t.deepEqual(
+                      { root, previous },
+                      { root: rootKey, previous: [fromMessageSigil(msg.key)] },
+                      'adding message to root'
+                    )
 
-                    getTangle(group.id, (err, { root, previous }) => {
+                    server.tribes2.publish(content, null, (err, msg) => {
                       t.error(err, 'no error')
-                      t.deepEqual(
-                        { root, previous },
-                        {
-                          root: rootKey,
-                          previous: [fromMessageSigil(msg.key)],
-                        },
-                        'adding message to tip'
+
+                      getTangle(
+                        server,
+                        'group',
+                        group.id,
+                        (err, { root, previous }) => {
+                          t.error(err, 'no error')
+                          t.deepEqual(
+                            { root, previous },
+                            {
+                              root: rootKey,
+                              previous: [fromMessageSigil(msg.key)],
+                            },
+                            'adding message to tip'
+                          )
+                          server.close(true, t.end)
+                        }
                       )
-                      server.close(true, t.end)
                     })
-                  })
-                })
+                  }
+                )
               })
             })
           )
@@ -110,13 +118,16 @@ test(`get-tangle-${n}-publishes`, (t) => {
     t.error(err, 'no error creating group')
 
     const groupId = data.id
+
+    //console.time('getTangles')
+
     pull(
       pull.values(publishArray),
       paraMap(
         (value, cb) =>
           server.tribes2.publish(
             { type: 'memo', value, recps: [groupId] },
-            null,
+            { tangles: ['members', 'epoch'] },
             cb
           ),
         4
@@ -128,6 +139,8 @@ test(`get-tangle-${n}-publishes`, (t) => {
         },
         (err) => {
           t.error(err, 'no error publishing')
+
+          //console.timeEnd('getTangles')
 
           t.true(
             count < n * 8,
@@ -197,9 +210,6 @@ test('get-tangle with branch', async (t) => {
   const group = await p(alice.tribes2.create)(null).catch(t.fail)
   t.pass('alice created a group')
 
-  const getAliceGroupTangle = GetTangle(alice, 'group')
-  const getBobGroupTangle = GetTangle(bob, 'group')
-
   const invite = await p(alice.tribes2.addMembers)(group.id, [bobRoot.id], {
     text: 'ahoy',
   }).catch(t.fail)
@@ -212,8 +222,8 @@ test('get-tangle with branch', async (t) => {
   await bob.tribes2.acceptInvite(group.id)
 
   // Both servers should see the same group tangle
-  const aliceTangle = await p(getAliceGroupTangle)(group.id).catch(t.fail)
-  const bobTangle = await p(getBobGroupTangle)(group.id).catch(t.fail)
+  const aliceTangle = await p(getTangle)(alice, 'group', group.id).catch(t.fail)
+  const bobTangle = await p(getTangle)(bob, 'group', group.id).catch(t.fail)
   t.deepEqual(aliceTangle, bobTangle, 'tangles should match')
   t.deepEqual(aliceTangle.root, group.root, 'the root is the groupId')
   t.deepEqual(
@@ -240,7 +250,9 @@ test('get-tangle with branch', async (t) => {
   t.pass('bob and alice replicated their trees')
 
   // There should now be a branch in Alice's group tangle
-  const aliceTangle2 = await p(getAliceGroupTangle)(group.id).catch(t.fail)
+  const aliceTangle2 = await p(getTangle)(alice, 'group', group.id).catch(
+    t.fail
+  )
 
   t.deepEqual(aliceTangle2.previous.length, 2, 'There should be two tips')
 
@@ -267,9 +279,6 @@ test('members tangle works', async (t) => {
   const group = await alice.tribes2.create().catch(t.fail)
   t.pass('alice created a group')
 
-  const getGroup = GetTangle(alice, 'group')
-  const getMembers = GetTangle(alice, 'members')
-
   const bobInvite = await p(alice.tribes2.addMembers)(group.id, [bobRoot.id], {
     text: 'ahoy',
   }).catch(t.fail)
@@ -283,8 +292,8 @@ test('members tangle works', async (t) => {
   await replicate(alice, bob)
   t.pass('bob joined group and posted')
 
-  const groupTangle = await p(getGroup)(group.id)
-  const membersTangle = await p(getMembers)(group.id)
+  const groupTangle = await p(getTangle)(alice, 'group', group.id)
+  const membersTangle = await p(getTangle)(alice, 'members', group.id)
 
   const expectedGroupTangle = {
     root: group.root,
@@ -324,8 +333,8 @@ test('members tangle works', async (t) => {
     'tangle on msg is correct'
   )
 
-  const newGroupTangle = await p(getGroup)(group.id)
-  const newMembersTangle = await p(getMembers)(group.id)
+  const newGroupTangle = await p(getTangle)(alice, 'group', group.id)
+  const newMembersTangle = await p(getTangle)(alice, 'members', group.id)
 
   t.deepEquals(
     newGroupTangle,
