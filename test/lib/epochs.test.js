@@ -5,6 +5,8 @@ const Server = require('../helpers/testbot')
 const replicate = require('../helpers/replicate')
 
 function Run (t) {
+  // this function takes care of running a promise and logging
+  // (or testing) that it happens and any errors are handled
   return async function run (label, promise, opts = {}) {
     const {
       isTest = true,
@@ -27,7 +29,7 @@ function Run (t) {
   }
 }
 
-test.only('lib/epochs', async t => {
+test('lib/epochs', async t => {
   const run = Run(t)
 
   const peers = [Server(), Server(), Server()]
@@ -54,11 +56,21 @@ test.only('lib/epochs', async t => {
     p(alice.tribes2.create)({})
   )
 
-  let epochGraph = await run(
+  let epochs = await run(
     'alice gets epochs',
     alice.tribes2.getEpochs(group.id)
   )
-  console.log(JSON.stringify(epochGraph, null, 2))
+  t.deepEqual(
+    epochs,
+    [{
+      key: group.root,
+      previous: null,
+      epochKey: group.writeKey.key,
+      author: epochs[0].author // CHEAT
+      // TODO where can we get the author feed from... do we need it?
+    }],
+    'there is 1 epoch'
+  )
 
   await sync('replication (to get Additions feeds)')
 
@@ -81,17 +93,37 @@ test.only('lib/epochs', async t => {
   await sync('replication (to see acceptance)')
 
   // alice removes oscar
-  const epochNext = await run(
+  await run(
     'alice excludes oscar',
     alice.tribes2.excludeMembers(group.id, [rootIds[1]], {})
   )
   await sync('replication (exclusion)')
 
-  epochGraph = await run(
+  epochs = await run(
     'alice gets epochs',
     alice.tribes2.getEpochs(group.id)
   )
-  console.log(JSON.stringify(epochGraph, null, 2))
+
+  const groupUpdated = await alice.tribes2.get(group.id)
+
+  t.deepEqual(
+    epochs,
+    [
+      {
+        key: group.root,
+        previous: null,
+        epochKey: group.writeKey.key,
+        author: epochs[0].author // CHEAT
+      },
+      {
+        key: epochs[1].key, // CHEAT ...get this from excludeMembers?
+        previous: [group.root],
+        epochKey: groupUpdated.writeKey.key,
+        author: epochs[1].author // CHEAT
+      }
+    ],
+    'there are 2 epochs'
+  )
 
   t.end()
 })
