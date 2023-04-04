@@ -49,14 +49,14 @@ test.only('lib/epochs', async t => {
     Promise.all(peers.map(peer => p(peer.tribes2.start)())),
   )
 
-  let group = await run(
+  const group = await run(
     'alice creates a group',
     p(alice.tribes2.create)({})
   )
 
   let epochGraph = await run(
     'alice gets epochs',
-    alice.tribes2.getEpochGraph(group.id)
+    alice.tribes2.getEpochs(group.id)
   )
   console.log(JSON.stringify(epochGraph, null, 2))
 
@@ -81,7 +81,7 @@ test.only('lib/epochs', async t => {
   await sync('replication (to see acceptance)')
 
   // alice removes oscar
-  await run(
+  const epochNext = await run(
     'alice excludes oscar',
     alice.tribes2.excludeMembers(group.id, [rootIds[1]], {})
   )
@@ -89,7 +89,7 @@ test.only('lib/epochs', async t => {
 
   epochGraph = await run(
     'alice gets epochs',
-    alice.tribes2.getEpochGraph(group.id)
+    alice.tribes2.getEpochs(group.id)
   )
   console.log(JSON.stringify(epochGraph, null, 2))
 

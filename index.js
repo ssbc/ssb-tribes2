@@ -53,7 +53,7 @@ module.exports = {
       findOrCreateGroupWithoutMembers,
       getRootFeedIdFromMsgId,
     } = MetaFeedHelpers(ssb)
-    const { getEpochGraph } = Epochs(ssb)
+    const { getEpochs, getEpochGraph } = Epochs(ssb)
 
     function create(opts = {}, cb) {
       if (cb === undefined) return promisify(create)(opts)
@@ -445,6 +445,7 @@ module.exports = {
       acceptInvite,
       start,
 
+      getEpochs,
       getEpochGraph,
     }
   },

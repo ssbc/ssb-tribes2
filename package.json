@@ -29,7 +29,6 @@
     "*.js"
   ],
   "dependencies": {
-    "@tangle/graph": "^3.0.2",
     "@tangle/overwrite-fields": "^2.0.3",
     "@tangle/reduce": "^5.0.4",
     "@tangle/strategy": "^4.1.2",
