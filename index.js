@@ -17,7 +17,12 @@ const {
 } = require('ssb-db2/operators')
 const {
   validator: {
-    group: { addMember: isAddMember, content: isContent },
+    group: {
+      addMember: isAddMember,
+      content: isContent,
+      exclude: isExclude,
+      initEpoch: isInitEpoch,
+    },
   },
   keySchemes,
 } = require('private-group-spec')
@@ -187,7 +192,7 @@ module.exports = {
             }
             const excludeOpts = {
               tangles: ['members'],
-              isValid: () => true,
+              isValid: isExclude,
             }
             publish(excludeContent, excludeOpts, (err) => {
               // prettier-ignore
@@ -228,7 +233,7 @@ module.exports = {
                       }
                       const newTangleOpts = {
                         tangles: ['epoch'],
-                        isValid: () => true,
+                        isValid: isInitEpoch,
                       }
                       publish(newEpochContent, newTangleOpts, (err) => {
                         // prettier-ignore
