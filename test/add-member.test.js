@@ -56,7 +56,10 @@ test('get added to a group', async (t) => {
       t.pass('alice and bob replicate after bob getting added to the group')
     )
     .catch((err) => {
-      console.error('failed to replicate after adding bob to the group', err)
+      console.error(
+        'failed to replicate after alice added bob to the group',
+        err
+      )
       t.error(err)
     })
 
