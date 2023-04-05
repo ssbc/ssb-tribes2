@@ -282,7 +282,11 @@ test.only("If you're not the excluder nor the excludee then you should still be 
   const { writeKey: writeKey2 } = await carol.tribes2.get(groupId)
 
   const branches = await pull(
-    carol.metafeeds.branchStream({ root: carolRoot, old: true, live: false }),
+    carol.metafeeds.branchStream({
+      root: carolRoot.id,
+      old: true,
+      live: false,
+    }),
     pull.collectAsPromise()
   )
 
