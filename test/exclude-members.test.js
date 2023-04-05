@@ -154,6 +154,8 @@ test('add and remove a person, post on the new feed', async (t) => {
   )
   const additionsContents = msgsFromAdditions.map((msg) => msg.value.content)
 
+  t.equal(additionsContents.length, 3, '3 messages on additions feed')
+
   const reinviteMsg = additionsContents[2]
 
   t.equal(reinviteMsg.type, 'group/add-member')
