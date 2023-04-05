@@ -176,7 +176,7 @@ test('add and remove a person, post on the new feed', async (t) => {
   await p(bob.close)(true)
 })
 
-test.only("If you're not the excluder nor the excludee then you should still be in the group and have access to the new epoch", async (t) => {
+test("If you're not the excluder nor the excludee then you should still be in the group and have access to the new epoch", async (t) => {
   // alice creates the group. adds bob and carol. removes bob.
   // bob gets added and is removed
   // carol stays in the group
