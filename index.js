@@ -186,7 +186,7 @@ module.exports = {
           tangles: ['members'],
           isValid: isExclude,
         }
-        publish(excludeContent, excludeOpts, (err) => {
+        publish(excludeContent, excludeOpts, (err, excludeMsg) => {
           // prettier-ignore
           if (err) return cb(clarify(err, 'Failed to publish exclude msg'))
 
@@ -235,7 +235,7 @@ module.exports = {
                       // prettier-ignore
                       if (err) return cb(clarify(err, "Couldn't re-add remaining members when excluding members"))
                       //TODO: we probably don't want to return this exactly
-                      return cb(null, reMsg)
+                      return cb(null, { excludeMsg, reAddMsg: reMsg })
                     })
                   })
                 })

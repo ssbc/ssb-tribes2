@@ -176,7 +176,7 @@ test('add and remove a person, post on the new feed', async (t) => {
   await p(bob.close)(true)
 })
 
-test("If you're not the excluder nor the excludee then you should still be in the group and have access to the new epoch", async (t) => {
+test.only("If you're not the excluder nor the excludee then you should still be in the group and have access to the new epoch", async (t) => {
   // alice creates the group. adds bob and carol. removes bob.
   // bob gets added and is removed
   // carol stays in the group
@@ -245,7 +245,7 @@ test("If you're not the excluder nor the excludee then you should still be in th
 
   await replicate(alice, carol).catch(t.error)
 
-  const excludeMsg = await alice.tribes2
+  const { reAddMsg } = await alice.tribes2
     .excludeMembers(groupId, [bobRoot.id])
     .then((res) => {
       t.pass('alice excluded bob')
@@ -258,9 +258,9 @@ test("If you're not the excluder nor the excludee then you should still be in th
   // TODO: maybe remove?
   await p(setTimeout)(10000)
 
-  const carolHasExcludeMsg = await p(carol.db.getMsg)(excludeMsg.key)
+  const carolHasReAddMsg = await p(carol.db.getMsg)(reAddMsg.key)
 
-  console.log('carol has exclude', carolHasExcludeMsg)
+  console.log('carol has readd', carolHasReAddMsg)
 
   const {
     value: { author: secondFeedId },
@@ -286,12 +286,19 @@ test("If you're not the excluder nor the excludee then you should still be in th
     pull.collectAsPromise()
   )
 
+  console.log('carol branches', branches)
+
   const groupFeedPurposes = branches
     .filter((branch) => branch.length === 4)
     .map((branch) => branch[3])
     .filter((feed) => feed.recps && feed.purpose.length === 44)
     .map((feed) => feed.purpose)
 
+  console.log({
+    groupFeedPurposes,
+    key1: writeKey1.key.toString('base64'),
+    key2: writeKey2.key.toString('base64'),
+  })
   t.true(
     groupFeedPurposes.includes(writeKey1.key.toString('base64')),
     'Carol has a feed for the old key'
