@@ -1,8 +1,12 @@
 const test = require('tape')
 const { promisify: p } = require('util')
+const pull = require('pull-stream')
+const { where, type, descending, toPullStream } = require('ssb-db2/operators')
+const { fromMessageSigil } = require('ssb-uri2')
 
 const Server = require('../helpers/testbot')
 const replicate = require('../helpers/replicate')
+const Epochs = require('../../lib/epochs')
 
 function Run (t) {
   // this function takes care of running a promise and logging
@@ -18,7 +22,6 @@ function Run (t) {
     return promise
       .then(res => {
         if (isTest) t.pass(label)
-        else console.log(' ', label)
         return res
       })
       .catch(err => {
@@ -50,38 +53,37 @@ test('lib/epochs', async t => {
     'start tribes',
     Promise.all(peers.map(peer => p(peer.tribes2.start)())),
   )
+  const rootFeeds = await Promise.all(
+    peers.map(peer => p(peer.metafeeds.findOrCreate)())
+  )
+  const [aliceId, bobId, oscarId] = rootFeeds.map(feed => feed.id)
 
   const group = await run(
     'alice creates a group',
-    p(alice.tribes2.create)({})
+    alice.tribes2.create({})
   )
 
   let epochs = await run(
     'alice gets epochs',
-    alice.tribes2.getEpochs(group.id)
+    Epochs(alice).getEpochs(group.id)
   )
+
   t.deepEqual(
     epochs,
     [{
-      key: group.root,
+      id: group.root,
       previous: null,
       epochKey: group.writeKey.key,
-      author: epochs[0].author // CHEAT
-      // TODO where can we get the author feed from... do we need it?
+      author: aliceId
     }],
     'there is 1 epoch'
   )
 
   await sync('replication (to get Additions feeds)')
 
-  // alice adds peers
-  const rootFeeds = await Promise.all(
-    others.map(peer => p(peer.metafeeds.findOrCreate)())
-  )
-  const rootIds = rootFeeds.map(feed => feed.id)
   await run(
     'alice invites other peers to group',
-    alice.tribes2.addMembers(group.id, rootIds, {})
+    alice.tribes2.addMembers(group.id, [bobId, oscarId], {})
   )
   await sync('replication (to propogate invites)')
   await run(
@@ -95,31 +97,46 @@ test('lib/epochs', async t => {
   // alice removes oscar
   await run(
     'alice excludes oscar',
-    alice.tribes2.excludeMembers(group.id, [rootIds[1]], {})
+    alice.tribes2.excludeMembers(group.id, [oscarId], {})
   )
   await sync('replication (exclusion)')
 
   epochs = await run(
     'alice gets epochs',
-    alice.tribes2.getEpochs(group.id)
+    Epochs(alice).getEpochs(group.id)
   )
 
   const groupUpdated = await alice.tribes2.get(group.id)
+
+  const lastGroupInitId = await new Promise((resolve, reject) => {
+    pull(
+      alice.db.query(
+        where(type('group/init')),
+        descending(),
+        toPullStream()
+      ),
+      pull.map(m => fromMessageSigil(m.key)),
+      pull.take(1),
+      pull.collect((err, keys) => {
+        err ? reject(err) : resolve(keys[0])
+      })
+    )
+  })
 
   t.deepEqual(
     epochs,
     [
       {
-        key: group.root,
+        id: group.root,
         previous: null,
         epochKey: group.writeKey.key,
-        author: epochs[0].author // CHEAT
+        author: aliceId
       },
       {
-        key: epochs[1].key, // CHEAT ...get this from excludeMembers?
+        id: lastGroupInitId,
         previous: [group.root],
         epochKey: groupUpdated.writeKey.key,
-        author: epochs[1].author // CHEAT
+        author: aliceId
       }
     ],
     'there are 2 epochs'
