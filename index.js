@@ -177,92 +177,71 @@ module.exports = {
         // prettier-ignore
         if (err) return cb(clarify(err, "Couldn't get own root when excluding members"))
 
-        get(groupId, (err, { writeKey: oldWriteKey } = {}) => {
+        const excludeContent = {
+          type: 'group/exclude',
+          excludes: feedIds,
+          recps: [groupId],
+        }
+        const excludeOpts = {
+          tangles: ['members'],
+          isValid: isExclude,
+        }
+        publish(excludeContent, excludeOpts, (err) => {
           // prettier-ignore
-          if (err) return cb(clarify(err, "Couldn't get old key when excluding members"))
+          if (err) return cb(clarify(err, 'Failed to publish exclude msg'))
 
-          findOrCreateGroupFeed(oldWriteKey.key, (err, oldGroupFeed) => {
-            // prettier-ignore
-            if (err) return cb(clarify(err, "Couldn't get the old group feed when excluding members"))
-
-            const excludeContent = {
-              type: 'group/exclude',
-              excludes: feedIds,
-              recps: [groupId],
-            }
-            const excludeOpts = {
-              tangles: ['members'],
-              isValid: isExclude,
-            }
-            publish(excludeContent, excludeOpts, (err) => {
+          pull(
+            listMembers(groupId),
+            pull.collect((err, beforeMembers) => {
               // prettier-ignore
-              if (err) return cb(clarify(err, 'Failed to publish exclude msg'))
+              if (err) return cb(clarify(err, "Couldn't get old member list when excluding members"))
 
-              pull(
-                listMembers(groupId),
-                pull.collect((err, beforeMembers) => {
+              const remainingMembers = beforeMembers.filter(
+                (member) => !feedIds.includes(member)
+              )
+              const newGroupKey = new SecretKey()
+              const addInfo = { key: newGroupKey.toBuffer() }
+
+              ssb.box2.addGroupInfo(groupId, addInfo, (err) => {
+                // prettier-ignore
+                if (err) return cb(clarify(err, "Couldn't store new key when excluding members"))
+
+                const newKey = {
+                  key: newGroupKey.toBuffer(),
+                  scheme: keySchemes.private_group,
+                }
+                ssb.box2.pickGroupWriteKey(groupId, newKey, (err) => {
                   // prettier-ignore
-                  if (err) return cb(clarify(err, "Couldn't get old member list when excluding members"))
+                  if (err) return cb(clarify(err, "Couldn't switch to new key for writing when excluding members"))
 
-                  const remainingMembers = beforeMembers.filter(
-                    (member) => !feedIds.includes(member)
-                  )
-                  const newGroupKey = new SecretKey()
-                  const addInfo = { key: newGroupKey.toBuffer() }
-
-                  ssb.box2.addGroupInfo(groupId, addInfo, (err) => {
+                  const newEpochContent = {
+                    type: 'group/init',
+                    version: 'v2',
+                    groupKey: newGroupKey.toString('base64'),
+                    tangles: {
+                      members: { root: null, previous: null },
+                    },
+                    recps: [groupId, myRoot.id],
+                  }
+                  const newTangleOpts = {
+                    tangles: ['epoch'],
+                    isValid: isInitEpoch,
+                  }
+                  publish(newEpochContent, newTangleOpts, (err) => {
                     // prettier-ignore
-                    if (err) return cb(clarify(err, "Couldn't store new key when excluding members"))
+                    if (err) return cb(clarify(err, "Couldn't post init msg on new epoch when excluding members"))
 
-                    const newKey = {
-                      key: newGroupKey.toBuffer(),
-                      scheme: keySchemes.private_group,
-                    }
-                    ssb.box2.pickGroupWriteKey(groupId, newKey, (err) => {
+                    addMembers(groupId, remainingMembers, {}, (err, reMsg) => {
                       // prettier-ignore
-                      if (err) return cb(clarify(err, "Couldn't switch to new key for writing when excluding members"))
-
-                      const newEpochContent = {
-                        type: 'group/init',
-                        version: 'v2',
-                        groupKey: newGroupKey.toString('base64'),
-                        tangles: {
-                          members: { root: null, previous: null },
-                        },
-                        recps: [groupId, myRoot.id],
-                      }
-                      const newTangleOpts = {
-                        tangles: ['epoch'],
-                        isValid: isInitEpoch,
-                      }
-                      publish(newEpochContent, newTangleOpts, (err) => {
-                        // prettier-ignore
-                        if (err) return cb(clarify(err, "Couldn't post init msg on new epoch when excluding members"))
-
-                        const reAddOpts = {
-                          // the re-adding needs to be published on the old
-                          // feed so that the additions feed is not spammed,
-                          // while people need to still be able to find it
-                          _feedKeys: oldGroupFeed.keys,
-                        }
-                        addMembers(
-                          groupId,
-                          remainingMembers,
-                          reAddOpts,
-                          (err, reAddMsg) => {
-                            // prettier-ignore
-                            if (err) return cb(clarify(err, "Couldn't re-add remaining members when excluding members"))
-                            //TODO: we probably don't want to return this exactly
-                            return cb(null, reAddMsg)
-                          }
-                        )
-                      })
+                      if (err) return cb(clarify(err, "Couldn't re-add remaining members when excluding members"))
+                      //TODO: we probably don't want to return this exactly
+                      return cb(null, reMsg)
                     })
                   })
                 })
-              )
+              })
             })
-          })
+          )
         })
       })
     }

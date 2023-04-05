@@ -14,9 +14,9 @@ const pull = require('pull-stream')
 
 test('add and remove a person, post on the new feed', async (t) => {
   // Alice's feeds should look like
-  // first: initGroup->excludeBob->reAddAlice
+  // first: initGroup->excludeBob
   // second: initEpoch->post
-  // additions: addAlice->addBob (not checking this here)
+  // additions: addAlice->addBob->reAddAlice
   const alice = Testbot({
     keys: ssbKeys.generate(null, 'alice'),
     mfSeed: Buffer.from(
@@ -104,7 +104,7 @@ test('add and remove a person, post on the new feed', async (t) => {
 
   const firstContents = msgsFromFirst.map((msg) => msg.value.content)
 
-  t.equal(firstContents.length, 3, '3 messages on first feed')
+  t.equal(firstContents.length, 2, '2 messages on first feed')
 
   const firstInit = firstContents[0]
 
@@ -121,24 +121,9 @@ test('add and remove a person, post on the new feed', async (t) => {
     previous: [fromMessageSigil(addBobMsg.key)],
   })
 
-  const reinviteMsg = firstContents[2]
-
-  t.equal(reinviteMsg.type, 'group/add-member')
-  t.deepEqual(reinviteMsg.recps, [groupId, aliceRoot.id])
-
   const msgsFromSecond = await alice.db.query(
     where(author(secondFeedId)),
     toPromise()
-  )
-
-  const secondInitKey = fromMessageSigil(msgsFromSecond[0].key)
-  t.deepEqual(
-    reinviteMsg.tangles.members,
-    {
-      root: secondInitKey,
-      previous: [secondInitKey],
-    },
-    'members tangle resets after new epoch'
   )
 
   const secondContents = msgsFromSecond.map((msg) => msg.value.content)
@@ -160,6 +145,32 @@ test('add and remove a person, post on the new feed', async (t) => {
   const post = secondContents[1]
 
   t.equal(post.text, 'post', 'found post on second feed')
+
+  const aliceAdditions = await p(alice.metafeeds.findOrCreate)({
+    purpose: 'group/additions',
+  })
+  const msgsFromAdditions = await alice.db.query(
+    where(author(aliceAdditions.id)),
+    toPromise()
+  )
+  const additionsContents = msgsFromAdditions.map((msg) => msg.value.content)
+
+  t.equal(additionsContents.length, 3, '3 messages on additions feed')
+
+  const reinviteMsg = additionsContents[2]
+
+  t.equal(reinviteMsg.type, 'group/add-member')
+  t.deepEqual(reinviteMsg.recps, [groupId, aliceRoot.id])
+
+  const secondInitKey = fromMessageSigil(msgsFromSecond[0].key)
+  t.deepEqual(
+    reinviteMsg.tangles.members,
+    {
+      root: secondInitKey,
+      previous: [secondInitKey],
+    },
+    'members tangle resets after new epoch'
+  )
 
   await p(alice.close)(true)
   await p(bob.close)(true)
