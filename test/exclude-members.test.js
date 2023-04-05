@@ -125,11 +125,20 @@ test('add and remove a person, post on the new feed', async (t) => {
 
   t.equal(reinviteMsg.type, 'group/add-member')
   t.deepEqual(reinviteMsg.recps, [groupId, aliceRoot.id])
-  // TODO: check members tangle
 
   const msgsFromSecond = await alice.db.query(
     where(author(secondFeedId)),
     toPromise()
+  )
+
+  const secondInitKey = fromMessageSigil(msgsFromSecond[0].key)
+  t.deepEqual(
+    reinviteMsg.tangles.members,
+    {
+      root: secondInitKey,
+      previous: [secondInitKey],
+    },
+    'members tangle resets after new epoch'
   )
 
   const secondContents = msgsFromSecond.map((msg) => msg.value.content)

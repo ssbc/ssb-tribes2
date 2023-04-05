@@ -54,6 +54,7 @@ test('create more', async (t) => {
       groupKey: group.writeKey.key.toString('base64'),
       tangles: {
         group: { root: null, previous: null },
+        epoch: { root: null, previous: null },
         members: { root: null, previous: null },
       },
     },
