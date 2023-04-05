@@ -55,7 +55,7 @@ test('lib/epochs', async t => {
 
   await run(
     'start tribes',
-    Promise.all(peers.map(peer => p(peer.tribes2.start)())),
+    Promise.all(peers.map(peer => peer.tribes2.start())),
   )
   const rootFeeds = await Promise.all(
     peers.map(peer => p(peer.metafeeds.findOrCreate)())
@@ -66,14 +66,8 @@ test('lib/epochs', async t => {
     'alice creates a group',
     alice.tribes2.create({})
   )
-
-  let epochs = await run(
-    'alice gets epochs',
-    Epochs(alice).getEpochs(group.id)
-  )
-
   t.deepEqual(
-    epochs,
+    await Epochs(alice).getEpochs(group.id),
     [{
       id: group.root,
       previous: null,
@@ -81,6 +75,11 @@ test('lib/epochs', async t => {
       author: aliceId
     }],
     'there is 1 epoch'
+  )
+  t.deepEqual(
+    await Epochs(alice).getMembers(group.root), // epoch zero root
+    { members: [aliceId], toExclude: [] },
+    'group members: alice'
   )
 
   await sync('replication (to get Additions feeds)')
@@ -97,6 +96,11 @@ test('lib/epochs', async t => {
     )
   )
   await sync('replication (to see acceptance)')
+  t.deepEqual(
+    await Epochs(alice).getMembers(group.root), // epoch zero root
+    { members: [aliceId, bobId, oscarId], toExclude: [] },
+    'epoch 0 members: alice, bob, oscar'
+  )
 
   // alice removes oscar
   await run(
@@ -105,13 +109,8 @@ test('lib/epochs', async t => {
   )
   await sync('replication (exclusion)')
 
-  epochs = await run(
-    'alice gets epochs',
-    Epochs(alice).getEpochs(group.id)
-  )
-
+  const epochs = await Epochs(alice).getEpochs(group.id)
   const groupUpdated = await alice.tribes2.get(group.id)
-
   const lastGroupInitId = await new Promise((resolve, reject) => {
     pull(
       alice.db.query(
@@ -126,7 +125,6 @@ test('lib/epochs', async t => {
       })
     )
   })
-
   t.deepEqual(
     epochs,
     [
@@ -144,6 +142,16 @@ test('lib/epochs', async t => {
       }
     ],
     'there are 2 epochs'
+  )
+  t.deepEqual(
+    await Epochs(alice).getMembers(epochs[0].id),
+    { members: [aliceId, bobId, oscarId], toExclude: [oscarId] },
+    'epoch 0 members: alice, bob, oscar (note toExclude oscar)'
+  )
+  t.deepEqual(
+    await Epochs(alice).getMembers(epochs[1].id),
+    { members: [aliceId, bobId], toExclude: [] },
+    'epoch 1 members: alice, bob'
   )
 
   t.end()
