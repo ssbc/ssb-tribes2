@@ -243,7 +243,7 @@ test("If you're not the excluder nor the excludee then you should still be in th
     .catch((err) => t.error(err, 'carol failed to publish on first feed'))
   if (firstFeedId) t.pass('carol posted first post')
 
-  const { reAddMsg } = await alice.tribes2
+  await alice.tribes2
     .excludeMembers(groupId, [bobRoot.id])
     .then((res) => {
       t.pass('alice excluded bob')
@@ -255,10 +255,6 @@ test("If you're not the excluder nor the excludee then you should still be in th
 
   // TODO: maybe remove?
   await p(setTimeout)(10000)
-
-  const carolHasReAddMsg = await p(carol.db.getMsg)(reAddMsg.key)
-
-  console.log('carol has readd', carolHasReAddMsg)
 
   const {
     value: { author: secondFeedId },
@@ -288,19 +284,12 @@ test("If you're not the excluder nor the excludee then you should still be in th
     pull.collectAsPromise()
   )
 
-  console.log('carol branches', branches)
-
   const groupFeedPurposes = branches
     .filter((branch) => branch.length === 4)
     .map((branch) => branch[3])
     .filter((feed) => feed.recps && feed.purpose.length === 44)
     .map((feed) => feed.purpose)
 
-  console.log({
-    groupFeedPurposes,
-    key1: writeKey1.key.toString('base64'),
-    key2: writeKey2.key.toString('base64'),
-  })
   t.true(
     groupFeedPurposes.includes(writeKey1.key.toString('base64')),
     'Carol has a feed for the old key'
