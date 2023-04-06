@@ -243,8 +243,6 @@ test("If you're not the excluder nor the excludee then you should still be in th
     .catch((err) => t.error(err, 'carol failed to publish on first feed'))
   if (firstFeedId) t.pass('carol posted first post')
 
-  await replicate(alice, carol).catch(t.error)
-
   const { reAddMsg } = await alice.tribes2
     .excludeMembers(groupId, [bobRoot.id])
     .then((res) => {
