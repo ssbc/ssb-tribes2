@@ -253,8 +253,8 @@ test("If you're not the excluder nor the excludee then you should still be in th
 
   await replicate(alice, carol).catch(t.error)
 
-  // TODO: maybe remove?
-  await p(setTimeout)(10000)
+  // let carol find the new epoch and switch to the new key
+  await p(setTimeout)(500)
 
   const {
     value: { author: secondFeedId },
