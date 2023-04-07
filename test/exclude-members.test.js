@@ -230,6 +230,9 @@ test('Verify that you actually get removed from a group', async (t) => {
 
   await replicate(alice, bob)
 
+  // TODO: lower
+  await p(setTimeout)(4000)
+
   await bob.tribes2
     .publish({
       type: 'test',
@@ -244,4 +247,7 @@ test('Verify that you actually get removed from a group', async (t) => {
     )
 
   // TODO: check bob's group list, it should still have an entry for the group but it should be marked that he's removed from it or something. or an opt for the function?
+
+  // TODO: try to check the messages encrypted to the new key/epoch, and fail
+  // checking the re-addition messages on alice's additions feed should do
 })

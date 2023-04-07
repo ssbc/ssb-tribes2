@@ -407,6 +407,34 @@ module.exports = {
         if (err) return cb(clarify(err, 'Error finding or creating additions feed when starting ssb-tribes2'))
         return cb()
       })
+
+      ssb.metafeeds.findOrCreate((err, myRoot) => {
+        // prettier-ignore
+        if (err) return cb(clarify(err, 'todo'))
+
+        pull(
+          ssb.db.query(
+            where(and(isDecrypted('box2'), type('group/exclude'))),
+            live({ old: true }),
+            toPullStream()
+          ),
+          pull.filter((msg) =>
+            // it's an exclusion of us
+            msg.value?.content?.excludes?.includes(myRoot.id)
+          ),
+          pull.drain(
+            (msg) => {
+              const groupId = msg.value?.content?.recps?.[0]
+              console.log('removing for groupid', groupId)
+              ssb.box2.removeGroupInfo(groupId, null)
+            },
+            (err) => {
+              // prettier-ignore
+              if (err) return cb(clarify(err, 'todo'))
+            }
+          )
+        )
+      })
     }
 
     return {
