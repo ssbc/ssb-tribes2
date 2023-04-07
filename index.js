@@ -411,7 +411,7 @@ module.exports = {
       // look for new epochs that we're added to
       ssb.metafeeds.findOrCreate((err, myRoot) => {
         // prettier-ignore
-        if (err) return cb(clarify(err, 'todo'))
+        if (err) return cb(clarify(err, 'Error getting own root in start()'))
 
         pull(
           ssb.db.query(
@@ -430,7 +430,7 @@ module.exports = {
               ssb.box2.listGroupIds(),
               pull.collect((err, groupIds) => {
                 // prettier-ignore
-                if (err) return cb(clarify(err, 'todo'))
+                if (err) return cb(clarify(err, "Error getting groups we're already in when looking for new epochs"))
 
                 if (groupIds.includes(msg.value?.content?.recps?.[0])) {
                   return cb(null, msg)
@@ -448,7 +448,7 @@ module.exports = {
               const newKey = Buffer.from(msg.value?.content?.groupKey, 'base64')
               ssb.box2.addGroupInfo(groupId, { key: newKey }, (err) => {
                 // prettier-ignore
-                if (err) return cb(clarify(err, 'todo'))
+                if (err) return cb(clarify(err, 'Error adding new epoch key that we found'))
 
                 const newKeyPick = {
                   key: newKey,
@@ -457,18 +457,18 @@ module.exports = {
                 // TODO: naively guessing that this is the latest key for now
                 ssb.box2.pickGroupWriteKey(groupId, newKeyPick, (err) => {
                   // prettier-ignore
-                  if (err) return cb(clarify(err, "todo"))
+                  if (err) return cb(clarify(err, 'Error switching to new epoch key that we found'))
 
                   ssb.db.reindexEncrypted((err) => {
                     // prettier-ignore
-                    if (err) cb(clarify(err, 'todo'))
+                    if (err) cb(clarify(err, 'Error reindexing after finding new epoch'))
                   })
                 })
               })
             },
             (err) => {
               // prettier-ignore
-              if (err) return cb(clarify(err, 'todo'))
+              if (err) return cb(clarify(err, "Error finding new epochs we've been added to"))
             }
           )
         )
