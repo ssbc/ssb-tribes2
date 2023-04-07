@@ -174,3 +174,74 @@ test('add and remove a person, post on the new feed', async (t) => {
   await p(alice.close)(true)
   await p(bob.close)(true)
 })
+
+test('Verify that you actually get removed from a group', async (t) => {
+  const alice = Testbot({
+    keys: ssbKeys.generate(null, 'alice'),
+    mfSeed: Buffer.from(
+      '000000000000000000000000000000000000000000000000000000000000a1ce',
+      'hex'
+    ),
+  })
+  const bob = Testbot({
+    keys: ssbKeys.generate(null, 'bob'),
+    mfSeed: Buffer.from(
+      '0000000000000000000000000000000000000000000000000000000000000b0b',
+      'hex'
+    ),
+  })
+
+  await alice.tribes2.start()
+  await bob.tribes2.start()
+  t.pass('tribes2 started for both alice and bob')
+
+  const aliceRoot = await p(alice.metafeeds.findOrCreate)()
+  const bobRoot = await p(bob.metafeeds.findOrCreate)()
+
+  await replicate(alice, bob)
+  t.pass('alice and bob replicate their trees')
+
+  const { id: groupId } = await alice.tribes2
+    .create()
+    .catch((err) => t.error(err, 'alice failed to create group'))
+
+  await alice.tribes2
+    .addMembers(groupId, [bobRoot.id])
+    .catch((err) => t.error(err, 'add member fail'))
+
+  await replicate(alice, bob)
+
+  await bob.tribes2.acceptInvite(groupId).catch(t.error)
+
+  await bob.tribes2
+    .publish({
+      type: 'test',
+      text: 'bob first post',
+      recps: [groupId],
+    })
+    .then(() => t.pass("bob posts in the group while he's in it"))
+    .catch(t.error)
+
+  await replicate(alice, bob)
+
+  await alice.tribes2
+    .excludeMembers(groupId, [bobRoot.id])
+    .catch((err) => t.error(err, 'remove member fail'))
+
+  await replicate(alice, bob)
+
+  await bob.tribes2
+    .publish({
+      type: 'test',
+      text: 'bob second post',
+      recps: [groupId],
+    })
+    .then(() =>
+      t.fail("Bob posted again in the group even if he's removed from it")
+    )
+    .catch(() =>
+      t.pass("Bob can't post in the group anymore since he's removed from it")
+    )
+
+  // TODO: check bob's group list, it should still have an entry for the group but it should be marked that he's removed from it or something. or an opt for the function?
+})
