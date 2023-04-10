@@ -195,7 +195,7 @@ test('Verify that you actually get removed from a group', async (t) => {
   await bob.tribes2.start()
   t.pass('tribes2 started for both alice and bob')
 
-  const aliceRoot = await p(alice.metafeeds.findOrCreate)()
+  await p(alice.metafeeds.findOrCreate)()
   const bobRoot = await p(bob.metafeeds.findOrCreate)()
 
   await replicate(alice, bob)
@@ -230,8 +230,9 @@ test('Verify that you actually get removed from a group', async (t) => {
 
   await replicate(alice, bob)
 
-  // TODO: lower
-  await p(setTimeout)(4000)
+  await p(setTimeout)(500)
+
+  t.pass('replicated, about to publish')
 
   await bob.tribes2
     .publish({
@@ -250,4 +251,7 @@ test('Verify that you actually get removed from a group', async (t) => {
 
   // TODO: try to check the messages encrypted to the new key/epoch, and fail
   // checking the re-addition messages on alice's additions feed should do
+
+  await p(alice.close)(true)
+  await p(bob.close)(true)
 })

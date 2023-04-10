@@ -259,18 +259,23 @@ module.exports = {
       }
       const groupId = recps[0]
 
-      addTangles(ssb, content, tangles, (err, content) => {
+      get(groupId, (err, { writeKey, removed }) => {
         // prettier-ignore
-        if (err) return cb(clarify(err, 'Failed to add group tangle when publishing to a group'))
+        if (err) return cb(clarify(err, 'Failed to get group details when publishing to a group'))
 
-        if (!isValid(content))
+        if (removed)
           return cb(
-            new Error(isValid.errorsString ?? 'content failed validation')
+            new Error("Cannot publish to a group we've been removed from")
           )
 
-        get(groupId, (err, { writeKey }) => {
+        addTangles(ssb, content, tangles, (err, content) => {
           // prettier-ignore
-          if (err) return cb(clarify(err, 'Failed to get group details when publishing to a group'))
+          if (err) return cb(clarify(err, 'Failed to add group tangle when publishing to a group'))
+
+          if (!isValid(content))
+            return cb(
+              new Error(isValid.errorsString ?? 'content failed validation')
+            )
 
           const getFeed = opts?.feedKeys
             ? (_, cb) => cb(null, { keys: opts.feedKeys })
@@ -425,7 +430,6 @@ module.exports = {
           pull.drain(
             (msg) => {
               const groupId = msg.value?.content?.recps?.[0]
-              console.log('removing for groupid', groupId)
               ssb.box2.removeGroupInfo(groupId, null)
             },
             (err) => {
