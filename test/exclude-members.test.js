@@ -229,6 +229,12 @@ test('Verify that you actually get excluded from a group', async (t) => {
     .excludeMembers(groupId, [bobRoot.id])
     .catch((err) => t.error(err, 'exclude member fail'))
 
+  const { key: aliceNewEpochPostKey } = await alice.tribes2.publish({
+    type: 'shitpost',
+    text: 'alicepost',
+    recps: [groupId],
+  })
+
   await replicate(alice, bob)
 
   await p(setTimeout)(500)
@@ -255,8 +261,12 @@ test('Verify that you actually get excluded from a group', async (t) => {
     "bob is excluded from the only group he's been in. sad."
   )
 
-  // TODO: try to check the messages encrypted to the new key/epoch, and fail
-  // checking the re-addition messages on alice's additions feed should do
+  const bobGotMsg = await p(bob.db.get)(aliceNewEpochPostKey)
+  t.equals(
+    typeof bobGotMsg.content,
+    'string',
+    "bob didn't manage to decrypt alice's new message"
+  )
 
   await p(alice.close)(true)
   await p(bob.close)(true)
