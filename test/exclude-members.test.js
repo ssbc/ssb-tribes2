@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: CC0-1.0
 
 const test = require('tape')
+const pull = require('pull-stream')
 const { promisify: p } = require('util')
 const ssbKeys = require('ssb-keys')
 const { where, author, toPromise } = require('ssb-db2/operators')
@@ -247,7 +248,12 @@ test('Verify that you actually get excluded from a group', async (t) => {
       t.pass("Bob can't post in the group anymore since he's excluded from it")
     )
 
-  // TODO: check bob's group list, it should still have an entry for the group but it should be marked that he's excluded from it or something. or an opt for the function?
+  const bobGroups = await pull(bob.tribes2.list(), pull.collectAsPromise())
+  t.deepEquals(
+    bobGroups,
+    [{ id: groupId, excluded: true }],
+    "bob is excluded from the only group he's been in. sad."
+  )
 
   // TODO: try to check the messages encrypted to the new key/epoch, and fail
   // checking the re-addition messages on alice's additions feed should do
