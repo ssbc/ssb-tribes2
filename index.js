@@ -259,13 +259,13 @@ module.exports = {
       }
       const groupId = recps[0]
 
-      get(groupId, (err, { writeKey, removed }) => {
+      get(groupId, (err, { writeKey, excluded }) => {
         // prettier-ignore
         if (err) return cb(clarify(err, 'Failed to get group details when publishing to a group'))
 
-        if (removed)
+        if (excluded)
           return cb(
-            new Error("Cannot publish to a group we've been removed from")
+            new Error("Cannot publish to a group we've been excluded from")
           )
 
         addTangles(ssb, content, tangles, (err, content) => {
@@ -430,7 +430,7 @@ module.exports = {
           pull.drain(
             (msg) => {
               const groupId = msg.value?.content?.recps?.[0]
-              ssb.box2.removeGroupInfo(groupId, null)
+              ssb.box2.excludeGroupInfo(groupId, null)
             },
             (err) => {
               // prettier-ignore

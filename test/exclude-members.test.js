@@ -11,7 +11,7 @@ const Testbot = require('./helpers/testbot')
 const replicate = require('./helpers/replicate')
 const countGroupFeeds = require('./helpers/count-group-feeds')
 
-test('add and remove a person, post on the new feed', async (t) => {
+test('add and exclude a person, post on the new feed', async (t) => {
   // Alice's feeds should look like
   // first: initGroup->excludeBob
   // second: initEpoch->post
@@ -62,7 +62,7 @@ test('add and remove a person, post on the new feed', async (t) => {
 
   await alice.tribes2
     .excludeMembers(groupId, [bobRoot.id])
-    .catch((err) => t.error(err, 'remove member fail'))
+    .catch((err) => t.error(err, 'exclude member fail'))
 
   t.equals(
     await p(countGroupFeeds)(alice),
@@ -175,7 +175,7 @@ test('add and remove a person, post on the new feed', async (t) => {
   await p(bob.close)(true)
 })
 
-test('Verify that you actually get removed from a group', async (t) => {
+test('Verify that you actually get excluded from a group', async (t) => {
   const alice = Testbot({
     keys: ssbKeys.generate(null, 'alice'),
     mfSeed: Buffer.from(
@@ -226,11 +226,11 @@ test('Verify that you actually get removed from a group', async (t) => {
 
   await alice.tribes2
     .excludeMembers(groupId, [bobRoot.id])
-    .catch((err) => t.error(err, 'remove member fail'))
+    .catch((err) => t.error(err, 'exclude member fail'))
 
   await replicate(alice, bob)
 
-  await p(setTimeout)(500)
+  await p(setTimeout)(5000)
 
   t.pass('replicated, about to publish')
 
@@ -241,13 +241,13 @@ test('Verify that you actually get removed from a group', async (t) => {
       recps: [groupId],
     })
     .then(() =>
-      t.fail("Bob posted again in the group even if he's removed from it")
+      t.fail("Bob posted again in the group even if he's excluded from it")
     )
     .catch(() =>
-      t.pass("Bob can't post in the group anymore since he's removed from it")
+      t.pass("Bob can't post in the group anymore since he's excluded from it")
     )
 
-  // TODO: check bob's group list, it should still have an entry for the group but it should be marked that he's removed from it or something. or an opt for the function?
+  // TODO: check bob's group list, it should still have an entry for the group but it should be marked that he's excluded from it or something. or an opt for the function?
 
   // TODO: try to check the messages encrypted to the new key/epoch, and fail
   // checking the re-addition messages on alice's additions feed should do
