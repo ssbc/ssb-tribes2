@@ -271,6 +271,18 @@ test('Verify that you actually get excluded from a group', async (t) => {
   const invites = await pull(bob.tribes2.listInvites(), pull.collectAsPromise())
   t.deepEquals(invites, [], 'Bob has no invites')
 
+  await pull(bob.tribes2.listMembers(groupId), pull.collectAsPromise())
+    .then(() =>
+      t.fail(
+        "Bob didn't get an error when trying to list members of the group he's excluded from"
+      )
+    )
+    .catch(() =>
+      t.pass(
+        "Bob gets an error when trying to list members of the group he's excluded from"
+      )
+    )
+
   await p(alice.close)(true)
   await p(bob.close)(true)
 })

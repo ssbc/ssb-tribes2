@@ -297,16 +297,36 @@ module.exports = {
 
     function listMembers(groupId, opts = {}) {
       return pull(
-        ssb.db.query(
-          where(and(isDecrypted('box2'), type('group/add-member'))),
-          opts.live ? live({ old: true }) : null,
-          toPullStream()
-        ),
-        pull.map((msg) => lodashGet(msg, 'value.content.recps', [])),
-        pull.filter((recps) => recps.length > 1 && recps[0] === groupId),
-        pull.map((recps) => recps.slice(1)),
-        pull.flatten(),
-        pull.unique()
+        pull.values([0]),
+        pull.asyncMap((n, cb) => {
+          get(groupId, (err, group) => {
+            // prettier-ignore
+            if (err) return cb(clarify(err, 'Failed to get group info when listing members'))
+
+            if (group.excluded) {
+              return cb(
+                new Error("We're excluded from this group, can't list members")
+              )
+            } else {
+              const source = pull(
+                ssb.db.query(
+                  where(and(isDecrypted('box2'), type('group/add-member'))),
+                  opts.live ? live({ old: true }) : null,
+                  toPullStream()
+                ),
+                pull.map((msg) => lodashGet(msg, 'value.content.recps', [])),
+                pull.filter(
+                  (recps) => recps.length > 1 && recps[0] === groupId
+                ),
+                pull.map((recps) => recps.slice(1)),
+                pull.flatten(),
+                pull.unique()
+              )
+              return cb(null, source)
+            }
+          })
+        }),
+        pull.flatten()
       )
     }
 
