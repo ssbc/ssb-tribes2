@@ -268,6 +268,9 @@ test('Verify that you actually get excluded from a group', async (t) => {
     "bob didn't manage to decrypt alice's new message"
   )
 
+  const invites = await pull(bob.tribes2.listInvites(), pull.collectAsPromise())
+  t.deepEquals(invites, [], 'Bob has no invites')
+
   await p(alice.close)(true)
   await p(bob.close)(true)
 })
