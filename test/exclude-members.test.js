@@ -230,7 +230,7 @@ test('Verify that you actually get excluded from a group', async (t) => {
 
   await replicate(alice, bob)
 
-  await p(setTimeout)(5000)
+  await p(setTimeout)(500)
 
   t.pass('replicated, about to publish')
 
