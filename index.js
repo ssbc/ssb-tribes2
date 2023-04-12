@@ -420,9 +420,10 @@ module.exports = {
             live({ old: true }),
             toPullStream()
           ),
+          pull.filter(isAddMember),
           // groups/epochs we're added to
           pull.filter((msg) => {
-            return msg.value?.content?.recps?.includes(myRoot.id)
+            return msg.value.content.recps.includes(myRoot.id)
           }),
           // to find new epochs we only check groups we've accepted the invite to
           paraMap((msg, cb) => {
@@ -432,7 +433,7 @@ module.exports = {
                 // prettier-ignore
                 if (err) return cb(clarify(err, "Error getting groups we're already in when looking for new epochs"))
 
-                if (groupIds.includes(msg.value?.content?.recps?.[0])) {
+                if (groupIds.includes(msg.value.content.recps[0])) {
                   return cb(null, msg)
                 } else {
                   return cb()
@@ -443,9 +444,9 @@ module.exports = {
           pull.filter(Boolean),
           pull.drain(
             (msg) => {
-              const groupId = msg.value?.content?.recps?.[0]
+              const groupId = msg.value.content.recps[0]
 
-              const newKey = Buffer.from(msg.value?.content?.groupKey, 'base64')
+              const newKey = Buffer.from(msg.value.content.groupKey, 'base64')
               ssb.box2.addGroupInfo(groupId, { key: newKey }, (err) => {
                 // prettier-ignore
                 if (err) return cb(clarify(err, 'Error adding new epoch key that we found'))
