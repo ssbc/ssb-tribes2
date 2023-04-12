@@ -440,7 +440,7 @@ module.exports = {
                 }
               })
             )
-          }),
+          }, 4),
           pull.filter(Boolean),
           pull.drain(
             (msg) => {
