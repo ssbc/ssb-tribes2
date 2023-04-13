@@ -32,14 +32,21 @@ const buildGroupId = require('./lib/build-group-id')
 const addTangles = require('./lib/tangles/add-tangles')
 const publishAndPrune = require('./lib/prune-publish')
 const MetaFeedHelpers = require('./lib/meta-feed-helpers')
+// const Epochs = require('./lib/epochs')
 
 module.exports = {
   name: 'tribes2',
   manifest: {
     create: 'async',
-    publish: 'async',
+    get: 'async',
     list: 'source',
     addMembers: 'async',
+    excludeMembers: 'async',
+    publish: 'async',
+    start: 'async',
+    listMemebers: 'source',
+    listInvites: 'source',
+    acceptInvite: 'async',
     start: 'async',
   },
   // eslint-disable-next-line no-unused-vars
@@ -51,6 +58,7 @@ module.exports = {
       findOrCreateGroupWithoutMembers,
       getRootFeedIdFromMsgId,
     } = MetaFeedHelpers(ssb)
+    // const { getEpochs } = Epochs(ssb)
 
     function create(opts = {}, cb) {
       if (cb === undefined) return promisify(create)(opts)
