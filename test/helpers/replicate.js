@@ -22,7 +22,7 @@ module.exports = async function replicate(person1, person2) {
   await retryUntil(async () => {
     const clocks = await Promise.all([
       p(person1.getVectorClock)(),
-      p(person2.getVectorClock)()
+      p(person2.getVectorClock)(),
     ])
     return deepEqual(...clocks)
   })
@@ -31,7 +31,7 @@ module.exports = async function replicate(person1, person2) {
   await p(conn.close)(true)
 }
 
-function setupFeedRequests (person1, person2) {
+function setupFeedRequests(person1, person2) {
   let drain
   pull(
     pullMany([
