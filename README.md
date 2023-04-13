@@ -66,7 +66,7 @@ If you want to **add more members** to the group:
 
 ```js
 // You need to know your friends' (bob and carol) *root* metafeed IDs
-ssb.tribes2.addMembers(group.id, [bobRootId, carolRootId], (err, msg) => {
+ssb.tribes2.addMembers(group.id, [bobRootId, carolRootId], {}, (err, msg) => {
   // msg is the message that was published on your invitations feed
 })
 ```
