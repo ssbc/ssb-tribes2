@@ -286,3 +286,131 @@ test('Verify that you actually get excluded from a group', async (t) => {
   await p(alice.close)(true)
   await p(bob.close)(true)
 })
+
+test("If you're not the excluder nor the excludee then you should still be in the group and have access to the new epoch", async (t) => {
+  // alice creates the group. adds bob and carol. removes bob.
+  // bob gets added and is removed
+  // carol stays in the group
+  const alice = Testbot({
+    keys: ssbKeys.generate(null, 'alice'),
+    mfSeed: Buffer.from(
+      '000000000000000000000000000000000000000000000000000000000000a1ce',
+      'hex'
+    ),
+  })
+  const bob = Testbot({
+    keys: ssbKeys.generate(null, 'bob'),
+    mfSeed: Buffer.from(
+      '0000000000000000000000000000000000000000000000000000000000000b0b',
+      'hex'
+    ),
+  })
+  const carol = Testbot({
+    keys: ssbKeys.generate(null, 'carol'),
+    mfSeed: Buffer.from(
+      '00000000000000000000000000000000000000000000000000000000000ca201',
+      'hex'
+    ),
+  })
+
+  await alice.tribes2.start()
+  await bob.tribes2.start()
+  await carol.tribes2.start()
+  t.pass('tribes2 started for everyone')
+
+  await p(alice.metafeeds.findOrCreate)()
+  const bobRoot = await p(bob.metafeeds.findOrCreate)()
+  const carolRoot = await p(carol.metafeeds.findOrCreate)()
+
+  await replicate(alice, bob)
+  await replicate(alice, carol)
+  await replicate(bob, carol)
+  t.pass('everyone replicates their trees')
+
+  const { id: groupId, writeKey: writeKey1 } = await alice.tribes2
+    .create()
+    .catch((err) => t.error(err, 'alice failed to create group'))
+
+  await replicate(alice, carol)
+
+  await alice.tribes2
+    .addMembers(groupId, [bobRoot.id, carolRoot.id])
+    .catch((err) => t.error(err, 'add bob fail'))
+
+  await replicate(alice, carol)
+
+  await carol.tribes2.acceptInvite(groupId)
+
+  await replicate(alice, carol)
+
+  const {
+    value: { author: firstFeedId },
+  } = await carol.tribes2
+    .publish({
+      type: 'test',
+      text: 'first post',
+      recps: [groupId],
+    })
+    .catch((err) => t.error(err, 'carol failed to publish on first feed'))
+  if (firstFeedId) t.pass('carol posted first post')
+
+  await alice.tribes2
+    .excludeMembers(groupId, [bobRoot.id])
+    .then((res) => {
+      t.pass('alice excluded bob')
+      return res
+    })
+    .catch((err) => t.error(err, 'remove member fail'))
+
+  await replicate(alice, carol).catch(t.error)
+
+  // let carol find the new epoch and switch to the new key
+  await p(setTimeout)(500)
+
+  const {
+    value: { author: secondFeedId },
+  } = await carol.tribes2
+    .publish({
+      type: 'test',
+      text: 'second post',
+      recps: [groupId],
+    })
+    .catch(t.fail)
+  if (secondFeedId) t.pass('carol posted second post')
+
+  t.notEquals(
+    secondFeedId,
+    firstFeedId,
+    'feed for second publish is different to first publish'
+  )
+
+  const { writeKey: writeKey2 } = await carol.tribes2.get(groupId)
+
+  const branches = await pull(
+    carol.metafeeds.branchStream({
+      root: carolRoot.id,
+      old: true,
+      live: false,
+    }),
+    pull.collectAsPromise()
+  )
+
+  const groupFeedPurposes = branches
+    .filter((branch) => branch.length === 4)
+    .map((branch) => branch[3])
+    .filter((feed) => feed.recps && feed.purpose.length === 44)
+    .map((feed) => feed.purpose)
+
+  t.true(
+    groupFeedPurposes.includes(writeKey1.key.toString('base64')),
+    'Carol has a feed for the old key'
+  )
+  t.true(
+    groupFeedPurposes.includes(writeKey2.key.toString('base64')),
+    'Carol has a feed for the new key'
+  )
+
+  await p(alice.close)(true)
+  await p(bob.close)(true)
+  await p(carol.close)(true)
+})
