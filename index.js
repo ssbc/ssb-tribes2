@@ -442,8 +442,9 @@ module.exports = {
 
       ssb.metafeeds.findOrCreate((err, myRoot) => {
         // prettier-ignore
-        if (err) return cb(clarify(err, 'todo'))
+        if (err) return cb(clarify(err, 'Error getting own root in start()'))
 
+        // check if we've been excluded
         pull(
           ssb.db.query(
             where(and(isDecrypted('box2'), type('group/exclude'))),
@@ -462,17 +463,12 @@ module.exports = {
             },
             (err) => {
               // prettier-ignore
-              if (err) return cb(clarify(err, 'todo'))
+              if (err) return cb(clarify(err, 'Error on looking for exclude messages excluding us'))
             }
           )
         )
-      })
 
-      // look for new epochs that we're added to
-      ssb.metafeeds.findOrCreate((err, myRoot) => {
-        // prettier-ignore
-        if (err) return cb(clarify(err, 'Error getting own root in start()'))
-
+        // look for new epochs that we're added to
         pull(
           ssb.db.query(
             // TODO: does this output new stuff if we accept an invite to an old epoch and then find additions to newer epochs?
