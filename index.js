@@ -450,13 +450,14 @@ module.exports = {
             live({ old: true }),
             toPullStream()
           ),
+          pull.filter(isExclude),
           pull.filter((msg) =>
             // it's an exclusion of us
-            msg.value?.content?.excludes?.includes(myRoot.id)
+            msg.value.content.excludes.includes(myRoot.id)
           ),
           pull.drain(
             (msg) => {
-              const groupId = msg.value?.content?.recps?.[0]
+              const groupId = msg.value.content.recps[0]
               ssb.box2.excludeGroupInfo(groupId, null)
             },
             (err) => {
