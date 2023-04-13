@@ -5,6 +5,7 @@
 const { promisify } = require('util')
 const pull = require('pull-stream')
 const paraMap = require('pull-paramap')
+const pullMany = require('pull-many')
 const lodashGet = require('lodash.get')
 const clarify = require('clarify-error')
 const {
@@ -43,7 +44,6 @@ module.exports = {
     addMembers: 'async',
     excludeMembers: 'async',
     publish: 'async',
-    start: 'async',
     listMemebers: 'source',
     listInvites: 'source',
     acceptInvite: 'async',
@@ -118,7 +118,13 @@ module.exports = {
     }
 
     function list(opts = {}) {
-      return pull(ssb.box2.listGroupIds({ live: !!opts.live }), paraMap(get, 4))
+      return pull(
+        ssb.box2.listGroupIds({
+          live: !!opts.live,
+          excluded: !!opts.excluded,
+        }),
+        paraMap(get, 4)
+      )
     }
 
     function addMembers(groupId, feedIds, opts = {}, cb) {
@@ -267,18 +273,23 @@ module.exports = {
       }
       const groupId = recps[0]
 
-      addTangles(ssb, content, tangles, (err, content) => {
+      get(groupId, (err, { writeKey, excluded }) => {
         // prettier-ignore
-        if (err) return cb(clarify(err, 'Failed to add group tangle when publishing to a group'))
+        if (err) return cb(clarify(err, 'Failed to get group details when publishing to a group'))
 
-        if (!isValid(content))
+        if (excluded)
           return cb(
-            new Error(isValid.errorsString ?? 'content failed validation')
+            new Error("Cannot publish to a group we've been excluded from")
           )
 
-        get(groupId, (err, { writeKey }) => {
+        addTangles(ssb, content, tangles, (err, content) => {
           // prettier-ignore
-          if (err) return cb(clarify(err, 'Failed to get group details when publishing to a group'))
+          if (err) return cb(clarify(err, 'Failed to add group tangle when publishing to a group'))
+
+          if (!isValid(content))
+            return cb(
+              new Error(isValid.errorsString ?? 'content failed validation')
+            )
 
           const getFeed = opts?.feedKeys
             ? (_, cb) => cb(null, { keys: opts.feedKeys })
@@ -300,16 +311,36 @@ module.exports = {
 
     function listMembers(groupId, opts = {}) {
       return pull(
-        ssb.db.query(
-          where(and(isDecrypted('box2'), type('group/add-member'))),
-          opts.live ? live({ old: true }) : null,
-          toPullStream()
-        ),
-        pull.map((msg) => lodashGet(msg, 'value.content.recps', [])),
-        pull.filter((recps) => recps.length > 1 && recps[0] === groupId),
-        pull.map((recps) => recps.slice(1)),
-        pull.flatten(),
-        pull.unique()
+        pull.values([0]),
+        pull.asyncMap((n, cb) => {
+          get(groupId, (err, group) => {
+            // prettier-ignore
+            if (err) return cb(clarify(err, 'Failed to get group info when listing members'))
+
+            if (group.excluded) {
+              return cb(
+                new Error("We're excluded from this group, can't list members")
+              )
+            } else {
+              const source = pull(
+                ssb.db.query(
+                  where(and(isDecrypted('box2'), type('group/add-member'))),
+                  opts.live ? live({ old: true }) : null,
+                  toPullStream()
+                ),
+                pull.map((msg) => lodashGet(msg, 'value.content.recps', [])),
+                pull.filter(
+                  (recps) => recps.length > 1 && recps[0] === groupId
+                ),
+                pull.map((recps) => recps.slice(1)),
+                pull.flatten(),
+                pull.unique()
+              )
+              return cb(null, source)
+            }
+          })
+        }),
+        pull.flatten()
       )
     }
 
@@ -322,7 +353,11 @@ module.exports = {
             if (err) return cb(clarify(err, 'Failed to get root metafeed when listing invites'))
 
             pull(
-              ssb.box2.listGroupIds(),
+              pullMany([
+                ssb.box2.listGroupIds(),
+                ssb.box2.listGroupIds({ excluded: true }),
+              ]),
+              pull.flatten(),
               pull.collect((err, groupIds) => {
                 // prettier-ignore
                 if (err) return cb(clarify(err, 'Failed to list group IDs when listing invites'))
@@ -416,11 +451,35 @@ module.exports = {
         return cb()
       })
 
-      // look for new epochs that we're added to
       ssb.metafeeds.findOrCreate((err, myRoot) => {
         // prettier-ignore
         if (err) return cb(clarify(err, 'Error getting own root in start()'))
 
+        // check if we've been excluded
+        pull(
+          ssb.db.query(
+            where(and(isDecrypted('box2'), type('group/exclude'))),
+            live({ old: true }),
+            toPullStream()
+          ),
+          pull.filter(isExclude),
+          pull.filter((msg) =>
+            // it's an exclusion of us
+            msg.value.content.excludes.includes(myRoot.id)
+          ),
+          pull.drain(
+            (msg) => {
+              const groupId = msg.value.content.recps[0]
+              ssb.box2.excludeGroupInfo(groupId, null)
+            },
+            (err) => {
+              // prettier-ignore
+              if (err) return cb(clarify(err, 'Error on looking for exclude messages excluding us'))
+            }
+          )
+        )
+
+        // look for new epochs that we're added to
         pull(
           ssb.db.query(
             // TODO: does this output new stuff if we accept an invite to an old epoch and then find additions to newer epochs?

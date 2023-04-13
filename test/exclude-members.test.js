@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: CC0-1.0
 
 const test = require('tape')
+const pull = require('pull-stream')
 const { promisify: p } = require('util')
 const ssbKeys = require('ssb-keys')
 const { where, author, toPromise } = require('ssb-db2/operators')
@@ -10,9 +11,8 @@ const { fromMessageSigil } = require('ssb-uri2')
 const Testbot = require('./helpers/testbot')
 const replicate = require('./helpers/replicate')
 const countGroupFeeds = require('./helpers/count-group-feeds')
-const pull = require('pull-stream')
 
-test('add and remove a person, post on the new feed', async (t) => {
+test('add and exclude a person, post on the new feed', async (t) => {
   // Alice's feeds should look like
   // first: initGroup->excludeBob
   // second: initEpoch->post
@@ -63,7 +63,7 @@ test('add and remove a person, post on the new feed', async (t) => {
 
   await alice.tribes2
     .excludeMembers(groupId, [bobRoot.id])
-    .catch((err) => t.error(err, 'remove member fail'))
+    .catch((err) => t.error(err, 'exclude member fail'))
 
   t.equals(
     await p(countGroupFeeds)(alice),
@@ -171,6 +171,120 @@ test('add and remove a person, post on the new feed', async (t) => {
     },
     'members tangle resets after new epoch'
   )
+
+  await p(alice.close)(true)
+  await p(bob.close)(true)
+})
+
+test('Verify that you actually get excluded from a group', async (t) => {
+  const alice = Testbot({
+    keys: ssbKeys.generate(null, 'alice'),
+    mfSeed: Buffer.from(
+      '000000000000000000000000000000000000000000000000000000000000a1ce',
+      'hex'
+    ),
+  })
+  const bob = Testbot({
+    keys: ssbKeys.generate(null, 'bob'),
+    mfSeed: Buffer.from(
+      '0000000000000000000000000000000000000000000000000000000000000b0b',
+      'hex'
+    ),
+  })
+
+  await alice.tribes2.start()
+  await bob.tribes2.start()
+  t.pass('tribes2 started for both alice and bob')
+
+  await p(alice.metafeeds.findOrCreate)()
+  const bobRoot = await p(bob.metafeeds.findOrCreate)()
+
+  await replicate(alice, bob)
+  t.pass('alice and bob replicate their trees')
+
+  const { id: groupId } = await alice.tribes2
+    .create()
+    .catch((err) => t.error(err, 'alice failed to create group'))
+
+  await alice.tribes2
+    .addMembers(groupId, [bobRoot.id])
+    .catch((err) => t.error(err, 'add member fail'))
+
+  await replicate(alice, bob)
+
+  await bob.tribes2.acceptInvite(groupId).catch(t.error)
+
+  await bob.tribes2
+    .publish({
+      type: 'test',
+      text: 'bob first post',
+      recps: [groupId],
+    })
+    .then(() => t.pass("bob posts in the group while he's in it"))
+    .catch(t.error)
+
+  await replicate(alice, bob)
+
+  await alice.tribes2
+    .excludeMembers(groupId, [bobRoot.id])
+    .catch((err) => t.error(err, 'exclude member fail'))
+
+  const { key: aliceNewEpochPostKey } = await alice.tribes2.publish({
+    type: 'shitpost',
+    text: 'alicepost',
+    recps: [groupId],
+  })
+
+  await replicate(alice, bob)
+
+  await p(setTimeout)(500)
+
+  t.pass('replicated, about to publish')
+
+  await bob.tribes2
+    .publish({
+      type: 'test',
+      text: 'bob second post',
+      recps: [groupId],
+    })
+    .then(() =>
+      t.fail("Bob posted again in the group even if he's excluded from it")
+    )
+    .catch(() =>
+      t.pass("Bob can't post in the group anymore since he's excluded from it")
+    )
+
+  const bobGroups = await pull(
+    bob.tribes2.list({ excluded: true }),
+    pull.collectAsPromise()
+  )
+  t.deepEquals(
+    bobGroups,
+    [{ id: groupId, excluded: true }],
+    "bob is excluded from the only group he's been in. sad."
+  )
+
+  const bobGotMsg = await p(bob.db.get)(aliceNewEpochPostKey)
+  t.equals(
+    typeof bobGotMsg.content,
+    'string',
+    "bob didn't manage to decrypt alice's new message"
+  )
+
+  const invites = await pull(bob.tribes2.listInvites(), pull.collectAsPromise())
+  t.deepEquals(invites, [], 'Bob has no invites')
+
+  await pull(bob.tribes2.listMembers(groupId), pull.collectAsPromise())
+    .then(() =>
+      t.fail(
+        "Bob didn't get an error when trying to list members of the group he's excluded from"
+      )
+    )
+    .catch(() =>
+      t.pass(
+        "Bob gets an error when trying to list members of the group he's excluded from"
+      )
+    )
 
   await p(alice.close)(true)
   await p(bob.close)(true)
