@@ -5,6 +5,7 @@
 const { promisify } = require('util')
 const pull = require('pull-stream')
 const paraMap = require('pull-paramap')
+const pullMany = require('pull-many')
 const lodashGet = require('lodash.get')
 const clarify = require('clarify-error')
 const {
@@ -117,7 +118,13 @@ module.exports = {
     }
 
     function list(opts = {}) {
-      return pull(ssb.box2.listGroupIds({ live: !!opts.live }), paraMap(get, 4))
+      return pull(
+        ssb.box2.listGroupIds({
+          live: !!opts.live,
+          excluded: !!opts.excluded,
+        }),
+        paraMap(get, 4)
+      )
     }
 
     function addMembers(groupId, feedIds, opts = {}, cb) {
@@ -346,7 +353,11 @@ module.exports = {
             if (err) return cb(clarify(err, 'Failed to get root metafeed when listing invites'))
 
             pull(
-              ssb.box2.listGroupIds(),
+              pullMany([
+                ssb.box2.listGroupIds(),
+                ssb.box2.listGroupIds({ excluded: true }),
+              ]),
+              pull.flatten(),
               pull.collect((err, groupIds) => {
                 // prettier-ignore
                 if (err) return cb(clarify(err, 'Failed to list group IDs when listing invites'))

@@ -254,7 +254,10 @@ test('Verify that you actually get excluded from a group', async (t) => {
       t.pass("Bob can't post in the group anymore since he's excluded from it")
     )
 
-  const bobGroups = await pull(bob.tribes2.list(), pull.collectAsPromise())
+  const bobGroups = await pull(
+    bob.tribes2.list({ excluded: true }),
+    pull.collectAsPromise()
+  )
   t.deepEquals(
     bobGroups,
     [{ id: groupId, excluded: true }],

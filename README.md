@@ -126,9 +126,9 @@ Gets information about a specific group.
 - `groupId` _GroupUri_ - the public-safe SSB URI which identifies the group
 - `cb` _Function_ - callback function of signature `(err, group)` where `group` is an object on the same format as the `group` object returned by #create
 
-### `ssb.tribes2.list({ live }) => source`
+### `ssb.tribes2.list({ live, excluded }) => source`
 
-Creates a pull-stream source which emits `group` data of each private group you're a part of. If `live` is true then it also outputs all new groups you join.
+Creates a pull-stream source which emits `group` data of each private group you're a part of. If `live` is true then it also outputs all new groups you join. If `excluded` is true then it only outputs groups that you've been excluded from, instead of just ones you haven't.
 (Same format as `group` object returned by #create)
 
 ### `ssb.tribes2.addMembers(groupId, feedIds, opts, cb)`
