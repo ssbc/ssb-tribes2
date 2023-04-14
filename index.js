@@ -6,7 +6,9 @@ const { promisify } = require('util')
 const pull = require('pull-stream')
 const paraMap = require('pull-paramap')
 const pullMany = require('pull-many')
+const multicb = require('multicb')
 const lodashGet = require('lodash.get')
+const chunk = require('lodash.chunk')
 const clarify = require('clarify-error')
 const {
   where,
@@ -245,9 +247,14 @@ module.exports = {
                     // prettier-ignore
                     if (err) return cb(clarify(err, "Couldn't post init msg on new epoch when excluding members"))
 
-                    addMembers(groupId, remainingMembers, {}, (err) => {
+                    const done = multicb()
+                    chunk(remainingMembers, 15).forEach((membersToAdd) => {
+                      addMembers(groupId, membersToAdd, {}, done())
+                    })
+                    done((err) => {
                       // prettier-ignore
                       if (err) return cb(clarify(err, "Couldn't re-add remaining members when excluding members"))
+
                       return cb()
                     })
                   })

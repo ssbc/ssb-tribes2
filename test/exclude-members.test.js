@@ -418,7 +418,7 @@ test("If you're not the excluder nor the excludee then you should still be in th
   await p(carol.close)(true)
 })
 
-test.only('Can exclude a person in a group with a lot of members', async (t) => {
+test('Can exclude a person in a group with a lot of members', async (t) => {
   const alice = Testbot({
     keys: ssbKeys.generate(null, 'alice'),
     mfSeed: Buffer.from(
