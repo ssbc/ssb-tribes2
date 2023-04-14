@@ -418,7 +418,7 @@ test("If you're not the excluder nor the excludee then you should still be in th
   await p(carol.close)(true)
 })
 
-test.only('Can exclude a person in a group with a lot of members', async (t) => {
+test('Can exclude a person in a group with a lot of members', async (t) => {
   const alice = Testbot({
     keys: ssbKeys.generate(null, 'alice'),
     mfSeed: Buffer.from(
@@ -440,7 +440,6 @@ test.only('Can exclude a person in a group with a lot of members', async (t) => 
     peers.map((peer) => p(peer.metafeeds.findOrCreate)())
   ).catch((err) => t.error(err, 'Error getting root feeds for peers'))
   const peerRootIds = peerRoots.map((root) => root.id)
-  const [bobRootId, ...otherRootIds] = peerRootIds
 
   const { id: groupId } = await alice.tribes2.create()
 
@@ -454,7 +453,7 @@ test.only('Can exclude a person in a group with a lot of members', async (t) => 
   await Promise.all(peers.map((peer) => peer.tribes2.acceptInvite(groupId)))
 
   await alice.tribes2
-    .excludeMembers(groupId, [bobRootId])
+    .excludeMembers(groupId, [peerRootIds[0]])
     .then(() =>
       t.pass('alice was able to exclude bob in a group with many members')
     )
@@ -490,8 +489,6 @@ test.only('Can exclude a person in a group with a lot of members', async (t) => 
   )
     .then(() => t.pass("Others didn't get excluded from the group"))
     .catch(() => t.fail('Others got excluded from the group'))
-
-  // TODO: check that the others actually have access to the new epoch (alice post something there?)
 
   await p(alice.close)(true)
   await Promise.all(peers.map((peer) => p(peer.close)(true)))
