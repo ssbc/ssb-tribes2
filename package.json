@@ -45,6 +45,7 @@
     "private-group-spec": "^6.0.0",
     "pull-paramap": "^1.2.2",
     "pull-stream": "^3.7.0",
+    "set.prototype.difference": "^1.0.2",
     "ssb-bfe": "^3.7.0",
     "ssb-box2": "^6.0.0",
     "ssb-crut": "^4.6.2",
@@ -73,8 +74,9 @@
   },
   "scripts": {
     "test:raw": "tape 'test/**/*.test.js'",
-    "test": "npm run test:raw | tap-arc",
+    "test:only": "if grep -r --exclude-dir=node_modules --exclude-dir=.git --color 'test\\.only' ; then exit 1; fi",
     "test:bail": "npm run test:raw | tap-arc --bail",
+    "test": "npm run test:raw | tap-arc && npm run test:only",
     "format-code": "prettier --write \"*.js\"",
     "format-code-staged": "pretty-quick --staged --pattern \"*.js\"",
     "coverage": "c8 --reporter=lcov npm run test"
