@@ -418,7 +418,7 @@ test("If you're not the excluder nor the excludee then you should still be in th
   await p(carol.close)(true)
 })
 
-test('Can exclude a person in a group with a lot of members', async (t) => {
+test.only('Can exclude a person in a group with a lot of members', async (t) => {
   const alice = Testbot({
     keys: ssbKeys.generate(null, 'alice'),
     mfSeed: Buffer.from(
@@ -465,10 +465,31 @@ test('Can exclude a person in a group with a lot of members', async (t) => {
       )
     )
 
-  // const [bob, ...others] = peers
-  // TODO: check that bob is actually out
+  await sync()
 
-  // TODO: check that the others are not out
+  const [bob, ...others] = peers
+
+  const bobGroup = await bob.tribes2.get(groupId)
+  t.deepEquals(
+    bobGroup,
+    { id: groupId, excluded: true },
+    'bob is excluded from group'
+  )
+
+  await Promise.all(
+    others.map((other) => {
+      return (async () => {
+        const otherGroup = await other.tribes2.get(groupId)
+
+        if (otherGroup.excluded) throw 'got excluded'
+        if (otherGroup.readKeys.length !== 2) throw 'not enough readkeys'
+
+        return otherGroup
+      })()
+    })
+  )
+    .then(() => t.pass("Others didn't get excluded from the group"))
+    .catch(() => t.fail('Others got excluded from the group'))
 
   // TODO: check that the others actually have access to the new epoch (alice post something there?)
 
