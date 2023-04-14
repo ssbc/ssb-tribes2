@@ -235,3 +235,24 @@ test('lib/epochs (getMissingMembers)', async t => {
 
   t.end()
 })
+
+test('lib/epochs (tieBreak)', async t => {
+  const { tieBreak } = Epochs({})
+
+  const A = {
+    epochKey: Buffer.from('AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=', 'base64')
+  }
+  const B = {
+    epochKey: Buffer.from('EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE=', 'base64')
+  }
+  const C = {
+    epochKey: Buffer.from('YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY=', 'base64')
+  }
+
+  t.deepEqual(tieBreak([A,B,C]), A)
+  t.deepEqual(tieBreak([C,B,A]), A)
+  t.deepEqual(tieBreak([C,B]), B)
+  t.deepEqual(tieBreak([B]), B)
+
+  t.end()
+})
