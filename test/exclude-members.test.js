@@ -417,3 +417,61 @@ test("If you're not the excluder nor the excludee then you should still be in th
   await p(bob.close)(true)
   await p(carol.close)(true)
 })
+
+test.only('Can exclude a person in a group with a lot of members', async (t) => {
+  const alice = Testbot({
+    keys: ssbKeys.generate(null, 'alice'),
+    mfSeed: Buffer.from(
+      '000000000000000000000000000000000000000000000000000000000000a1ce',
+      'hex'
+    ),
+  })
+
+  const peers = Array.from({ length: 20 }).map(() => Testbot())
+
+  async function sync() {
+    await Promise.all(peers.map((peer) => replicate(alice, peer)))
+  }
+
+  await alice.tribes2.start()
+  await Promise.all(peers.map((peer) => peer.tribes2.start()))
+
+  const peerRoots = await Promise.all(
+    peers.map((peer) => p(peer.metafeeds.findOrCreate)())
+  ).catch((err) => t.error(err, 'Error getting root feeds for peers'))
+  const peerRootIds = peerRoots.map((root) => root.id)
+  const [bobRootId, ...otherRootIds] = peerRootIds
+
+  const { id: groupId } = await alice.tribes2.create()
+
+  await sync()
+
+  await alice.tribes2.addMembers(groupId, peerRootIds.slice(0, 10))
+  await alice.tribes2.addMembers(groupId, peerRootIds.slice(10))
+
+  await sync()
+
+  await Promise.all(peers.map((peer) => peer.tribes2.acceptInvite(groupId)))
+
+  await alice.tribes2
+    .excludeMembers(groupId, [bobRootId])
+    .then(() =>
+      t.pass('alice was able to exclude bob in a group with many members')
+    )
+    .catch((err) =>
+      t.error(
+        err,
+        'alice was unable to exclude bob in a group with many members'
+      )
+    )
+
+  // const [bob, ...others] = peers
+  // TODO: check that bob is actually out
+
+  // TODO: check that the others are not out
+
+  // TODO: check that the others actually have access to the new epoch (alice post something there?)
+
+  await p(alice.close)(true)
+  await Promise.all(peers.map((peer) => p(peer.close)(true)))
+})
