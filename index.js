@@ -7,6 +7,7 @@ const pull = require('pull-stream')
 const paraMap = require('pull-paramap')
 const pullMany = require('pull-many')
 const lodashGet = require('lodash.get')
+const uniqBy = require('lodash.uniqby')
 const clarify = require('clarify-error')
 const {
   where,
@@ -362,7 +363,8 @@ module.exports = {
                 // prettier-ignore
                 if (err) return cb(clarify(err, 'Failed to list group IDs when listing invites'))
 
-                const source = pull(
+                let acc = {}
+                pull(
                   ssb.db.query(
                     where(and(isDecrypted('box2'), type('group/add-member'))),
                     toPullStream()
@@ -392,10 +394,32 @@ module.exports = {
                       readKeys: [{ key, scheme }],
                       root: lodashGet(msg, 'value.content.root'),
                     }
-                  })
-                )
+                  }),
+                  // aggregate multiple readKeys from invites to different epochs into one invite object
+                  pull.drain(
+                    (invite) => {
+                      // TODO: which writeKey should be picked??
+                      // or is that maybe not that important to decide here, maybe for acceptInvite?
+                      if (acc[invite.id]) {
+                        // readKeys from both invites
+                        acc[invite.id].readKeys.push(...invite.readKeys)
+                        // but no duplicates
+                        acc[invite.id].readKeys = uniqBy(
+                          acc[invite.id].readKeys,
+                          (readKey) => readKey.key.toString('base64')
+                        )
+                      } else {
+                        acc[invite.id] = invite
+                      }
+                    },
+                    (err) => {
+                      if (err) return cb('todo')
 
-                return cb(null, source)
+                      const inviteArray = Object.values(acc)
+                      return cb(null, pull.values(inviteArray))
+                    }
+                  )
+                )
               })
             )
           })
@@ -415,6 +439,7 @@ module.exports = {
         pull.drain(
           (groupInfo) => {
             foundInvite = true
+            // TODO: loop over all the readKeys we've found and add them all
             ssb.box2.addGroupInfo(
               groupInfo.id,
               {

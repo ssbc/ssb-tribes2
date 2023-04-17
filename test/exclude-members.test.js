@@ -477,10 +477,7 @@ test('Get added to an old epoch but still find newer epochs', async (t) => {
 
   await alice.tribes2
     .excludeMembers(groupId, [carolRoot.id])
-    .then((res) => {
-      t.pass('alice excluded carol')
-      return res
-    })
+    .then(() => t.pass('alice excluded carol'))
     .catch((err) => t.error(err, 'remove member fail'))
 
   const { key: secondPostId } = await alice.tribes2
@@ -494,7 +491,25 @@ test('Get added to an old epoch but still find newer epochs', async (t) => {
   // only replicate bob's invite to him once we're already on the new epoch
   await replicate(alice, bob).catch(t.error)
 
-  // TODO: bob list invites
+  const bobInvites = await pull(
+    bob.tribes2.listInvites(),
+    pull.collectAsPromise()
+  ).catch(t.fail)
+  t.deepEquals(
+    bobInvites.map((invite) => invite.id),
+    [groupId],
+    'bob has an invite to the group'
+  )
+  t.equals(
+    bobInvites[0].readKeys.length,
+    2,
+    'there are 2 readKeys in the invite'
+  )
+  t.notEquals(
+    bobInvites[0].readKeys[0].key.toString('base64'),
+    bobInvites[0].readKeys[1].key.toString('base64'),
+    'the two readKeys are different'
+  )
 
   // TODO: bob use invite
 
