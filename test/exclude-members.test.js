@@ -417,3 +417,90 @@ test("If you're not the excluder nor the excludee then you should still be in th
   await p(bob.close)(true)
   await p(carol.close)(true)
 })
+
+test('Get added to an old epoch but still find newer epochs', async (t) => {
+  const alice = Testbot({
+    keys: ssbKeys.generate(null, 'alice'),
+    mfSeed: Buffer.from(
+      '000000000000000000000000000000000000000000000000000000000000a1ce',
+      'hex'
+    ),
+  })
+  const bob = Testbot({
+    keys: ssbKeys.generate(null, 'bob'),
+    mfSeed: Buffer.from(
+      '0000000000000000000000000000000000000000000000000000000000000b0b',
+      'hex'
+    ),
+  })
+  const carol = Testbot({
+    keys: ssbKeys.generate(null, 'carol'),
+    mfSeed: Buffer.from(
+      '00000000000000000000000000000000000000000000000000000000000ca201',
+      'hex'
+    ),
+  })
+
+  await alice.tribes2.start()
+  await bob.tribes2.start()
+  await carol.tribes2.start()
+  t.pass('tribes2 started for everyone')
+
+  await p(alice.metafeeds.findOrCreate)()
+  const bobRoot = await p(bob.metafeeds.findOrCreate)()
+  const carolRoot = await p(carol.metafeeds.findOrCreate)()
+
+  await replicate(alice, bob)
+  await replicate(alice, carol)
+  await replicate(bob, carol)
+  t.pass('everyone replicates their trees')
+
+  const { id: groupId } = await alice.tribes2
+    .create()
+    .catch((err) => t.error(err, 'alice failed to create group'))
+
+  const { key: firstPostId } = await alice.tribes2
+    .publish({
+      type: 'test',
+      text: 'first post',
+      recps: [groupId],
+    })
+    .catch(t.fail)
+
+  // replicate the first group messages to bob when he can't decrypt them
+  await replicate(alice, bob).catch(t.error)
+
+  await alice.tribes2
+    .addMembers(groupId, [bobRoot.id, carolRoot.id])
+    .then(() => t.pass('added bob and carol'))
+    .catch((err) => t.error(err, 'add bob and carol fail'))
+
+  await alice.tribes2
+    .excludeMembers(groupId, [carolRoot.id])
+    .then((res) => {
+      t.pass('alice excluded carol')
+      return res
+    })
+    .catch((err) => t.error(err, 'remove member fail'))
+
+  const { key: secondPostId } = await alice.tribes2
+    .publish({
+      type: 'test',
+      text: 'second post',
+      recps: [groupId],
+    })
+    .catch(t.fail)
+
+  // only replicate bob's invite to him once we're already on the new epoch
+  await replicate(alice, bob).catch(t.error)
+
+  // TODO: bob list invites
+
+  // TODO: bob use invite
+
+  // TODO: bob can read first and second alice post
+
+  await p(alice.close)(true)
+  await p(bob.close)(true)
+  await p(carol.close)(true)
+})
