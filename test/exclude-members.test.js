@@ -418,7 +418,7 @@ test("If you're not the excluder nor the excludee then you should still be in th
   await p(carol.close)(true)
 })
 
-test.only('Get added to an old epoch but still find newer epochs', async (t) => {
+test('Get added to an old epoch but still find newer epochs', async (t) => {
   const alice = Testbot({
     keys: ssbKeys.generate(null, 'alice'),
     mfSeed: Buffer.from(
