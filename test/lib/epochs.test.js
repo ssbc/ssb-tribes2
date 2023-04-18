@@ -69,7 +69,7 @@ test('lib/epochs (getEpochs, getMembers)', async t => {
     [{
       id: group.root,
       previous: null,
-      epochKey: group.writeKey.key,
+      secret: group.writeKey.key,
       author: aliceId
     }],
     'there is 1 epoch'
@@ -129,13 +129,13 @@ test('lib/epochs (getEpochs, getMembers)', async t => {
       {
         id: group.root,
         previous: null,
-        epochKey: group.writeKey.key,
+        secret: group.writeKey.key,
         author: aliceId
       },
       {
         id: lastGroupInitId,
         previous: [group.root],
-        epochKey: groupUpdated.writeKey.key,
+        secret: groupUpdated.writeKey.key,
         author: aliceId
       }
     ],
@@ -226,7 +226,7 @@ test('lib/epochs (getMissingMembers)', async t => {
     [
       {
         epoch: newEpoch.id,
-        epochKey: newEpoch.epochKey,
+        secret: newEpoch.secret,
         missing: [bobId]
       }
     ],
