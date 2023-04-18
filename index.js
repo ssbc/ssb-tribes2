@@ -399,8 +399,6 @@ module.exports = {
                   // aggregate multiple readKeys from invites to different epochs into one invite object
                   pull.drain(
                     (invite) => {
-                      // TODO: which writeKey should be picked??
-                      // or is that maybe not that important to decide here, maybe for acceptInvite?
                       if (acc[invite.id]) {
                         // readKeys from both invites
                         acc[invite.id].readKeys.push(...invite.readKeys)
@@ -443,6 +441,8 @@ module.exports = {
 
             const done = multicb()
 
+            // TODO: which writeKey should be picked??
+            // this will essentially pick a random write key
             groupInfo.readKeys.forEach((readKey) => {
               ssb.box2.addGroupInfo(
                 groupInfo.id,
@@ -514,7 +514,6 @@ module.exports = {
         // look for new epochs that we're added to
         pull(
           ssb.db.query(
-            // TODO: does this output new stuff if we accept an invite to an old epoch and then find additions to newer epochs?
             where(and(isDecrypted('box2'), type('group/add-member'))),
             live({ old: true }),
             toPullStream()
