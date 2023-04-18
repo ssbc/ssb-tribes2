@@ -511,9 +511,23 @@ test('Get added to an old epoch but still find newer epochs', async (t) => {
     'the two readKeys are different'
   )
 
-  // TODO: bob use invite
+  await bob.tribes2.acceptInvite(groupId).catch(t.fail)
 
-  // TODO: bob can read first and second alice post
+  await p(setTimeout)(5000)
+
+  const bobGotFirstMsg = await p(bob.db.get)(firstPostId)
+  t.notEquals(
+    typeof bobGotFirstMsg.content,
+    'string',
+    "bob managed to decrypt alice's first message"
+  )
+
+  const bobGotSecondMsg = await p(bob.db.get)(secondPostId)
+  t.notEquals(
+    typeof bobGotSecondMsg.content,
+    'string',
+    "bob managed to decrypt alice's second message"
+  )
 
   await p(alice.close)(true)
   await p(bob.close)(true)

@@ -6,6 +6,7 @@ const { promisify } = require('util')
 const pull = require('pull-stream')
 const paraMap = require('pull-paramap')
 const pullMany = require('pull-many')
+const multicb = require('multicb')
 const lodashGet = require('lodash.get')
 const uniqBy = require('lodash.uniqby')
 const clarify = require('clarify-error')
@@ -439,23 +440,29 @@ module.exports = {
         pull.drain(
           (groupInfo) => {
             foundInvite = true
-            // TODO: loop over all the readKeys we've found and add them all
-            ssb.box2.addGroupInfo(
-              groupInfo.id,
-              {
-                key: groupInfo.writeKey.key,
-                root: groupInfo.root,
-              },
-              (err) => {
+
+            const done = multicb()
+
+            groupInfo.readKeys.forEach((readKey) => {
+              ssb.box2.addGroupInfo(
+                groupInfo.id,
+                {
+                  key: readKey.key,
+                  root: groupInfo.root,
+                },
+                done()
+              )
+            })
+
+            done((err) => {
+              // prettier-ignore
+              if (err) return cb(clarify(err, 'Failed to add group info when accepting an invite'))
+              ssb.db.reindexEncrypted((err) => {
                 // prettier-ignore
-                if (err) return cb(clarify(err, 'Failed to add group info when accepting an invite'))
-                ssb.db.reindexEncrypted((err) => {
-                  // prettier-ignore
-                  if (err) cb(clarify(err, 'Failed to reindex encrypted messages when accepting an invite'))
+                if (err) cb(clarify(err, 'Failed to reindex encrypted messages when accepting an invite'))
                   else cb(null, groupInfo)
-                })
-              }
-            )
+              })
+            })
           },
           (err) => {
             // prettier-ignore
