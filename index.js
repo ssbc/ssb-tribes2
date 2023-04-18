@@ -310,6 +310,7 @@ module.exports = {
     }
 
     function listMembers(groupId, opts = {}) {
+      // TODO: getPickedEpoch -> getMembers for that epoch
       return pull(
         pull.values([0]),
         pull.asyncMap((n, cb) => {

@@ -290,7 +290,7 @@ test('Verify that you actually get excluded from a group', async (t) => {
   await p(bob.close)(true)
 })
 
-test("If you're not the excluder nor the excludee then you should still be in the group and have access to the new epoch", async (t) => {
+test.only("If you're not the excluder nor the excludee then you should still be in the group and have access to the new epoch", async (t) => {
   // alice creates the group. adds bob and carol. removes bob.
   // bob gets added and is removed
   // carol stays in the group
@@ -321,7 +321,7 @@ test("If you're not the excluder nor the excludee then you should still be in th
   await carol.tribes2.start()
   t.pass('tribes2 started for everyone')
 
-  await p(alice.metafeeds.findOrCreate)()
+  const aliceRoot = await p(alice.metafeeds.findOrCreate)()
   const bobRoot = await p(bob.metafeeds.findOrCreate)()
   const carolRoot = await p(carol.metafeeds.findOrCreate)()
 
@@ -411,6 +411,26 @@ test("If you're not the excluder nor the excludee then you should still be in th
   t.true(
     groupFeedPurposes.includes(writeKey2.key.toString('base64')),
     'Carol has a feed for the new key'
+  )
+
+  const aliceMembers = await pull(
+    alice.tribes2.listMembers(groupId),
+    pull.collectAsPromise()
+  )
+  t.deepEquals(
+    aliceMembers.sort(),
+    [aliceRoot.id, carolRoot.id].sort(),
+    'alice gets the correct members list'
+  )
+
+  const carolMembers = await pull(
+    carol.tribes2.listMembers(groupId),
+    pull.collectAsPromise()
+  )
+  t.deepEquals(
+    carolMembers.sort(),
+    [aliceRoot.id, carolRoot.id].sort(),
+    'carol gets the correct members list'
   )
 
   await p(alice.close)(true)
