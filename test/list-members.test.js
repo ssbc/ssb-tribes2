@@ -134,3 +134,110 @@ test('live list members', async (t) => {
   await p(alice.close)(true)
   await p(bob.close)(true)
 })
+
+test('listMembers works with exclusion', async (t) => {
+  const alice = Testbot({
+    keys: ssbKeys.generate(null, 'alice'),
+    mfSeed: Buffer.from(
+      '000000000000000000000000000000000000000000000000000000000000a1ce',
+      'hex'
+    ),
+  })
+  const bob = Testbot({
+    keys: ssbKeys.generate(null, 'bob'),
+    mfSeed: Buffer.from(
+      '0000000000000000000000000000000000000000000000000000000000000b0b',
+      'hex'
+    ),
+  })
+  const carol = Testbot({
+    keys: ssbKeys.generate(null, 'carol'),
+    mfSeed: Buffer.from(
+      '00000000000000000000000000000000000000000000000000000000000ca201',
+      'hex'
+    ),
+  })
+
+  await Promise.all([
+    alice.tribes2.start(),
+    bob.tribes2.start(),
+    carol.tribes2.start(),
+  ]).then(() => t.pass('tribes2 started for everyone'))
+
+  const [aliceRoot, bobRoot, carolRoot] = await Promise.all([
+    p(alice.metafeeds.findOrCreate)(),
+    p(bob.metafeeds.findOrCreate)(),
+    p(carol.metafeeds.findOrCreate)(),
+  ])
+
+  await Promise.all([
+    replicate(alice, bob),
+    replicate(alice, carol),
+    replicate(bob, carol),
+  ]).then(() => t.pass('everyone replicates their trees'))
+
+  const { id: groupId } = await alice.tribes2
+    .create()
+    .catch((err) => t.error(err, 'alice failed to create group'))
+
+  await replicate(alice, carol)
+
+  await alice.tribes2
+    .addMembers(groupId, [bobRoot.id, carolRoot.id])
+    .catch((err) => t.error(err, 'add bob fail'))
+
+  await replicate(alice, carol)
+
+  await bob.tribes2.acceptInvite(groupId)
+  await carol.tribes2.acceptInvite(groupId)
+
+  await replicate(alice, bob)
+  await replicate(alice, carol)
+
+  await alice.tribes2
+    .excludeMembers(groupId, [bobRoot.id])
+    .then((res) => {
+      t.pass('alice excluded bob')
+      return res
+    })
+    .catch((err) => t.error(err, 'remove member fail'))
+
+  await replicate(alice, bob)
+  await replicate(alice, carol)
+
+  const aliceMembers = await pull(
+    alice.tribes2.listMembers(groupId),
+    pull.collectAsPromise()
+  )
+  t.deepEquals(
+    aliceMembers.sort(),
+    [aliceRoot.id, carolRoot.id].sort(),
+    'alice gets the correct members list'
+  )
+
+  const carolMembers = await pull(
+    carol.tribes2.listMembers(groupId),
+    pull.collectAsPromise()
+  )
+  t.deepEquals(
+    carolMembers.sort(),
+    [aliceRoot.id, carolRoot.id].sort(),
+    'carol gets the correct members list'
+  )
+
+  await pull(bob.tribes2.listMembers(groupId), pull.collectAsPromise())
+    .then(() =>
+      t.fail(
+        "Bob didn't get an error when trying to list members of the group he's excluded from"
+      )
+    )
+    .catch(() =>
+      t.pass(
+        "Bob gets an error when trying to list members of the group he's excluded from"
+      )
+    )
+
+  await p(alice.close)(true)
+  await p(bob.close)(true)
+  await p(carol.close)(true)
+})

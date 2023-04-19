@@ -274,18 +274,6 @@ test('Verify that you actually get excluded from a group', async (t) => {
   const invites = await pull(bob.tribes2.listInvites(), pull.collectAsPromise())
   t.deepEquals(invites, [], 'Bob has no invites')
 
-  await pull(bob.tribes2.listMembers(groupId), pull.collectAsPromise())
-    .then(() =>
-      t.fail(
-        "Bob didn't get an error when trying to list members of the group he's excluded from"
-      )
-    )
-    .catch(() =>
-      t.pass(
-        "Bob gets an error when trying to list members of the group he's excluded from"
-      )
-    )
-
   await p(alice.close)(true)
   await p(bob.close)(true)
 })
@@ -321,7 +309,7 @@ test("If you're not the excluder nor the excludee then you should still be in th
   await carol.tribes2.start()
   t.pass('tribes2 started for everyone')
 
-  const aliceRoot = await p(alice.metafeeds.findOrCreate)()
+  await p(alice.metafeeds.findOrCreate)()
   const bobRoot = await p(bob.metafeeds.findOrCreate)()
   const carolRoot = await p(carol.metafeeds.findOrCreate)()
 
@@ -411,26 +399,6 @@ test("If you're not the excluder nor the excludee then you should still be in th
   t.true(
     groupFeedPurposes.includes(writeKey2.key.toString('base64')),
     'Carol has a feed for the new key'
-  )
-
-  const aliceMembers = await pull(
-    alice.tribes2.listMembers(groupId),
-    pull.collectAsPromise()
-  )
-  t.deepEquals(
-    aliceMembers.sort(),
-    [aliceRoot.id, carolRoot.id].sort(),
-    'alice gets the correct members list'
-  )
-
-  const carolMembers = await pull(
-    carol.tribes2.listMembers(groupId),
-    pull.collectAsPromise()
-  )
-  t.deepEquals(
-    carolMembers.sort(),
-    [aliceRoot.id, carolRoot.id].sort(),
-    'carol gets the correct members list'
   )
 
   await p(alice.close)(true)
