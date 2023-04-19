@@ -6,7 +6,6 @@ const { promisify } = require('util')
 const pull = require('pull-stream')
 const paraMap = require('pull-paramap')
 const pullMany = require('pull-many')
-const multicb = require('multicb')
 const lodashGet = require('lodash.get')
 const chunk = require('lodash.chunk')
 const clarify = require('clarify-error')
@@ -247,16 +246,18 @@ module.exports = {
                     // prettier-ignore
                     if (err) return cb(clarify(err, "Couldn't post init msg on new epoch when excluding members"))
 
-                    const done = multicb()
-                    chunk(remainingMembers, 15).forEach((membersToAdd) => {
-                      addMembers(groupId, membersToAdd, {}, done())
-                    })
-                    done((err) => {
-                      // prettier-ignore
-                      if (err) return cb(clarify(err, "Couldn't re-add remaining members when excluding members"))
+                    pull(
+                      pull.values(chunk(remainingMembers, 15)),
+                      pull.asyncMap((membersToAdd, cb) =>
+                        addMembers(groupId, membersToAdd, {}, cb)
+                      ),
+                      pull.collect((err) => {
+                        // prettier-ignore
+                        if (err) return cb(clarify(err, "Couldn't re-add remaining members when excluding members"))
 
-                      return cb()
-                    })
+                        return cb()
+                      })
+                    )
                   })
                 })
               })

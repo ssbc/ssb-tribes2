@@ -43,7 +43,6 @@
     "lodash.chunk": "^4.2.0",
     "lodash.get": "^4.4.2",
     "lodash.set": "^4.3.2",
-    "multicb": "^1.2.2",
     "private-group-spec": "^6.0.0",
     "pull-paramap": "^1.2.2",
     "pull-stream": "^3.7.0",
