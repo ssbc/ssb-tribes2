@@ -6,9 +6,9 @@ const test = require('tape')
 const { promisify } = require('util')
 
 const Server = require('../helpers/testbot')
-const { isGroup } = require('../../lib/operators')
+const { groupRecp, tangleRoot } = require('../../lib/operators')
 
-test('lib/operators - isGroup', async t => {
+test('lib/operators - groupRecp', async t => {
   const alice = Server()
   await alice.tribes2.start()
 
@@ -43,7 +43,7 @@ test('lib/operators - isGroup', async t => {
     where(
       and(
         type('post'),
-        isGroup(group.id)
+        groupRecp(group.id)
       )
     ),
     toPromise()
@@ -53,6 +53,54 @@ test('lib/operators - isGroup', async t => {
     results.map(m => m.value.content),
     [content],
     'finds the message in the group'
+  )
+
+  alice.close()
+
+  t.end()
+})
+
+test('lib/operators - tangleRoot', async t => {
+  const alice = Server()
+
+  const rootId = await promisify(alice.db.create)({
+    content: {
+      type: 'slime',
+      tangles: {
+        slime: { root: null, previous: null }
+      }
+    }
+  })
+
+  const updateContent1 = {
+    type: 'slime',
+    count: 1,
+    tangles: {
+      slime: { root: rootId, previous: [rootId] }
+    }
+  }
+  const updateContent2 = {
+    type: 'slime',
+    count: 2,
+    tangles: {
+      slime: { root: rootId, previous: [rootId] }
+    }
+  }
+  await promisify(alice.db.create)({ content: updateContent1 })
+  await promisify(alice.db.create)({ content: updateContent2 })
+
+  const { where, toPromise } = alice.db.operators
+  const results = await alice.db.query(
+    where(
+      tangleRoot('slime', rootId)
+    ),
+    toPromise()
+  )
+
+  t.deepEqual(
+    results.map(m => m.value.content),
+    [updateContent1, updateContent2],
+    'finds the message in the tangle'
   )
 
   alice.close()
