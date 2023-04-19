@@ -33,7 +33,7 @@ const buildGroupId = require('./lib/build-group-id')
 const addTangles = require('./lib/tangles/add-tangles')
 const publishAndPrune = require('./lib/prune-publish')
 const MetaFeedHelpers = require('./lib/meta-feed-helpers')
-// const Epochs = require('./lib/epochs')
+const Epochs = require('./lib/epochs')
 
 module.exports = {
   name: 'tribes2',
@@ -58,7 +58,7 @@ module.exports = {
       findOrCreateGroupWithoutMembers,
       getRootFeedIdFromMsgId,
     } = MetaFeedHelpers(ssb)
-    // const { getEpochs } = Epochs(ssb)
+    const { getPickedEpoch, getMembers } = Epochs(ssb)
 
     function create(opts = {}, cb) {
       if (cb === undefined) return promisify(create)(opts)
@@ -310,35 +310,19 @@ module.exports = {
     }
 
     function listMembers(groupId, opts = {}) {
-      // TODO: getPickedEpoch -> getMembers for that epoch
       return pull(
         pull.values([0]),
         pull.asyncMap((n, cb) => {
-          get(groupId, (err, group) => {
+          getPickedEpoch(groupId, (err, pickedEpoch) => {
             // prettier-ignore
-            if (err) return cb(clarify(err, 'Failed to get group info when listing members'))
+            if (err) return cb(clarify(err, 'todo'))
 
-            if (group.excluded) {
-              return cb(
-                new Error("We're excluded from this group, can't list members")
-              )
-            } else {
-              const source = pull(
-                ssb.db.query(
-                  where(and(isDecrypted('box2'), type('group/add-member'))),
-                  opts.live ? live({ old: true }) : null,
-                  toPullStream()
-                ),
-                pull.map((msg) => lodashGet(msg, 'value.content.recps', [])),
-                pull.filter(
-                  (recps) => recps.length > 1 && recps[0] === groupId
-                ),
-                pull.map((recps) => recps.slice(1)),
-                pull.flatten(),
-                pull.unique()
-              )
-              return cb(null, source)
-            }
+            getMembers(pickedEpoch.id, (err, pickedEpochMembers) => {
+              // prettier-ignore
+              if (err) return cb(clarify(err, 'todo'))
+
+              cb(null, pickedEpochMembers.members)
+            })
           })
         }),
         pull.flatten()
