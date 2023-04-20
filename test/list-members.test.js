@@ -40,7 +40,7 @@ test('list members', async (t) => {
     carol.tribes2.start(),
   ])
 
-  const [aliceRoot, bobRoot, carolRoot] = await Promise.all([
+  const [ aliceRoot, bobRoot, carolRoot ] = await Promise.all([
     p(alice.metafeeds.findOrCreate)(),
     p(bob.metafeeds.findOrCreate)(),
     p(carol.metafeeds.findOrCreate)(),

@@ -6,9 +6,7 @@ const { promisify } = require('util')
 const pull = require('pull-stream')
 const paraMap = require('pull-paramap')
 const pullMany = require('pull-many')
-const multicb = require('multicb')
-const lodashGet = require('lodash.get')
-const uniqBy = require('lodash.uniqby')
+const pullDefer = require('pull-defer')
 const clarify = require('clarify-error')
 const {
   where,
@@ -313,167 +311,159 @@ module.exports = {
     }
 
     function listMembers(groupId, opts = {}) {
-      return pull(
-        pull.values([0]),
-        pull.asyncMap((n, cb) => {
-          get(groupId, (err, group) => {
-            // prettier-ignore
-            if (err) return cb(clarify(err, 'Failed to get group info when listing members'))
+      const deferedSource = pullDefer.source()
 
-            if (group.excluded) {
-              return cb(
-                new Error("We're excluded from this group, can't list members")
+      get(groupId, (err, group) => {
+        // prettier-ignore
+        if (err) return deferedSource.abort(clarify(err, 'Failed to get group info when listing members'))
+        // prettier-ignore
+        if (group.excluded) return deferedSource.abort( new Error("We're excluded from this group, can't list members"))
+
+        const source = pull(
+          ssb.db.query(
+            where(
+              and(
+                isDecrypted('box2'),
+                type('group/add-member'),
+                groupRecp(groupId)
               )
-            } else {
-              const source = pull(
-                ssb.db.query(
-                  where(
-                    and(
-                      isDecrypted('box2'),
-                      type('group/add-member'),
-                      groupRecp(groupId)
-                    )
-                  ),
-                  opts.live ? live({ old: true }) : null,
-                  toPullStream()
-                ),
-                pull.map((msg) => msg.value.content.recps.slice(1)),
-                pull.flatten(),
-                pull.unique()
-              )
-              return cb(null, source)
-            }
-          })
-        }),
-        pull.flatten()
-      )
+            ),
+            opts.live ? live({ old: true }) : null,
+            toPullStream()
+          ),
+          pull.map((msg) => msg.value.content.recps.slice(1)),
+          pull.flatten(),
+          pull.unique()
+        )
+
+        deferedSource.resolve(source)
+      })
+
+      return deferedSource
     }
 
     function listInvites() {
-      return pull(
-        pull.values([0]), // dummy value used to kickstart the stream
-        pull.asyncMap((n, cb) => {
-          ssb.metafeeds.findOrCreate((err, myRoot) => {
-            // prettier-ignore
-            if (err) return cb(clarify(err, 'Failed to get root metafeed when listing invites'))
+      const deferedSource = pullDefer.source()
 
-            pull(
-              pullMany([
-                ssb.box2.listGroupIds(),
-                ssb.box2.listGroupIds({ excluded: true }),
-              ]),
-              pull.flatten(),
-              pull.collect((err, groupIds) => {
-                // prettier-ignore
-                if (err) return cb(clarify(err, 'Failed to list group IDs when listing invites'))
+      getMyGroups((err, myGroups) => {
+        // prettier-ignore
+        if (err) return deferedSource.abort(clarify(err, 'Failed to list group IDs when listing invites'))
 
-                let acc = {}
-                pull(
-                  ssb.db.query(
-                    where(and(isDecrypted('box2'), type('group/add-member'))),
-                    toPullStream()
-                  ),
-                  pull.filter((msg) =>
-                    // it's an addition of us
-                    lodashGet(msg, 'value.content.recps', []).includes(
-                      myRoot.id
-                    )
-                  ),
-                  pull.filter(
-                    (msg) =>
-                      // we haven't already accepted the addition
-                      !groupIds.includes(
-                        lodashGet(msg, 'value.content.recps[0]')
-                      )
-                  ),
-                  pull.map((msg) => {
-                    const key = Buffer.from(
-                      lodashGet(msg, 'value.content.groupKey'),
-                      'base64'
-                    )
-                    const scheme = keySchemes.private_group
-                    return {
-                      id: lodashGet(msg, 'value.content.recps[0]'),
-                      writeKey: { key, scheme },
-                      readKeys: [{ key, scheme }],
-                      root: lodashGet(msg, 'value.content.root'),
-                    }
-                  }),
-                  // aggregate multiple readKeys from invites to different epochs into one invite object
-                  pull.drain(
-                    (invite) => {
-                      if (acc[invite.id]) {
-                        // readKeys from both invites
-                        acc[invite.id].readKeys.push(...invite.readKeys)
-                        // but no duplicates
-                        acc[invite.id].readKeys = uniqBy(
-                          acc[invite.id].readKeys,
-                          (readKey) => readKey.key.toString('base64')
-                        )
-                      } else {
-                        acc[invite.id] = invite
-                      }
-                    },
-                    (err) => {
-                      if (err) return cb('todo')
+        const source = pull(
+          // get all the groupIds we've heard of from invites
+          ssb.db.query(
+            where(and(isDecrypted('box2'), type('group/add-member'))),
+            toPullStream()
+          ),
+          pull.filter((msg) => isAddMember(msg)),
+          pull.map((msg) => msg.value.content.recps[0]),
+          pull.unique(),
 
-                      const inviteArray = Object.values(acc)
-                      return cb(null, pull.values(inviteArray))
-                    }
-                  )
-                )
-              })
-            )
-          })
-        }),
-        pull.flatten()
-      )
+          // drop those we're a part of already
+          pull.filter((groupId) => !myGroups.has(groupId)),
+
+          // gather all the data required for each group-invite
+          pull.asyncMap(getGroupInviteData)
+        )
+
+        deferedSource.resolve(source)
+      })
+
+      return deferedSource
+
+      // listInvites helpers
+
+      function getMyGroups(cb) {
+        const myGroups = new Set()
+
+        pull(
+          pullMany([
+            ssb.box2.listGroupIds(),
+            ssb.box2.listGroupIds({ excluded: true }),
+          ]),
+          pull.flatten(),
+          pull.drain(
+            (groupId) => myGroups.add(groupId),
+            (err) => {
+              if (err) return cb(err)
+              return cb(null, myGroups)
+            }
+          )
+        )
+      }
+
+      function getGroupInviteData(groupId, cb) {
+        let root
+        const secrets = new Set()
+
+        pull(
+          ssb.db.query(
+            where(
+              and(
+                isDecrypted('box2'),
+                type('group/add-member'),
+                groupRecp(groupId)
+              )
+            ),
+            toPullStream()
+          ),
+          pull.filter((msg) => isAddMember(msg)),
+          pull.drain(
+            (msg) => {
+              root ||= msg.value.content.root
+              secrets.add(msg.value.content.groupKey)
+            },
+            (err) => {
+              if (err) return cb(err)
+
+              const readKeys = [...secrets].map((secret) => ({
+                key: Buffer.from(secret, 'base64'),
+                scheme: keySchemes.private_group,
+              }))
+              const invite = {
+                id: groupId,
+                root,
+                readKeys,
+              }
+              return cb(null, invite)
+            }
+          )
+        )
+      }
     }
 
     function acceptInvite(groupId, cb) {
       if (cb === undefined) return promisify(acceptInvite)(groupId)
 
-      let foundInvite = false
       pull(
         listInvites(),
-        pull.filter((groupInfo) => groupInfo.id === groupId),
+        pull.filter((inviteInfo) => inviteInfo.id === groupId),
         pull.take(1),
-        pull.drain(
-          (groupInfo) => {
-            foundInvite = true
+        pull.collect((err, inviteInfos) => {
+          // prettier-ignore
+          if (err) return cb(clarify(err, 'Failed to list invites when accepting an invite'))
+          // prettier-ignore
+          if (!inviteInfos.length) return cb(new Error("Didn't find invite for that group id"))
 
-            const done = multicb()
-
-            // TODO: which writeKey should be picked??
-            // this will essentially pick a random write key
-            groupInfo.readKeys.forEach((readKey) => {
-              ssb.box2.addGroupInfo(
-                groupInfo.id,
-                {
-                  key: readKey.key,
-                  root: groupInfo.root,
-                },
-                done()
-              )
-            })
-
-            done((err) => {
+          // TODO: which writeKey should be picked??
+          // this will essentially pick a random write key
+          const { id, root, readKeys } = inviteInfos[0]
+          pull(
+            pull.values(readKeys),
+            pull.asyncMap((readKey, cb) => {
+              ssb.box2.addGroupInfo(id, { key: readKey.key, root }, cb)
+            }),
+            pull.collect((err) => {
               // prettier-ignore
               if (err) return cb(clarify(err, 'Failed to add group info when accepting an invite'))
               ssb.db.reindexEncrypted((err) => {
                 // prettier-ignore
                 if (err) cb(clarify(err, 'Failed to reindex encrypted messages when accepting an invite'))
-                  else cb(null, groupInfo)
+                else cb(null, inviteInfos[0])
               })
             })
-          },
-          (err) => {
-            // prettier-ignore
-            if (err) return cb(clarify(err, 'Failed to list invites when accepting an invite'))
-            // prettier-ignore
-            if (!foundInvite) return cb(new Error("Didn't find invite for that group id"))
-          }
-        )
+          )
+        })
       )
     }
 
@@ -530,15 +520,14 @@ module.exports = {
           paraMap((msg, cb) => {
             pull(
               ssb.box2.listGroupIds(),
+              pull.filter((groupId) =>
+                groupId === msg.value.content.recps[0]
+              ),
+              pull.take(1),
               pull.collect((err, groupIds) => {
                 // prettier-ignore
                 if (err) return cb(clarify(err, "Error getting groups we're already in when looking for new epochs"))
-
-                if (groupIds.includes(msg.value.content.recps[0])) {
-                  return cb(null, msg)
-                } else {
-                  return cb()
-                }
+                cb(null, groupIds.length ? msg : null)
               })
             )
           }, 4),
