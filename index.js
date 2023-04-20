@@ -522,7 +522,7 @@ module.exports = {
             pull(
               ssb.box2.listGroupIds(),
               pull.filter((groupId) =>
-                groupId.includes(msg.value.content.recps[0])
+                groupId === msg.value.content.recps[0]
               ),
               pull.take(1),
               pull.collect((err, groupIds) => {
