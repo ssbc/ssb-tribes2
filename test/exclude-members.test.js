@@ -32,8 +32,10 @@ test('add and exclude a person, post on the new feed', async (t) => {
     ),
   })
 
-  await alice.tribes2.start()
-  await bob.tribes2.start()
+  await Promise.all([
+    alice.tribes2.start(),
+    bob.tribes2.start()
+  ])
   t.pass('tribes2 started for both alice and bob')
 
   const aliceRoot = await p(alice.metafeeds.findOrCreate)()
@@ -172,8 +174,10 @@ test('add and exclude a person, post on the new feed', async (t) => {
     'members tangle resets after new epoch'
   )
 
-  await p(alice.close)(true)
-  await p(bob.close)(true)
+  await Promise.all([
+    p(alice.close)(true),
+    p(bob.close)(true)
+  ])
 })
 
 test('Verify that you actually get excluded from a group', async (t) => {
@@ -192,8 +196,10 @@ test('Verify that you actually get excluded from a group', async (t) => {
     ),
   })
 
-  await alice.tribes2.start()
-  await bob.tribes2.start()
+  await Promise.all([
+    alice.tribes2.start(),
+    bob.tribes2.start()
+  ])
   t.pass('tribes2 started for both alice and bob')
 
   await p(alice.metafeeds.findOrCreate)()
@@ -286,8 +292,10 @@ test('Verify that you actually get excluded from a group', async (t) => {
       )
     )
 
-  await p(alice.close)(true)
-  await p(bob.close)(true)
+  await Promise.all([
+    p(alice.close)(true),
+    p(bob.close)(true)
+  ])
 })
 
 test("If you're not the excluder nor the excludee then you should still be in the group and have access to the new epoch", async (t) => {
@@ -316,9 +324,11 @@ test("If you're not the excluder nor the excludee then you should still be in th
     ),
   })
 
-  await alice.tribes2.start()
-  await bob.tribes2.start()
-  await carol.tribes2.start()
+  await Promise.all([
+    alice.tribes2.start(),
+    bob.tribes2.start(),
+    carol.tribes2.start()
+  ])
   t.pass('tribes2 started for everyone')
 
   await p(alice.metafeeds.findOrCreate)()
@@ -413,9 +423,11 @@ test("If you're not the excluder nor the excludee then you should still be in th
     'Carol has a feed for the new key'
   )
 
-  await p(alice.close)(true)
-  await p(bob.close)(true)
-  await p(carol.close)(true)
+  await Promise.all([
+    p(alice.close)(true),
+    p(bob.close)(true),
+    p(carol.close)(true)
+  ])
 })
 
 test('Get added to an old epoch but still find newer epochs', async (t) => {

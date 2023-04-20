@@ -135,8 +135,10 @@ test('live list groups', async (t) => {
     ),
   })
 
-  await alice.tribes2.start()
-  await bob.tribes2.start()
+  await Promise.all([
+    alice.tribes2.start(),
+    bob.tribes2.start(),
+  ])
 
   await p(alice.metafeeds.findOrCreate)()
   const bobRoot = await p(bob.metafeeds.findOrCreate)()
@@ -180,6 +182,8 @@ test('live list groups', async (t) => {
   t.equal(groups[0].root, group.root, 'root matches')
   t.true(groups[0].writeKey.key.equals(group.writeKey.key), 'secret matches')
 
-  await p(alice.close)(true)
-  await p(bob.close)(true)
+  await Promise.all([
+    p(alice.close)(true),
+    p(bob.close)(true),
+  ])
 })
