@@ -32,10 +32,7 @@ test('add and exclude a person, post on the new feed', async (t) => {
     ),
   })
 
-  await Promise.all([
-    alice.tribes2.start(),
-    bob.tribes2.start()
-  ])
+  await Promise.all([alice.tribes2.start(), bob.tribes2.start()])
   t.pass('tribes2 started for both alice and bob')
 
   const aliceRoot = await p(alice.metafeeds.findOrCreate)()
@@ -174,10 +171,7 @@ test('add and exclude a person, post on the new feed', async (t) => {
     'members tangle resets after new epoch'
   )
 
-  await Promise.all([
-    p(alice.close)(true),
-    p(bob.close)(true)
-  ])
+  await Promise.all([p(alice.close)(true), p(bob.close)(true)])
 })
 
 test('Verify that you actually get excluded from a group', async (t) => {
@@ -196,10 +190,7 @@ test('Verify that you actually get excluded from a group', async (t) => {
     ),
   })
 
-  await Promise.all([
-    alice.tribes2.start(),
-    bob.tribes2.start()
-  ])
+  await Promise.all([alice.tribes2.start(), bob.tribes2.start()])
   t.pass('tribes2 started for both alice and bob')
 
   await p(alice.metafeeds.findOrCreate)()
@@ -292,10 +283,7 @@ test('Verify that you actually get excluded from a group', async (t) => {
       )
     )
 
-  await Promise.all([
-    p(alice.close)(true),
-    p(bob.close)(true)
-  ])
+  await Promise.all([p(alice.close)(true), p(bob.close)(true)])
 })
 
 test("If you're not the excluder nor the excludee then you should still be in the group and have access to the new epoch", async (t) => {
@@ -327,7 +315,7 @@ test("If you're not the excluder nor the excludee then you should still be in th
   await Promise.all([
     alice.tribes2.start(),
     bob.tribes2.start(),
-    carol.tribes2.start()
+    carol.tribes2.start(),
   ])
   t.pass('tribes2 started for everyone')
 
@@ -426,7 +414,7 @@ test("If you're not the excluder nor the excludee then you should still be in th
   await Promise.all([
     p(alice.close)(true),
     p(bob.close)(true),
-    p(carol.close)(true)
+    p(carol.close)(true),
   ])
 })
 
@@ -542,4 +530,80 @@ test('Get added to an old epoch but still find newer epochs', async (t) => {
   await p(alice.close)(true)
   await p(bob.close)(true)
   await p(carol.close)(true)
+})
+
+test('Can exclude a person in a group with a lot of members', async (t) => {
+  const alice = Testbot({
+    keys: ssbKeys.generate(null, 'alice'),
+    mfSeed: Buffer.from(
+      '000000000000000000000000000000000000000000000000000000000000a1ce',
+      'hex'
+    ),
+  })
+
+  const peers = Array.from({ length: 20 }).map(() => Testbot())
+
+  async function sync() {
+    await Promise.all(peers.map((peer) => replicate(alice, peer)))
+  }
+
+  await alice.tribes2.start()
+  await Promise.all(peers.map((peer) => peer.tribes2.start()))
+
+  const peerRoots = await Promise.all(
+    peers.map((peer) => p(peer.metafeeds.findOrCreate)())
+  ).catch((err) => t.error(err, 'Error getting root feeds for peers'))
+  const peerRootIds = peerRoots.map((root) => root.id)
+
+  const { id: groupId } = await alice.tribes2.create()
+
+  await sync()
+
+  await alice.tribes2.addMembers(groupId, peerRootIds.slice(0, 10))
+  await alice.tribes2.addMembers(groupId, peerRootIds.slice(10))
+
+  await sync()
+
+  await Promise.all(peers.map((peer) => peer.tribes2.acceptInvite(groupId)))
+
+  await alice.tribes2
+    .excludeMembers(groupId, [peerRootIds[0]])
+    .then(() =>
+      t.pass('alice was able to exclude bob in a group with many members')
+    )
+    .catch((err) =>
+      t.error(
+        err,
+        'alice was unable to exclude bob in a group with many members'
+      )
+    )
+
+  await sync()
+
+  const [bob, ...others] = peers
+
+  const bobGroup = await bob.tribes2.get(groupId)
+  t.deepEquals(
+    bobGroup,
+    { id: groupId, excluded: true },
+    'bob is excluded from group'
+  )
+
+  await Promise.all(
+    others.map((other) => {
+      return (async () => {
+        const otherGroup = await other.tribes2.get(groupId)
+
+        if (otherGroup.excluded) throw 'got excluded'
+        if (otherGroup.readKeys.length !== 2) throw 'not enough readkeys'
+
+        return otherGroup
+      })()
+    })
+  )
+    .then(() => t.pass("Others didn't get excluded from the group"))
+    .catch(() => t.fail('Others got excluded from the group'))
+
+  await p(alice.close)(true)
+  await Promise.all(peers.map((peer) => p(peer.close)(true)))
 })
