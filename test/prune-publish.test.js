@@ -17,7 +17,7 @@ test('prune a message with way too big `previous`', async (t) => {
     ),
   })
 
-  ssb.tribes2.start()
+  await ssb.tribes2.start()
 
   const root = await p(ssb.metafeeds.findOrCreate)()
 

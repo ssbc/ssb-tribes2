@@ -35,6 +35,7 @@ const buildGroupId = require('./lib/build-group-id')
 const addTangles = require('./lib/tangles/add-tangles')
 const publishAndPrune = require('./lib/prune-publish')
 const MetaFeedHelpers = require('./lib/meta-feed-helpers')
+const { groupRecp } = require('./lib/operators')
 // const Epochs = require('./lib/epochs')
 
 module.exports = {
@@ -326,15 +327,17 @@ module.exports = {
             } else {
               const source = pull(
                 ssb.db.query(
-                  where(and(isDecrypted('box2'), type('group/add-member'))),
+                  where(
+                    and(
+                      isDecrypted('box2'),
+                      type('group/add-member'),
+                      groupRecp(groupId)
+                    )
+                  ),
                   opts.live ? live({ old: true }) : null,
                   toPullStream()
                 ),
-                pull.map((msg) => lodashGet(msg, 'value.content.recps', [])),
-                pull.filter(
-                  (recps) => recps.length > 1 && recps[0] === groupId
-                ),
-                pull.map((recps) => recps.slice(1)),
+                pull.map((msg) => msg.value.content.recps.slice(1)),
                 pull.flatten(),
                 pull.unique()
               )
