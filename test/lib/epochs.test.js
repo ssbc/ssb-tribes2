@@ -12,23 +12,19 @@ const Server = require('../helpers/testbot')
 const replicate = require('../helpers/replicate')
 const Epochs = require('../../lib/epochs')
 
-function Run (t) {
+function Run(t) {
   // this function takes care of running a promise and logging
   // (or testing) that it happens and any errors are handled
-  return async function run (label, promise, opts = {}) {
-    const {
-      isTest = true,
-      timer = false,
-      logError = false
-    } = opts
+  return async function run(label, promise, opts = {}) {
+    const { isTest = true, timer = false, logError = false } = opts
 
     if (timer) console.time('> ' + label)
     return promise
-      .then(res => {
+      .then((res) => {
         if (isTest) t.pass(label)
         return res
       })
-      .catch(err => {
+      .catch((err) => {
         t.error(err, label)
         if (logError) console.error(err)
       })
@@ -36,42 +32,41 @@ function Run (t) {
   }
 }
 
-test('lib/epochs (getEpochs, getMembers)', async t => {
+test('lib/epochs (getEpochs, getMembers)', async (t) => {
   const run = Run(t)
 
   const peers = [Server(), Server(), Server()]
   const [alice, ...others] = peers
 
-  async function sync (label) {
+  async function sync(label) {
     return run(
       `replicate (${label})`,
-      Promise.all(others.map(peer => replicate(alice, peer))),
+      Promise.all(others.map((peer) => replicate(alice, peer))),
       { isTest: false }
     )
   }
-  t.teardown(() => peers.forEach(peer => peer.close(true)))
+  t.teardown(() => peers.forEach((peer) => peer.close(true)))
 
   await run(
     'start tribes',
-    Promise.all(peers.map(peer => peer.tribes2.start())),
+    Promise.all(peers.map((peer) => peer.tribes2.start()))
   )
   const rootFeeds = await Promise.all(
-    peers.map(peer => p(peer.metafeeds.findOrCreate)())
+    peers.map((peer) => p(peer.metafeeds.findOrCreate)())
   )
-  const [aliceId, bobId, oscarId] = rootFeeds.map(feed => feed.id)
+  const [aliceId, bobId, oscarId] = rootFeeds.map((feed) => feed.id)
 
-  const group = await run(
-    'alice creates a group',
-    alice.tribes2.create({})
-  )
+  const group = await run('alice creates a group', alice.tribes2.create({}))
   t.deepEqual(
     await Epochs(alice).getEpochs(group.id),
-    [{
-      id: group.root,
-      previous: null,
-      secret: group.writeKey.key,
-      author: aliceId
-    }],
+    [
+      {
+        id: group.root,
+        previous: null,
+        secret: group.writeKey.key,
+        author: aliceId,
+      },
+    ],
     'there is 1 epoch'
   )
   t.deepEqual(
@@ -89,9 +84,7 @@ test('lib/epochs (getEpochs, getMembers)', async t => {
   await sync('to propogate invites')
   await run(
     'others accept invites',
-    Promise.all(
-      others.map(peer => peer.tribes2.acceptInvite(group.id))
-    )
+    Promise.all(others.map((peer) => peer.tribes2.acceptInvite(group.id)))
   )
   await sync('to see acceptance')
   t.deepEqual(
@@ -111,12 +104,8 @@ test('lib/epochs (getEpochs, getMembers)', async t => {
   const groupUpdated = await alice.tribes2.get(group.id)
   const lastGroupInitId = await new Promise((resolve, reject) => {
     pull(
-      alice.db.query(
-        where(type('group/init')),
-        descending(),
-        toPullStream()
-      ),
-      pull.map(m => fromMessageSigil(m.key)),
+      alice.db.query(where(type('group/init')), descending(), toPullStream()),
+      pull.map((m) => fromMessageSigil(m.key)),
       pull.take(1),
       pull.collect((err, keys) => {
         err ? reject(err) : resolve(keys[0])
@@ -130,14 +119,14 @@ test('lib/epochs (getEpochs, getMembers)', async t => {
         id: group.root,
         previous: null,
         secret: group.writeKey.key,
-        author: aliceId
+        author: aliceId,
       },
       {
         id: lastGroupInitId,
         previous: [group.root],
         secret: groupUpdated.writeKey.key,
-        author: aliceId
-      }
+        author: aliceId,
+      },
     ],
     'there are 2 epochs'
   )
@@ -155,34 +144,31 @@ test('lib/epochs (getEpochs, getMembers)', async t => {
   t.end()
 })
 
-test('lib/epochs (getMissingMembers)', async t => {
+test('lib/epochs (getMissingMembers)', async (t) => {
   const run = Run(t)
 
   const peers = [Server(), Server(), Server()]
   const [alice, ...others] = peers
 
-  async function sync (label) {
+  async function sync(label) {
     return run(
       `replicate (${label})`,
-      Promise.all(others.map(peer => replicate(alice, peer))),
+      Promise.all(others.map((peer) => replicate(alice, peer))),
       { isTest: false }
     )
   }
-  t.teardown(() => peers.forEach(peer => peer.close(true)))
+  t.teardown(() => peers.forEach((peer) => peer.close(true)))
 
   await run(
     'start tribes',
-    Promise.all(peers.map(peer => peer.tribes2.start())),
+    Promise.all(peers.map((peer) => peer.tribes2.start()))
   )
   const rootFeeds = await Promise.all(
-    peers.map(peer => p(peer.metafeeds.findOrCreate)())
+    peers.map((peer) => p(peer.metafeeds.findOrCreate)())
   )
-  const [aliceId, bobId, oscarId] = rootFeeds.map(feed => feed.id)
+  const [aliceId, bobId, oscarId] = rootFeeds.map((feed) => feed.id)
 
-  const group = await run(
-    'alice creates a group',
-    alice.tribes2.create({})
-  )
+  const group = await run('alice creates a group', alice.tribes2.create({}))
   await sync('to get Additions feeds')
   await run(
     'alice invites other peers to group',
@@ -191,9 +177,7 @@ test('lib/epochs (getMissingMembers)', async t => {
   await sync('to propogate invites')
   await run(
     'others accept invites',
-    Promise.all(
-      others.map(peer => peer.tribes2.acceptInvite(group.id))
-    )
+    Promise.all(others.map((peer) => peer.tribes2.acceptInvite(group.id)))
   )
   await sync('to see acceptance')
 
@@ -208,7 +192,7 @@ test('lib/epochs (getMissingMembers)', async t => {
   alice.db.create.hook((create, args) => {
     const { content } = args[0]
     if (content.type === 'group/add-member') {
-      content.recps = content.recps.filter(recp => recp !== bobId)
+      content.recps = content.recps.filter((recp) => recp !== bobId)
     }
     // console.log('create', args[0].content)
     create.apply(this, args)
@@ -218,8 +202,9 @@ test('lib/epochs (getMissingMembers)', async t => {
     alice.tribes2.excludeMembers(group.id, [oscarId], {})
   )
 
-  const newEpoch = await Epochs(alice).getEpochs(group.id)
-    .then(epochs => epochs.find(epoch => epoch.previous))
+  const newEpoch = await Epochs(alice)
+    .getEpochs(group.id)
+    .then((epochs) => epochs.find((epoch) => epoch.previous))
 
   t.deepEqual(
     await Epochs(alice).getMissingMembers(group.id),
@@ -227,8 +212,8 @@ test('lib/epochs (getMissingMembers)', async t => {
       {
         epoch: newEpoch.id,
         secret: newEpoch.secret,
-        missing: [bobId]
-      }
+        missing: [bobId],
+      },
     ],
     'bob is missing from the new epoch'
   )
@@ -236,22 +221,31 @@ test('lib/epochs (getMissingMembers)', async t => {
   t.end()
 })
 
-test('lib/epochs (tieBreak)', async t => {
+test('lib/epochs (tieBreak)', async (t) => {
   const { tieBreak } = Epochs({})
 
   const A = {
-    epochKey: Buffer.from('AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=', 'base64')
+    epochKey: Buffer.from(
+      'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
+      'base64'
+    ),
   }
   const B = {
-    epochKey: Buffer.from('EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE=', 'base64')
+    epochKey: Buffer.from(
+      'EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE=',
+      'base64'
+    ),
   }
   const C = {
-    epochKey: Buffer.from('YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY=', 'base64')
+    epochKey: Buffer.from(
+      'YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY=',
+      'base64'
+    ),
   }
 
-  t.deepEqual(tieBreak([A,B,C]), A)
-  t.deepEqual(tieBreak([C,B,A]), A)
-  t.deepEqual(tieBreak([C,B]), B)
+  t.deepEqual(tieBreak([A, B, C]), A)
+  t.deepEqual(tieBreak([C, B, A]), A)
+  t.deepEqual(tieBreak([C, B]), B)
   t.deepEqual(tieBreak([B]), B)
 
   t.end()
