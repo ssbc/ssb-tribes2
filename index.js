@@ -424,7 +424,6 @@ module.exports = {
                 id: groupId,
                 root,
                 readKeys,
-                // writeKey :shrug:
               }
               return cb(null, invite)
             }
