@@ -34,13 +34,17 @@ test('list members', async (t) => {
     ),
   })
 
-  await alice.tribes2.start()
-  await bob.tribes2.start()
-  await carol.tribes2.start()
+  await Promise.all([
+    alice.tribes2.start(),
+    bob.tribes2.start(),
+    carol.tribes2.start(),
+  ])
 
-  const aliceRoot = await p(alice.metafeeds.findOrCreate)()
-  const bobRoot = await p(bob.metafeeds.findOrCreate)()
-  const carolRoot = await p(carol.metafeeds.findOrCreate)()
+  const [ aliceRoot, bobRoot, carolRoot ] = await Promise.all([
+    p(alice.metafeeds.findOrCreate)(),
+    p(bob.metafeeds.findOrCreate)(),
+    p(carol.metafeeds.findOrCreate)(),
+  ])
 
   await replicate(alice, bob)
   t.pass('alice and bob replicated their trees')
@@ -74,9 +78,11 @@ test('list members', async (t) => {
     )
   })
 
-  await p(alice.close)(true)
-  await p(bob.close)(true)
-  await p(carol.close)(true)
+  await Promise.all([
+    p(alice.close)(true),
+    p(bob.close)(true),
+    p(carol.close)(true),
+  ])
 })
 
 test('live list members', async (t) => {
@@ -96,8 +102,7 @@ test('live list members', async (t) => {
     ),
   })
 
-  await alice.tribes2.start()
-  await bob.tribes2.start()
+  await Promise.all([alice.tribes2.start(), bob.tribes2.start()])
 
   const aliceRoot = await p(alice.metafeeds.findOrCreate)()
   const bobRoot = await p(bob.metafeeds.findOrCreate)()
@@ -131,8 +136,7 @@ test('live list members', async (t) => {
   await p(setTimeout)(2000)
   t.deepEqual(members, [aliceRoot.id, bobRoot.id], 'bob add was detected live')
 
-  await p(alice.close)(true)
-  await p(bob.close)(true)
+  await Promise.all([p(alice.close)(true), p(bob.close)(true)])
 })
 
 test('listMembers works with exclusion', async (t) => {

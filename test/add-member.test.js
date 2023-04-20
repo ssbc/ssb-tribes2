@@ -25,8 +25,7 @@ test('get added to a group', async (t) => {
     ),
   })
 
-  await alice.tribes2.start()
-  await bob.tribes2.start()
+  await Promise.all([alice.tribes2.start(), bob.tribes2.start()])
   t.pass('tribes2 started for both alice and bob')
 
   await p(alice.metafeeds.findOrCreate)()
@@ -84,8 +83,7 @@ test('get added to a group', async (t) => {
     )
   )
 
-  await p(alice.close)(true)
-  await p(bob.close)(true)
+  await Promise.all([p(alice.close)(true), p(bob.close)(true)])
 })
 
 test('add member', async (t) => {
@@ -103,8 +101,7 @@ test('add member', async (t) => {
       'hex'
     ),
   })
-  kaitiaki.tribes2.start()
-  newPerson.tribes2.start()
+  await Promise.all([kaitiaki.tribes2.start(), newPerson.tribes2.start()])
   t.pass('they start up tribes2')
 
   const kaitiakiRoot = await p(kaitiaki.metafeeds.findOrCreate)()
@@ -189,8 +186,7 @@ test('add member', async (t) => {
     t.fail(err)
   }
 
-  await p(kaitiaki.close)(true)
-  await p(newPerson.close)(true)
+  await Promise.all([p(kaitiaki.close)(true), p(newPerson.close)(true)])
 })
 
 test('addMembers empty', async (t) => {

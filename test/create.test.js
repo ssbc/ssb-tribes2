@@ -95,7 +95,7 @@ test('create more', async (t) => {
 test('root message is encrypted', async (t) => {
   const alice = Testbot()
 
-  alice.tribes2.start()
+  await alice.tribes2.start()
   const group = await alice.tribes2.create().catch(t.fail)
 
   const kvt = await p(alice.db.getMsg)(group.root).catch(t.fail)

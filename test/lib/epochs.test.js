@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2022 Mix Irving
+// SPDX-FileCopyrightText: 2023 Mix Irving
 //
 // SPDX-License-Identifier: CC0-1.0
 
@@ -12,23 +12,19 @@ const Server = require('../helpers/testbot')
 const replicate = require('../helpers/replicate')
 const Epochs = require('../../lib/epochs')
 
-function Run (t) {
+function Run(t) {
   // this function takes care of running a promise and logging
   // (or testing) that it happens and any errors are handled
-  return async function run (label, promise, opts = {}) {
-    const {
-      isTest = true,
-      timer = false,
-      logError = false
-    } = opts
+  return async function run(label, promise, opts = {}) {
+    const { isTest = true, timer = false, logError = false } = opts
 
     if (timer) console.time('> ' + label)
     return promise
-      .then(res => {
+      .then((res) => {
         if (isTest) t.pass(label)
         return res
       })
-      .catch(err => {
+      .catch((err) => {
         t.error(err, label)
         if (logError) console.error(err)
       })
@@ -36,69 +32,64 @@ function Run (t) {
   }
 }
 
-test('lib/epochs', async t => {
+test('lib/epochs (getEpochs, getMembers)', async (t) => {
   const run = Run(t)
 
   const peers = [Server(), Server(), Server()]
-  t.teardown(() => peers.forEach(peer => peer.close(true)))
-
   const [alice, ...others] = peers
-  const [bob, oscar] = others
 
-  async function sync (label) {
+  async function sync(label) {
     return run(
-      label,
-      Promise.all(others.map(peer => replicate(alice, peer))),
+      `replicate (${label})`,
+      Promise.all(others.map((peer) => replicate(alice, peer))),
       { isTest: false }
     )
   }
+  t.teardown(() => peers.forEach((peer) => peer.close(true)))
 
   await run(
     'start tribes',
-    Promise.all(peers.map(peer => peer.tribes2.start())),
+    Promise.all(peers.map((peer) => peer.tribes2.start()))
   )
   const rootFeeds = await Promise.all(
-    peers.map(peer => p(peer.metafeeds.findOrCreate)())
+    peers.map((peer) => p(peer.metafeeds.findOrCreate)())
   )
-  const [aliceId, bobId, oscarId] = rootFeeds.map(feed => feed.id)
+  const [aliceId, bobId, oscarId] = rootFeeds.map((feed) => feed.id)
 
-  const group = await run(
-    'alice creates a group',
-    alice.tribes2.create({})
-  )
+  const group = await run('alice creates a group', alice.tribes2.create({}))
   t.deepEqual(
     await Epochs(alice).getEpochs(group.id),
-    [{
-      id: group.root,
-      previous: null,
-      epochKey: group.writeKey.key,
-      author: aliceId
-    }],
+    [
+      {
+        id: group.root,
+        previous: null,
+        secret: group.writeKey.key,
+        author: aliceId,
+      },
+    ],
     'there is 1 epoch'
   )
   t.deepEqual(
     await Epochs(alice).getMembers(group.root), // epoch zero root
-    { members: [aliceId], toExclude: [] },
+    { added: [aliceId], toExclude: [] },
     'group members: alice'
   )
 
-  await sync('replication (to get Additions feeds)')
+  await sync('to get Additions feeds')
 
   await run(
     'alice invites other peers to group',
     alice.tribes2.addMembers(group.id, [bobId, oscarId], {})
   )
-  await sync('replication (to propogate invites)')
+  await sync('to propogate invites')
   await run(
     'others accept invites',
-    Promise.all(
-      others.map(peer => peer.tribes2.acceptInvite(group.id))
-    )
+    Promise.all(others.map((peer) => peer.tribes2.acceptInvite(group.id)))
   )
-  await sync('replication (to see acceptance)')
+  await sync('to see acceptance')
   t.deepEqual(
     await Epochs(alice).getMembers(group.root), // epoch zero root
-    { members: [aliceId, bobId, oscarId], toExclude: [] },
+    { added: [aliceId, bobId, oscarId], toExclude: [] },
     'epoch 0 members: alice, bob, oscar'
   )
 
@@ -107,18 +98,14 @@ test('lib/epochs', async t => {
     'alice excludes oscar',
     alice.tribes2.excludeMembers(group.id, [oscarId], {})
   )
-  await sync('replication (exclusion)')
+  await sync('exclusion')
 
   const epochs = await Epochs(alice).getEpochs(group.id)
   const groupUpdated = await alice.tribes2.get(group.id)
   const lastGroupInitId = await new Promise((resolve, reject) => {
     pull(
-      alice.db.query(
-        where(type('group/init')),
-        descending(),
-        toPullStream()
-      ),
-      pull.map(m => fromMessageSigil(m.key)),
+      alice.db.query(where(type('group/init')), descending(), toPullStream()),
+      pull.map((m) => fromMessageSigil(m.key)),
       pull.take(1),
       pull.collect((err, keys) => {
         err ? reject(err) : resolve(keys[0])
@@ -131,28 +118,135 @@ test('lib/epochs', async t => {
       {
         id: group.root,
         previous: null,
-        epochKey: group.writeKey.key,
-        author: aliceId
+        secret: group.writeKey.key,
+        author: aliceId,
       },
       {
         id: lastGroupInitId,
         previous: [group.root],
-        epochKey: groupUpdated.writeKey.key,
-        author: aliceId
-      }
+        secret: groupUpdated.writeKey.key,
+        author: aliceId,
+      },
     ],
     'there are 2 epochs'
   )
   t.deepEqual(
     await Epochs(alice).getMembers(epochs[0].id),
-    { members: [aliceId, bobId, oscarId], toExclude: [oscarId] },
+    { added: [aliceId, bobId, oscarId], toExclude: [oscarId] },
     'epoch 0 members: alice, bob, oscar (note toExclude oscar)'
   )
   t.deepEqual(
     await Epochs(alice).getMembers(epochs[1].id),
-    { members: [aliceId, bobId], toExclude: [] },
+    { added: [aliceId, bobId], toExclude: [] },
     'epoch 1 members: alice, bob'
   )
+
+  t.end()
+})
+
+test('lib/epochs (getMissingMembers)', async (t) => {
+  const run = Run(t)
+
+  const peers = [Server(), Server(), Server()]
+  const [alice, ...others] = peers
+
+  async function sync(label) {
+    return run(
+      `replicate (${label})`,
+      Promise.all(others.map((peer) => replicate(alice, peer))),
+      { isTest: false }
+    )
+  }
+  t.teardown(() => peers.forEach((peer) => peer.close(true)))
+
+  await run(
+    'start tribes',
+    Promise.all(peers.map((peer) => peer.tribes2.start()))
+  )
+  const rootFeeds = await Promise.all(
+    peers.map((peer) => p(peer.metafeeds.findOrCreate)())
+  )
+  const [aliceId, bobId, oscarId] = rootFeeds.map((feed) => feed.id)
+
+  const group = await run('alice creates a group', alice.tribes2.create({}))
+  await sync('to get Additions feeds')
+  await run(
+    'alice invites other peers to group',
+    alice.tribes2.addMembers(group.id, [bobId, oscarId], {})
+  )
+  await sync('to propogate invites')
+  await run(
+    'others accept invites',
+    Promise.all(others.map((peer) => peer.tribes2.acceptInvite(group.id)))
+  )
+  await sync('to see acceptance')
+
+  t.deepEqual(
+    await Epochs(alice).getMissingMembers(group.id),
+    [],
+    'no missing members'
+  )
+
+  // alice removes oscar
+  // HACK: hook create to drop bob from the re-addition
+  alice.db.create.hook((create, args) => {
+    const { content } = args[0]
+    if (content.type === 'group/add-member') {
+      content.recps = content.recps.filter((recp) => recp !== bobId)
+    }
+    // console.log('create', args[0].content)
+    create.apply(this, args)
+  })
+  await run(
+    'alice excludes oscar',
+    alice.tribes2.excludeMembers(group.id, [oscarId], {})
+  )
+
+  const newEpoch = await Epochs(alice)
+    .getEpochs(group.id)
+    .then((epochs) => epochs.find((epoch) => epoch.previous))
+
+  t.deepEqual(
+    await Epochs(alice).getMissingMembers(group.id),
+    [
+      {
+        epoch: newEpoch.id,
+        secret: newEpoch.secret,
+        missing: [bobId],
+      },
+    ],
+    'bob is missing from the new epoch'
+  )
+
+  t.end()
+})
+
+test('lib/epochs (tieBreak)', async (t) => {
+  const { tieBreak } = Epochs({})
+
+  const A = {
+    epochKey: Buffer.from(
+      'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
+      'base64'
+    ),
+  }
+  const B = {
+    epochKey: Buffer.from(
+      'EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE=',
+      'base64'
+    ),
+  }
+  const C = {
+    epochKey: Buffer.from(
+      'YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY=',
+      'base64'
+    ),
+  }
+
+  t.deepEqual(tieBreak([A, B, C]), A)
+  t.deepEqual(tieBreak([C, B, A]), A)
+  t.deepEqual(tieBreak([C, B]), B)
+  t.deepEqual(tieBreak([B]), B)
 
   t.end()
 })

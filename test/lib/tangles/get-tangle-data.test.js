@@ -195,10 +195,8 @@ test('get-tangle', (t) => {
 
 test('get-tangle with branch', async (t) => {
   const alice = Testbot()
-  alice.tribes2.start()
-
   const bob = Testbot()
-  bob.tribes2.start()
+  await Promise.all([alice.tribes2.start(), bob.tribes2.start()])
   t.pass('started tribes2')
 
   const bobRoot = await p(bob.metafeeds.findOrCreate)()
@@ -256,8 +254,7 @@ test('get-tangle with branch', async (t) => {
 
   t.deepEqual(aliceTangle2.previous.length, 2, 'There should be two tips')
 
-  await p(alice.close)(true)
-  await p(bob.close)(true)
+  await Promise.all([p(alice.close)(true), p(bob.close)(true)])
 })
 
 test('members tangle works', async (t) => {
@@ -265,9 +262,11 @@ test('members tangle works', async (t) => {
   const bob = Testbot()
   const carol = Testbot()
 
-  await alice.tribes2.start()
-  await bob.tribes2.start()
-  await carol.tribes2.start()
+  await Promise.all([
+    alice.tribes2.start(),
+    bob.tribes2.start(),
+    carol.tribes2.start(),
+  ])
 
   const bobRoot = await p(bob.metafeeds.findOrCreate)()
   const carolRoot = await p(carol.metafeeds.findOrCreate)()
@@ -353,7 +352,9 @@ test('members tangle works', async (t) => {
     'got correct updated members tangle'
   )
 
-  await p(alice.close)(true)
-  await p(bob.close)(true)
-  await p(carol.close)(true)
+  await Promise.all([
+    p(alice.close)(true),
+    p(bob.close)(true),
+    p(carol.close)(true),
+  ])
 })

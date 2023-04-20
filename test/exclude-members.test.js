@@ -32,8 +32,7 @@ test('add and exclude a person, post on the new feed', async (t) => {
     ),
   })
 
-  await alice.tribes2.start()
-  await bob.tribes2.start()
+  await Promise.all([alice.tribes2.start(), bob.tribes2.start()])
   t.pass('tribes2 started for both alice and bob')
 
   const aliceRoot = await p(alice.metafeeds.findOrCreate)()
@@ -172,8 +171,7 @@ test('add and exclude a person, post on the new feed', async (t) => {
     'members tangle resets after new epoch'
   )
 
-  await p(alice.close)(true)
-  await p(bob.close)(true)
+  await Promise.all([p(alice.close)(true), p(bob.close)(true)])
 })
 
 test('Verify that you actually get excluded from a group', async (t) => {
@@ -192,8 +190,7 @@ test('Verify that you actually get excluded from a group', async (t) => {
     ),
   })
 
-  await alice.tribes2.start()
-  await bob.tribes2.start()
+  await Promise.all([alice.tribes2.start(), bob.tribes2.start()])
   t.pass('tribes2 started for both alice and bob')
 
   await p(alice.metafeeds.findOrCreate)()
@@ -274,8 +271,7 @@ test('Verify that you actually get excluded from a group', async (t) => {
   const invites = await pull(bob.tribes2.listInvites(), pull.collectAsPromise())
   t.deepEquals(invites, [], 'Bob has no invites')
 
-  await p(alice.close)(true)
-  await p(bob.close)(true)
+  await Promise.all([p(alice.close)(true), p(bob.close)(true)])
 })
 
 test("If you're not the excluder nor the excludee then you should still be in the group and have access to the new epoch", async (t) => {
@@ -304,9 +300,11 @@ test("If you're not the excluder nor the excludee then you should still be in th
     ),
   })
 
-  await alice.tribes2.start()
-  await bob.tribes2.start()
-  await carol.tribes2.start()
+  await Promise.all([
+    alice.tribes2.start(),
+    bob.tribes2.start(),
+    carol.tribes2.start(),
+  ])
   t.pass('tribes2 started for everyone')
 
   await p(alice.metafeeds.findOrCreate)()
@@ -401,7 +399,199 @@ test("If you're not the excluder nor the excludee then you should still be in th
     'Carol has a feed for the new key'
   )
 
+  await Promise.all([
+    p(alice.close)(true),
+    p(bob.close)(true),
+    p(carol.close)(true),
+  ])
+})
+
+test('Get added to an old epoch but still find newer epochs', async (t) => {
+  const alice = Testbot({
+    keys: ssbKeys.generate(null, 'alice'),
+    mfSeed: Buffer.from(
+      '000000000000000000000000000000000000000000000000000000000000a1ce',
+      'hex'
+    ),
+  })
+  const bob = Testbot({
+    keys: ssbKeys.generate(null, 'bob'),
+    mfSeed: Buffer.from(
+      '0000000000000000000000000000000000000000000000000000000000000b0b',
+      'hex'
+    ),
+  })
+  const carol = Testbot({
+    keys: ssbKeys.generate(null, 'carol'),
+    mfSeed: Buffer.from(
+      '00000000000000000000000000000000000000000000000000000000000ca201',
+      'hex'
+    ),
+  })
+
+  await alice.tribes2.start()
+  await bob.tribes2.start()
+  await carol.tribes2.start()
+  t.pass('tribes2 started for everyone')
+
+  await p(alice.metafeeds.findOrCreate)()
+  const bobRoot = await p(bob.metafeeds.findOrCreate)()
+  const carolRoot = await p(carol.metafeeds.findOrCreate)()
+
+  await replicate(alice, bob)
+  await replicate(alice, carol)
+  await replicate(bob, carol)
+  t.pass('everyone replicates their trees')
+
+  const { id: groupId } = await alice.tribes2
+    .create()
+    .catch((err) => t.error(err, 'alice failed to create group'))
+
+  const { key: firstPostId } = await alice.tribes2
+    .publish({
+      type: 'test',
+      text: 'first post',
+      recps: [groupId],
+    })
+    .catch(t.fail)
+
+  // replicate the first group messages to bob when he can't decrypt them
+  await replicate(alice, bob).catch(t.error)
+
+  await alice.tribes2
+    .addMembers(groupId, [bobRoot.id, carolRoot.id])
+    .then(() => t.pass('added bob and carol'))
+    .catch((err) => t.error(err, 'add bob and carol fail'))
+
+  await alice.tribes2
+    .excludeMembers(groupId, [carolRoot.id])
+    .then(() => t.pass('alice excluded carol'))
+    .catch((err) => t.error(err, 'remove member fail'))
+
+  const { key: secondPostId } = await alice.tribes2
+    .publish({
+      type: 'test',
+      text: 'second post',
+      recps: [groupId],
+    })
+    .catch(t.fail)
+
+  // only replicate bob's invite to him once we're already on the new epoch
+  await replicate(alice, bob).catch(t.error)
+
+  const bobInvites = await pull(
+    bob.tribes2.listInvites(),
+    pull.collectAsPromise()
+  ).catch(t.fail)
+  t.deepEquals(
+    bobInvites.map((invite) => invite.id),
+    [groupId],
+    'bob has an invite to the group'
+  )
+  t.equals(
+    bobInvites[0].readKeys.length,
+    2,
+    'there are 2 readKeys in the invite'
+  )
+  t.notEquals(
+    bobInvites[0].readKeys[0].key.toString('base64'),
+    bobInvites[0].readKeys[1].key.toString('base64'),
+    'the two readKeys are different'
+  )
+
+  await bob.tribes2.acceptInvite(groupId).catch(t.fail)
+
+  const bobGotFirstMsg = await p(bob.db.get)(firstPostId)
+  t.notEquals(
+    typeof bobGotFirstMsg.content,
+    'string',
+    "bob managed to decrypt alice's first message"
+  )
+
+  const bobGotSecondMsg = await p(bob.db.get)(secondPostId)
+  t.notEquals(
+    typeof bobGotSecondMsg.content,
+    'string',
+    "bob managed to decrypt alice's second message"
+  )
+
   await p(alice.close)(true)
   await p(bob.close)(true)
   await p(carol.close)(true)
+})
+
+test('Can exclude a person in a group with a lot of members', async (t) => {
+  const alice = Testbot({
+    keys: ssbKeys.generate(null, 'alice'),
+    mfSeed: Buffer.from(
+      '000000000000000000000000000000000000000000000000000000000000a1ce',
+      'hex'
+    ),
+  })
+
+  const peers = Array.from({ length: 20 }).map(() => Testbot())
+
+  async function sync() {
+    await Promise.all(peers.map((peer) => replicate(alice, peer)))
+  }
+
+  await alice.tribes2.start()
+  await Promise.all(peers.map((peer) => peer.tribes2.start()))
+
+  const peerRoots = await Promise.all(
+    peers.map((peer) => p(peer.metafeeds.findOrCreate)())
+  ).catch((err) => t.error(err, 'Error getting root feeds for peers'))
+  const peerRootIds = peerRoots.map((root) => root.id)
+
+  const { id: groupId } = await alice.tribes2.create()
+
+  await sync()
+
+  await alice.tribes2.addMembers(groupId, peerRootIds.slice(0, 10))
+  await alice.tribes2.addMembers(groupId, peerRootIds.slice(10))
+
+  await sync()
+
+  await Promise.all(peers.map((peer) => peer.tribes2.acceptInvite(groupId)))
+
+  await alice.tribes2
+    .excludeMembers(groupId, [peerRootIds[0]])
+    .then(() =>
+      t.pass('alice was able to exclude bob in a group with many members')
+    )
+    .catch((err) =>
+      t.error(
+        err,
+        'alice was unable to exclude bob in a group with many members'
+      )
+    )
+
+  await sync()
+
+  const [bob, ...others] = peers
+
+  const bobGroup = await bob.tribes2.get(groupId)
+  t.deepEquals(
+    bobGroup,
+    { id: groupId, excluded: true },
+    'bob is excluded from group'
+  )
+
+  await Promise.all(
+    others.map((other) => {
+      return (async () => {
+        const otherGroup = await other.tribes2.get(groupId)
+
+        if (otherGroup.excluded) throw 'got excluded'
+        if (otherGroup.readKeys.length !== 2) throw 'not enough readkeys'
+
+        return otherGroup
+      })()
+    })
+  )
+    .then(() => t.pass("Others didn't get excluded from the group"))
+    .catch(() => t.fail('Others got excluded from the group'))
+
+  await p(alice.close)(true)
+  await Promise.all(peers.map((peer) => p(peer.close)(true)))
 })
