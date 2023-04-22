@@ -40,7 +40,7 @@ test('list members', async (t) => {
     carol.tribes2.start(),
   ])
 
-  const [ aliceRoot, bobRoot, carolRoot ] = await Promise.all([
+  const [aliceRoot, bobRoot, carolRoot] = await Promise.all([
     p(alice.metafeeds.findOrCreate)(),
     p(bob.metafeeds.findOrCreate)(),
     p(carol.metafeeds.findOrCreate)(),
@@ -174,29 +174,26 @@ test('listMembers works with exclusion', async (t) => {
     p(carol.metafeeds.findOrCreate)(),
   ])
 
-  await Promise.all([
-    replicate(alice, bob),
-    replicate(alice, carol),
-    replicate(bob, carol),
-  ]).then(() => t.pass('everyone replicates their trees'))
+  await Promise.all([replicate(alice, bob), replicate(alice, carol)]).then(() =>
+    t.pass('everyone replicates their trees')
+  )
 
   const { id: groupId } = await alice.tribes2
     .create()
     .catch((err) => t.error(err, 'alice failed to create group'))
 
-  await replicate(alice, carol)
-
   await alice.tribes2
     .addMembers(groupId, [bobRoot.id, carolRoot.id])
-    .catch((err) => t.error(err, 'add bob fail'))
+    .catch((err) => t.error(err, 'add bob and carol fail'))
 
-  await replicate(alice, carol)
+  await Promise.all([replicate(alice, bob), replicate(alice, carol)])
 
-  await bob.tribes2.acceptInvite(groupId)
-  await carol.tribes2.acceptInvite(groupId)
+  await Promise.all([
+    bob.tribes2.acceptInvite(groupId),
+    carol.tribes2.acceptInvite(groupId),
+  ])
 
-  await replicate(alice, bob)
-  await replicate(alice, carol)
+  await Promise.all([replicate(alice, bob), replicate(alice, carol)])
 
   await alice.tribes2
     .excludeMembers(groupId, [bobRoot.id])
@@ -206,8 +203,7 @@ test('listMembers works with exclusion', async (t) => {
     })
     .catch((err) => t.error(err, 'remove member fail'))
 
-  await replicate(alice, bob)
-  await replicate(alice, carol)
+  await Promise.all([replicate(alice, bob), replicate(alice, carol)])
 
   const aliceMembers = await pull(
     alice.tribes2.listMembers(groupId),

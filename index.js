@@ -60,7 +60,7 @@ module.exports = {
       findOrCreateGroupWithoutMembers,
       getRootFeedIdFromMsgId,
     } = MetaFeedHelpers(ssb)
-    const { getPickedEpoch, getMembers } = Epochs(ssb)
+    const { getPickedEpoch, getAddedMembers } = Epochs(ssb)
 
     function create(opts = {}, cb) {
       if (cb === undefined) return promisify(create)(opts)
@@ -319,21 +319,13 @@ module.exports = {
     }
 
     function listMembers(groupId, opts = {}) {
-      const deferredSource = pullDefer.source()
-
-      getPickedEpoch(groupId, (err, pickedEpoch) => {
-        // prettier-ignore
-        if (err) return deferredSource.abort(clarify(err, 'todo'))
-
-        getMembers(pickedEpoch.id, (err, pickedEpochMembers) => {
-          // prettier-ignore
-          if (err) return deferredSource.abort(clarify(err, 'todo'))
-
-          deferredSource.resolve(pull.values(pickedEpochMembers.members))
-        })
-      })
-
-      return deferredSource
+      return pull(
+        getPickedEpoch(groupId, { live: !!opts?.live }),
+        pull.map((pickedEpoch) =>
+          getAddedMembers(pickedEpoch.id, { live: !!opts?.live })
+        ),
+        pull.flatten()
+      )
     }
 
     function listInvites() {
