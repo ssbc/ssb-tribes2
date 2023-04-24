@@ -60,7 +60,7 @@ module.exports = {
       findOrCreateGroupWithoutMembers,
       getRootFeedIdFromMsgId,
     } = MetaFeedHelpers(ssb)
-    const { getPickedEpoch, getAddedMembers } = Epochs(ssb)
+    const { getPickedEpoch, getMemberUpdates } = Epochs(ssb)
 
     function create(opts = {}, cb) {
       if (cb === undefined) return promisify(create)(opts)
@@ -322,9 +322,13 @@ module.exports = {
       return pull(
         getPickedEpoch(groupId, { live: !!opts?.live }),
         pull.map((pickedEpoch) =>
-          getAddedMembers(pickedEpoch.id, { live: !!opts?.live })
+          getMemberUpdates(pickedEpoch.id, { live: !!opts?.live })
         ),
-        pull.flatten()
+        pull.flatten(),
+        pull.map((update) => {
+          if (update.added) return update.added
+          return update
+        })
       )
     }
 
