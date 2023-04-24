@@ -139,7 +139,7 @@ test('live list members', async (t) => {
   await Promise.all([p(alice.close)(true), p(bob.close)(true)])
 })
 
-test('listMembers works with exclusion', async (t) => {
+test.only('listMembers works with exclusion', async (t) => {
   const alice = Testbot({
     keys: ssbKeys.generate(null, 'alice'),
     mfSeed: Buffer.from(
@@ -182,9 +182,32 @@ test('listMembers works with exclusion', async (t) => {
     .create()
     .catch((err) => t.error(err, 'alice failed to create group'))
 
+  const liveMembers = new Set()
+  pull(
+    alice.tribes2.listMembers(groupId, { live: true }),
+    pull.drain(
+      (update) => {
+        if (update.excluded) liveMembers.delete(update.excluded)
+        else liveMembers.add(update)
+      },
+      (err) => t.fail(err)
+    )
+  )
+
+  await p(setTimeout)(1000)
+
+  t.deepEquals([...liveMembers], [aliceRoot.id], 'only alice is in the group')
+
   await alice.tribes2
     .addMembers(groupId, [bobRoot.id, carolRoot.id])
     .catch((err) => t.error(err, 'add bob and carol fail'))
+
+  await p(setTimeout)(500)
+  t.deepEquals(
+    [...liveMembers].sort(),
+    [aliceRoot.id, bobRoot.id, carolRoot.id].sort(),
+    'alice bob and carol are in the group'
+  )
 
   await Promise.all([replicate(alice, bob), replicate(alice, carol)])
 
@@ -204,6 +227,13 @@ test('listMembers works with exclusion', async (t) => {
     .catch((err) => t.error(err, 'remove member fail'))
 
   await Promise.all([replicate(alice, bob), replicate(alice, carol)])
+
+  await p(setTimeout)(500)
+  t.deepEquals(
+    [...liveMembers].sort(),
+    [aliceRoot.id, carolRoot.id].sort(),
+    'bob is out of the group'
+  )
 
   const aliceMembers = await pull(
     alice.tribes2.listMembers(groupId),
