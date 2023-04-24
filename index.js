@@ -328,7 +328,9 @@ module.exports = {
         pull.map((update) => {
           if (update.added) return update.added
           return update
-        })
+        }),
+        // if it's not live, only include adds
+        pull.filter((update) => opts?.live || !update.excluded)
       )
     }
 
