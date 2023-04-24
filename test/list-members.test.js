@@ -139,7 +139,7 @@ test('live list members', async (t) => {
   await Promise.all([p(alice.close)(true), p(bob.close)(true)])
 })
 
-test.only('listMembers works with exclusion', async (t) => {
+test('listMembers works with exclusion', async (t) => {
   const alice = Testbot({
     keys: ssbKeys.generate(null, 'alice'),
     mfSeed: Buffer.from(
