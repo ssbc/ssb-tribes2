@@ -607,3 +607,83 @@ test('Can exclude a person in a group with a lot of members', async (t) => {
   await p(alice.close)(true)
   await Promise.all(peers.map((peer) => p(peer.close)(true)))
 })
+
+test("restarting the client doesn't make us rejoin old stuff", async (t) => {
+  const alice = Testbot({
+    keys: ssbKeys.generate(null, 'alice'),
+    mfSeed: Buffer.from(
+      '000000000000000000000000000000000000000000000000000000000000a1ce',
+      'hex'
+    ),
+  })
+  let bob = Testbot({
+    name: 'bobrestart',
+    keys: ssbKeys.generate(null, 'bob'),
+    mfSeed: Buffer.from(
+      '0000000000000000000000000000000000000000000000000000000000000b0b',
+      'hex'
+    ),
+  })
+
+  await Promise.all([alice.tribes2.start(), bob.tribes2.start()])
+
+  const bobRoot = await p(bob.metafeeds.findOrCreate)()
+
+  await replicate(alice, bob).catch(t.error)
+
+  const { id: groupId } = await alice.tribes2
+    .create()
+    .catch((err) => t.error(err, 'alice failed to create group'))
+
+  await alice.tribes2
+    .addMembers(groupId, [bobRoot.id])
+    .then(() => t.pass('added bob'))
+    .catch((err) => t.error(err, 'add bob fail'))
+
+  await replicate(alice, bob).catch(t.error)
+
+  await bob.tribes2.acceptInvite(groupId)
+
+  await replicate(alice, bob).catch(t.error)
+
+  await alice.tribes2
+    .excludeMembers(groupId, [bobRoot.id])
+    .then(() => t.pass('alice excluded bob'))
+    .catch((err) => t.error(err, 'remove member fail'))
+
+  await replicate(alice, bob).catch(t.error)
+
+  t.deepEquals(
+    await bob.tribes2.get(groupId),
+    { id: groupId, excluded: true },
+    "bob knows he's excluded from the group before restart"
+  )
+
+  await p(bob.close)(true).then(() => t.pass("bob's client was closed"))
+  bob = Testbot({
+    rimraf: false,
+    name: 'bobrestart',
+    keys: ssbKeys.generate(null, 'bob'),
+    mfSeed: Buffer.from(
+      '0000000000000000000000000000000000000000000000000000000000000b0b',
+      'hex'
+    ),
+  })
+  t.pass('bob got a new client')
+  await bob.tribes2.start().then(() => t.pass('bob restarted'))
+
+  t.deepEquals(
+    await bob.tribes2.get(groupId),
+    { id: groupId, excluded: true },
+    "bob knows he's excluded from the group after restart"
+  )
+
+  // TODO list()
+
+  // TODO listInvites()
+
+  // TODO acceptInvite()
+
+  await p(alice.close)(true)
+  await p(bob.close)(true)
+})
