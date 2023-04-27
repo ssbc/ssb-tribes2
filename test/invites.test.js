@@ -25,10 +25,7 @@ test('lists correct group invite and accepting actually does something', async (
     ),
   })
 
-  await Promise.all([
-    alice.tribes2.start(),
-    bob.tribes2.start(),
-  ])
+  await Promise.all([alice.tribes2.start(), bob.tribes2.start()])
   t.pass('tribes2 started')
 
   const bobRoot = await p(bob.metafeeds.findOrCreate)()
@@ -47,16 +44,15 @@ test('lists correct group invite and accepting actually does something', async (
   await replicate(alice, bob).catch(t.fail)
   t.pass('alice and bob replicate')
 
-  const invites = await pull(bob.tribes2.listInvites(), pull.collectAsPromise())
+  const invites = await pull(
+    bob.tribes2.listInvites(),
+    pull.collectAsPromise()
+  ).catch(t.error)
   t.equal(invites.length, 1, 'bob has 1 invite')
 
   const invite = invites[0]
   t.equal(invite.id, group.id, 'correct group id in invite')
-  t.true(invite.writeKey.key.equals(group.writeKey.key), 'correct writeKey')
-  t.true(
-    invite.readKeys[0].key.equals(group.readKeys[0].key),
-    'correct readKey'
-  )
+  t.deepEquals(invite.readKeys, group.readKeys, 'correct readKey')
   t.equal(invite.root, group.root, 'correct root')
 
   const msgEnc = await p(bob.db.get)(group.root).catch(t.fail)
@@ -81,8 +77,5 @@ test('lists correct group invite and accepting actually does something', async (
     'bob can now read root msg after accepting the invite'
   )
 
-  await Promise.all([
-    p(alice.close)(true),
-    p(bob.close)(true),
-  ])
+  await Promise.all([p(alice.close)(true), p(bob.close)(true)])
 })
