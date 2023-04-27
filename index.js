@@ -477,16 +477,21 @@ module.exports = {
 
     function start(cb) {
       if (cb === undefined) return promisify(start)()
+      console.log('running start for', ssb.id)
 
+      console.log('about to find additions feed')
       findOrCreateAdditionsFeed((err) => {
         // prettier-ignore
         if (err) return cb(clarify(err, 'Error finding or creating additions feed when starting ssb-tribes2'))
+        console.log('got additions feed')
         return cb()
       })
 
+      console.log('about to find root feed')
       ssb.metafeeds.findOrCreate((err, myRoot) => {
         // prettier-ignore
         if (err) return cb(clarify(err, 'Error getting own root in start()'))
+        console.log('got root feed')
 
         // check if we've been excluded
         pull(
@@ -503,7 +508,10 @@ module.exports = {
           pull.drain(
             (msg) => {
               const groupId = msg.value.content.recps[0]
-              ssb.box2.excludeGroupInfo(groupId, null)
+              ssb.box2.excludeGroupInfo(groupId, (err) => {
+                // prettier-ignore
+                if (err) return cb(clarify(err, 'Error on excluding group info after finding exclusion of ourselves'))
+              })
             },
             (err) => {
               // prettier-ignore
@@ -528,9 +536,7 @@ module.exports = {
           paraMap((msg, cb) => {
             pull(
               ssb.box2.listGroupIds(),
-              pull.filter((groupId) =>
-                groupId === msg.value.content.recps[0]
-              ),
+              pull.filter((groupId) => groupId === msg.value.content.recps[0]),
               pull.take(1),
               pull.collect((err, groupIds) => {
                 // prettier-ignore

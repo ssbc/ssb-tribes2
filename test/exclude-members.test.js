@@ -659,6 +659,9 @@ test("restarting the client doesn't make us rejoin old stuff", async (t) => {
     "bob knows he's excluded from the group before restart"
   )
 
+  // TODO remove probably?
+  await p(setTimeout)(3000)
+
   await p(bob.close)(true).then(() => t.pass("bob's client was closed"))
   bob = Testbot({
     rimraf: false,
