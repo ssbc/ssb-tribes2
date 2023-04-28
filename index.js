@@ -528,9 +528,7 @@ module.exports = {
           paraMap((msg, cb) => {
             pull(
               ssb.box2.listGroupIds(),
-              pull.filter((groupId) =>
-                groupId === msg.value.content.recps[0]
-              ),
+              pull.filter((groupId) => groupId === msg.value.content.recps[0]),
               pull.take(1),
               pull.collect((err, groupIds) => {
                 // prettier-ignore
