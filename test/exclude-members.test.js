@@ -594,8 +594,8 @@ test('Can exclude a person in a group with a lot of members', async (t) => {
       return (async () => {
         const otherGroup = await other.tribes2.get(groupId)
 
-        if (otherGroup.excluded) throw 'got excluded'
-        if (otherGroup.readKeys.length !== 2) throw 'not enough readkeys'
+        if (otherGroup.excluded) throw Error('got excluded')
+        if (otherGroup.readKeys.length !== 2) throw Error('not enough readkeys')
 
         return otherGroup
       })()
