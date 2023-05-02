@@ -32,6 +32,12 @@ function Run(t) {
   }
 }
 
+function getRootIds(peers) {
+  return Promise.all(
+    peers.map((peer) => p(peer.metafeeds.findOrCreate)())
+  ).then((feeds) => feeds.map((feed) => feed.id))
+}
+
 test('lib/epochs (getEpochs, getMembers)', async (t) => {
   const run = Run(t)
 
@@ -40,21 +46,18 @@ test('lib/epochs (getEpochs, getMembers)', async (t) => {
 
   async function sync(label) {
     return run(
-      `replicate (${label})`,
+      `(sync ${label})`,
       Promise.all(others.map((peer) => replicate(alice, peer))),
       { isTest: false }
     )
   }
   t.teardown(() => peers.forEach((peer) => peer.close(true)))
 
+  const [aliceId, bobId, oscarId] = await getRootIds(peers)
   await run(
     'start tribes',
     Promise.all(peers.map((peer) => peer.tribes2.start()))
   )
-  const rootFeeds = await Promise.all(
-    peers.map((peer) => p(peer.metafeeds.findOrCreate)())
-  )
-  const [aliceId, bobId, oscarId] = rootFeeds.map((feed) => feed.id)
 
   const group = await run('alice creates a group', alice.tribes2.create({}))
   t.deepEqual(
@@ -152,7 +155,7 @@ test('lib/epochs (getMissingMembers)', async (t) => {
 
   async function sync(label) {
     return run(
-      `replicate (${label})`,
+      `(sync ${label})`,
       Promise.all(others.map((peer) => replicate(alice, peer))),
       { isTest: false }
     )
@@ -225,19 +228,19 @@ test('lib/epochs (tieBreak)', async (t) => {
   const { tieBreak } = Epochs({})
 
   const A = {
-    epochKey: Buffer.from(
+    secret: Buffer.from(
       'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
       'base64'
     ),
   }
   const B = {
-    epochKey: Buffer.from(
+    secret: Buffer.from(
       'EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE=',
       'base64'
     ),
   }
   const C = {
-    epochKey: Buffer.from(
+    secret: Buffer.from(
       'YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY=',
       'base64'
     ),
@@ -247,6 +250,90 @@ test('lib/epochs (tieBreak)', async (t) => {
   t.deepEqual(tieBreak([C, B, A]), A)
   t.deepEqual(tieBreak([C, B]), B)
   t.deepEqual(tieBreak([B]), B)
+
+  t.end()
+})
+
+test('lib/epochs (getPreferredEpoch - 4.4. same membership)', async (t) => {
+  const run = Run(t)
+
+  const peers = [Server(), Server(), Server()]
+  t.teardown(() => peers.forEach((peer) => peer.close(true)))
+
+  const [alice, bob, oscar] = peers
+  const [aliceId, bobId, oscarId] = await getRootIds(peers)
+  await run(
+    'start tribes',
+    Promise.all(peers.map((peer) => peer.tribes2.start()))
+  )
+
+  const group = await run('alice creates a group', alice.tribes2.create({}))
+
+  await run(
+    '(sync dm feeds)',
+    Promise.all([replicate(alice, bob), replicate(alice, oscar)])
+  )
+
+  await run(
+    'alice invites bob, oscar',
+    alice.tribes2.addMembers(group.id, [bobId, oscarId], {})
+  )
+
+  await run(
+    '(sync invites)',
+    Promise.all([replicate(alice, bob), replicate(alice, oscar)])
+  )
+
+  await run(
+    'others accept invites',
+    Promise.all([
+      bob.tribes2.acceptInvite(group.id),
+      oscar.tribes2.acceptInvite(group.id),
+    ])
+  )
+
+  await run(
+    'bob and oscar both exclude alice (mutiny, fork)!',
+    Promise.all([
+      bob.tribes2.excludeMembers(group.id, [aliceId], {}),
+      oscar.tribes2.excludeMembers(group.id, [aliceId], {}),
+    ])
+  )
+
+  await run('(sync exclusion)', replicate(bob, oscar))
+
+  const epochs = await Epochs(oscar)
+    .getEpochs(group.id)
+    .then((epochs) => epochs.filter((epoch) => epoch.author != aliceId))
+  const preferredEpoch = Epochs({}).tieBreak(epochs)
+
+  t.deepEqual(
+    await Epochs(oscar).getPreferredEpoch(group.id),
+    preferredEpoch,
+    'getPreferredEpoch'
+  )
+
+  // TODO need to test epochs > 2
+
+  t.end()
+})
+
+test.skip('lib/epochs (getPreferredEpoch - 4.5. subset membership)', async (t) => {
+  // the choice is the epoch which is a subset of all the others
+
+  t.end()
+})
+
+test.skip('lib/epochs (getPreferredEpoch - 4.6. overlapping membership)', async (t) => {
+  // there is no preferred epoch, you will need to choose choose a winner
+  // and exclude some members
+  // (not sure what the API should be here)
+
+  t.end()
+})
+
+test.skip('lib/epochs (getPreferredEpoch - 4.7. disjoint membership)', async (t) => {
+  // there is no conflict in this case (doesn't need testing?)
 
   t.end()
 })
