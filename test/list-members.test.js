@@ -201,7 +201,7 @@ test('listMembers works with exclusion', async (t) => {
         if (update.excluded) liveMembers.delete(update.excluded)
         else liveMembers.add(update)
       },
-      (err) => t.fail(err)
+      (err) => t.error(err)
     )
   )
 
@@ -291,7 +291,10 @@ test('listMembers works with exclusion', async (t) => {
     'adding david to new epoch got detected live'
   )
 
-  await p(alice.close)(true)
-  await p(bob.close)(true)
-  await p(carol.close)(true)
+  await Promise.all([
+    p(alice.close)(true),
+    p(bob.close)(true),
+    p(carol.close)(true),
+    p(david.close)(true),
+  ])
 })
