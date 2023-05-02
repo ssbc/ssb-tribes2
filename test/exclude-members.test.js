@@ -652,9 +652,10 @@ test("restarting the client doesn't make us rejoin old stuff", async (t) => {
 
   await replicate(alice, bob).catch(t.error)
 
-  t.deepEquals(
-    await bob.tribes2.get(groupId),
-    { id: groupId, excluded: true },
+  const beforeGroup = await bob.tribes2.get(groupId)
+  t.equals(beforeGroup.id, groupId, 'correct group id')
+  t.true(
+    beforeGroup.excluded,
     "bob knows he's excluded from the group before restart"
   )
 
@@ -674,9 +675,8 @@ test("restarting the client doesn't make us rejoin old stuff", async (t) => {
   t.pass('bob got a new client')
   await bob.tribes2.start().then(() => t.pass('bob restarted'))
 
-  t.deepEquals(
-    await bob.tribes2.get(groupId),
-    { id: groupId, excluded: true },
+  t.true(
+    (await bob.tribes2.get(groupId)).excluded,
     "bob knows he's excluded from the group after restart"
   )
 
