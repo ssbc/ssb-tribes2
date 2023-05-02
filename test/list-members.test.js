@@ -161,22 +161,33 @@ test('listMembers works with exclusion', async (t) => {
       'hex'
     ),
   })
+  const david = Testbot({
+    keys: ssbKeys.generate(null, 'david'),
+    mfSeed: Buffer.from(
+      '00000000000000000000000000000000000000000000000000000000000da71d',
+      'hex'
+    ),
+  })
 
   await Promise.all([
     alice.tribes2.start(),
     bob.tribes2.start(),
     carol.tribes2.start(),
+    david.tribes2.start(),
   ]).then(() => t.pass('tribes2 started for everyone'))
 
-  const [aliceRoot, bobRoot, carolRoot] = await Promise.all([
+  const [aliceRoot, bobRoot, carolRoot, davidRoot] = await Promise.all([
     p(alice.metafeeds.findOrCreate)(),
     p(bob.metafeeds.findOrCreate)(),
     p(carol.metafeeds.findOrCreate)(),
+    p(david.metafeeds.findOrCreate)(),
   ])
 
-  await Promise.all([replicate(alice, bob), replicate(alice, carol)]).then(() =>
-    t.pass('everyone replicates their trees')
-  )
+  await Promise.all([
+    replicate(alice, bob),
+    replicate(alice, carol),
+    replicate(alice, david),
+  ]).then(() => t.pass('everyone replicates their trees'))
 
   const { id: groupId } = await alice.tribes2
     .create()
@@ -235,13 +246,19 @@ test('listMembers works with exclusion', async (t) => {
     'bob is out of the group'
   )
 
+  await alice.tribes2
+    .addMembers(groupId, [davidRoot.id])
+    .catch((err) => t.error(err, 'add david fail'))
+
+  await Promise.all([replicate(alice, bob), replicate(alice, carol)])
+
   const aliceMembers = await pull(
     alice.tribes2.listMembers(groupId),
     pull.collectAsPromise()
   )
   t.deepEquals(
     aliceMembers.sort(),
-    [aliceRoot.id, carolRoot.id].sort(),
+    [aliceRoot.id, carolRoot.id, davidRoot.id].sort(),
     'alice gets the correct members list'
   )
 
@@ -251,7 +268,7 @@ test('listMembers works with exclusion', async (t) => {
   )
   t.deepEquals(
     carolMembers.sort(),
-    [aliceRoot.id, carolRoot.id].sort(),
+    [aliceRoot.id, carolRoot.id, davidRoot.id].sort(),
     'carol gets the correct members list'
   )
 
@@ -266,6 +283,13 @@ test('listMembers works with exclusion', async (t) => {
         "Bob gets an error when trying to list members of the group he's excluded from"
       )
     )
+
+  await p(setTimeout)(500)
+  t.deepEquals(
+    [...liveMembers].sort(),
+    [aliceRoot.id, carolRoot.id, davidRoot.id].sort(),
+    'adding david to new epoch got detected live'
+  )
 
   await p(alice.close)(true)
   await p(bob.close)(true)
