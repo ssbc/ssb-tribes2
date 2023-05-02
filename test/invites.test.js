@@ -44,8 +44,10 @@ test('lists correct group invite and accepting actually does something', async (
   await replicate(alice, bob).catch(t.fail)
   t.pass('alice and bob replicate')
 
-  const invites = await pull(bob.tribes2.listInvites(), pull.collectAsPromise())
-    .catch(t.error)
+  const invites = await pull(
+    bob.tribes2.listInvites(),
+    pull.collectAsPromise()
+  ).catch(t.error)
   t.equal(invites.length, 1, 'bob has 1 invite')
 
   const invite = invites[0]
