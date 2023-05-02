@@ -321,9 +321,10 @@ module.exports = {
     function listMembers(groupId, opts = {}) {
       return pull(
         getPickedEpoch(groupId, { live: !!opts?.live }),
-        pull.map((pickedEpoch) =>
-          getMemberUpdates(pickedEpoch.id, { live: !!opts?.live })
-        ),
+        pull.map((pickedEpoch) => {
+          console.log('pickedEPoch', pickedEpoch)
+          return getMemberUpdates(pickedEpoch.id, { live: !!opts?.live })
+        }),
         pull.flatten(),
         pull.map((update) => {
           if (update.added) return update.added
