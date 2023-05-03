@@ -477,21 +477,16 @@ module.exports = {
 
     function start(cb) {
       if (cb === undefined) return promisify(start)()
-      console.log('running start for', ssb.id)
 
-      console.log('about to find additions feed')
       findOrCreateAdditionsFeed((err) => {
         // prettier-ignore
         if (err) return cb(clarify(err, 'Error finding or creating additions feed when starting ssb-tribes2'))
-        console.log('got additions feed')
         return cb()
       })
 
-      console.log('about to find root feed')
       ssb.metafeeds.findOrCreate((err, myRoot) => {
         // prettier-ignore
         if (err) return cb(clarify(err, 'Error getting own root in start()'))
-        console.log('got root feed')
 
         // check if we've been excluded
         pull(
