@@ -607,7 +607,7 @@ test('Can exclude a person in a group with a lot of members', async (t) => {
   await Promise.all(all.map((peer) => p(peer.close)(true)))
 })
 
-test("restarting the client doesn't make us rejoin old stuff", async (t) => {
+test.only("restarting the client doesn't make us rejoin old stuff", async (t) => {
   const alice = Testbot({
     keys: ssbKeys.generate(null, 'alice'),
     mfSeed: Buffer.from(
@@ -680,7 +680,8 @@ test("restarting the client doesn't make us rejoin old stuff", async (t) => {
     "bob knows he's excluded from the group after restart"
   )
 
-  // TODO list()
+  const list = await pull(bob.tribes2.list(), pull.collectAsPromise())
+  t.equal(list.length, 0, "there aren't any groups in bob's group list anymore")
 
   // TODO listInvites()
 
