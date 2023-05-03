@@ -198,7 +198,7 @@ test('Verify that you actually get excluded from a group', async (t) => {
   await Promise.all([alice.tribes2.start(), bob.tribes2.start()])
   t.pass('tribes2 started for both alice and bob')
 
-  const [aliceId, bobId] = await getRootIds([alice, bob], t)
+  const [, bobId] = await getRootIds([alice, bob], t)
 
   await replicate(alice, bob)
   t.pass('alice and bob replicate their trees')
@@ -323,7 +323,7 @@ test("If you're not the excluder nor the excludee then you should still be in th
   ])
   t.pass('tribes2 started for everyone')
 
-  const [aliceId, bobId, carolId] = await getRootIds([alice, bob, carol], t)
+  const [, bobId, carolId] = await getRootIds([alice, bob, carol], t)
 
   await replicate(alice, bob)
   await replicate(alice, carol)
@@ -450,7 +450,7 @@ test('Get added to an old epoch but still find newer epochs', async (t) => {
   ])
   t.pass('tribes2 started for everyone')
 
-  const [aliceId, bobId, carolId] = await getRootIds([alice, bob, carol], t)
+  const [, bobId, carolId] = await getRootIds([alice, bob, carol], t)
 
   await replicate(alice, bob)
   await replicate(alice, carol)
@@ -607,7 +607,7 @@ test('Can exclude a person in a group with a lot of members', async (t) => {
   await Promise.all(all.map((peer) => p(peer.close)(true)))
 })
 
-test.only("restarting the client doesn't make us rejoin old stuff", async (t) => {
+test("restarting the client doesn't make us rejoin old stuff", async (t) => {
   const alice = Testbot({
     keys: ssbKeys.generate(null, 'alice'),
     mfSeed: Buffer.from(
