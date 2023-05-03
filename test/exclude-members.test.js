@@ -686,7 +686,10 @@ test.only("restarting the client doesn't make us rejoin old stuff", async (t) =>
   const invites = await pull(bob.tribes2.listInvites(), pull.collectAsPromise())
   t.equal(invites.length, 0, "bob doesn't have any invites")
 
-  // TODO acceptInvite()
+  await bob.tribes2
+    .acceptInvite(groupId)
+    .then(() => t.fail("bob didn't error when trying to accept invalid invite"))
+    .catch(() => t.pass("bob couldn't accept old invite we were excluded from"))
 
   await p(alice.close)(true)
   await p(bob.close)(true)
