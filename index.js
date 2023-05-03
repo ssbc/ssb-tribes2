@@ -6,6 +6,7 @@ const { promisify } = require('util')
 const pull = require('pull-stream')
 const paraMap = require('pull-paramap')
 const pullMany = require('pull-many')
+const pullFlatMerge = require('pull-flat-merge')
 const pullDefer = require('pull-defer')
 const chunk = require('lodash.chunk')
 const clarify = require('clarify-error')
@@ -323,22 +324,40 @@ module.exports = {
     function listMembers(groupId, opts = {}) {
       const { live } = opts
 
+      if (!live) {
+        const deferredSource = pullDefer.source()
+
+        getPreferredEpoch(groupId, (err, epoch) => {
+          if (err)
+            return deferredSource.abort(
+              clarify('failed to load preferred epoch')
+            )
+
+          const source = pull(
+            getMembers.stream(epoch.id),
+            // if it's not live, only include added entries
+            pull.filter((update) => update.added)
+          )
+          deferredSource.resolve(source)
+        })
+
+        return deferredSource
+      }
+
       return pull(
         getPreferredEpoch.stream(groupId, { live }),
         pull.map((epoch) => getMembers.stream(epoch.id, { live })),
-        pull.flatten(),
-
-        // if it's not live, only include adds
-        live ? null : pull.filter((update) => update.added)
+        pullFlatMerge()
+        // NOTE pullFlatMerge needed in live case otherwise new streams don't get a word in!
       )
     }
 
     function listInvites() {
-      const deferedSource = pullDefer.source()
+      const deferredSource = pullDefer.source()
 
       getMyGroups((err, myGroups) => {
         // prettier-ignore
-        if (err) return deferedSource.abort(clarify(err, 'Failed to list group IDs when listing invites'))
+        if (err) return deferredSource.abort(clarify(err, 'Failed to list group IDs when listing invites'))
 
         const source = pull(
           // get all the groupIds we've heard of from invites
@@ -357,10 +376,10 @@ module.exports = {
           pull.asyncMap(getGroupInviteData)
         )
 
-        deferedSource.resolve(source)
+        deferredSource.resolve(source)
       })
 
-      return deferedSource
+      return deferredSource
 
       // listInvites helpers
 
@@ -368,6 +387,7 @@ module.exports = {
         const myGroups = new Set()
 
         pull(
+          // TODO replace with pull.values (unless want "round-robbin" sampling)
           pullMany([
             ssb.box2.listGroupIds(),
             ssb.box2.listGroupIds({ excluded: true }),

@@ -45,6 +45,7 @@
     "lodash.set": "^4.3.2",
     "private-group-spec": "^6.0.0",
     "pull-defer": "^0.2.3",
+    "pull-flat-merge": "^2.0.3",
     "pull-paramap": "^1.2.2",
     "pull-stream": "^3.7.0",
     "set.prototype.difference": "^1.0.2",

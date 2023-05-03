@@ -103,7 +103,6 @@ test('lib/epochs (getEpochs, getMembers)', async (t) => {
   )
   await sync('exclusion')
 
-  await p(setTimeout)(1000)
   const epochs = await Epochs(alice).getEpochs(group.id)
   const groupUpdated = await alice.tribes2.get(group.id)
   const [lastGroupInitId] = await pull(
@@ -113,21 +112,24 @@ test('lib/epochs (getEpochs, getMembers)', async (t) => {
     pull.collectAsPromise()
   )
 
-  const expected = [
-    {
-      id: group.root,
-      previous: null,
-      secret: group.writeKey.key,
-      author: aliceId,
-    },
-    {
-      id: lastGroupInitId,
-      previous: [group.root],
-      secret: groupUpdated.writeKey.key,
-      author: aliceId,
-    },
-  ]
-  t.deepEqual(epochs, expected, 'there are 2 epochs')
+  t.deepEqual(
+    epochs,
+    [
+      {
+        id: group.root,
+        previous: null,
+        secret: group.writeKey.key,
+        author: aliceId,
+      },
+      {
+        id: lastGroupInitId,
+        previous: [group.root],
+        secret: groupUpdated.writeKey.key,
+        author: aliceId,
+      },
+    ],
+    'there are 2 epochs'
+  )
 
   t.deepEqual(
     await Epochs(alice).getMembers(epochs[0].id),
@@ -143,7 +145,7 @@ test('lib/epochs (getEpochs, getMembers)', async (t) => {
   t.end()
 })
 
-test('lib/epochs (getMissingMembers)', { objectPrintDepth: 8 }, async (t) => {
+test('lib/epochs (getMissingMembers)', async (t) => {
   const run = Run(t)
 
   const peers = [Server(), Server(), Server()]

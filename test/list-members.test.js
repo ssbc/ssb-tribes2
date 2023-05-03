@@ -64,6 +64,8 @@ test('list members', async (t) => {
   await new Promise((res) => {
     pull(
       alice.tribes2.listMembers(group.id),
+      pull.map((info) => info.added),
+      pull.flatten(),
       pull.collect((err, members) => {
         t.error(err, 'returned members')
 
@@ -116,6 +118,8 @@ test('live list members', async (t) => {
   const members = []
   pull(
     alice.tribes2.listMembers(group.id, { live: true }),
+    pull.map((info) => info.added),
+    pull.flatten(),
     pull.drain(
       (member) => {
         members.push(member)
@@ -193,13 +197,14 @@ test('listMembers works with exclusion', async (t) => {
     .create()
     .catch((err) => t.error(err, 'alice failed to create group'))
 
+  t.pass('  --- listMembers (live) started ---  ')
   const liveMembers = new Set()
   pull(
     alice.tribes2.listMembers(groupId, { live: true }),
     pull.drain(
       (update) => {
-        if (update.excluded) liveMembers.delete(update.excluded)
-        else liveMembers.add(update)
+        update.added.forEach((feedId) => liveMembers.add(feedId))
+        update.toExclude.forEach((feedId) => liveMembers.delete(feedId))
       },
       (err) => t.error(err)
     )
@@ -248,12 +253,16 @@ test('listMembers works with exclusion', async (t) => {
 
   await alice.tribes2
     .addMembers(groupId, [davidRoot.id])
+    .then(() => t.pass('david added to group'))
     .catch((err) => t.error(err, 'add david fail'))
 
   await Promise.all([replicate(alice, bob), replicate(alice, carol)])
 
   const aliceMembers = await pull(
     alice.tribes2.listMembers(groupId),
+    pull.map((update) => update.added),
+    pull.flatten(),
+    pull.unique(),
     pull.collectAsPromise()
   )
   t.deepEquals(
@@ -264,6 +273,9 @@ test('listMembers works with exclusion', async (t) => {
 
   const carolMembers = await pull(
     carol.tribes2.listMembers(groupId),
+    pull.map((update) => update.added),
+    pull.flatten(),
+    pull.unique(),
     pull.collectAsPromise()
   )
   t.deepEquals(
