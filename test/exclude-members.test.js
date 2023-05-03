@@ -683,7 +683,8 @@ test.only("restarting the client doesn't make us rejoin old stuff", async (t) =>
   const list = await pull(bob.tribes2.list(), pull.collectAsPromise())
   t.equal(list.length, 0, "there aren't any groups in bob's group list anymore")
 
-  // TODO listInvites()
+  const invites = await pull(bob.tribes2.listInvites(), pull.collectAsPromise())
+  t.equal(invites.length, 0, "bob doesn't have any invites")
 
   // TODO acceptInvite()
 
