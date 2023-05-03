@@ -60,7 +60,7 @@ module.exports = {
       findOrCreateGroupWithoutMembers,
       getRootFeedIdFromMsgId,
     } = MetaFeedHelpers(ssb)
-    const { getPickedEpoch, getMemberUpdates } = Epochs(ssb)
+    const { getPreferredEpoch, getMembers } = Epochs(ssb)
 
     function create(opts = {}, cb) {
       if (cb === undefined) return promisify(create)(opts)
@@ -208,6 +208,8 @@ module.exports = {
 
           pull(
             listMembers(groupId),
+            pull.map((info) => info.added),
+            pull.flatten(),
             pull.collect((err, beforeMembers) => {
               // prettier-ignore
               if (err) return cb(clarify(err, "Couldn't get old member list when excluding members"))
@@ -319,19 +321,15 @@ module.exports = {
     }
 
     function listMembers(groupId, opts = {}) {
+      const { live } = opts
+
       return pull(
-        getPickedEpoch(groupId, { live: !!opts?.live }),
-        pull.map((pickedEpoch) => {
-          console.log('pickedEPoch', pickedEpoch)
-          return getMemberUpdates(pickedEpoch.id, { live: !!opts?.live })
-        }),
+        getPreferredEpoch.stream(groupId, { live }),
+        pull.map((epoch) => getMembers.stream(epoch.id, { live })),
         pull.flatten(),
-        pull.map((update) => {
-          if (update.added) return update.added
-          return update
-        }),
+
         // if it's not live, only include adds
-        pull.filter((update) => opts?.live || !update.excluded)
+        live ? null : pull.filter((update) => update.added)
       )
     }
 
