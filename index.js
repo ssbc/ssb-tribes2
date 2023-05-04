@@ -151,10 +151,12 @@ module.exports = {
           // prettier-ignore
           if (err) return cb(clarify(err, "couldn't get root id of author of root msg"))
 
+          // TODO: one content/publish per epoch tip
           const content = {
             type: 'group/add-member',
             version: 'v2',
             groupKey: writeKey.key.toString('base64'),
+            // TODO: also attach every past secret for all predecessor epochs
             root,
             creator: rootAuthorId,
             recps: [groupId, ...feedIds],
