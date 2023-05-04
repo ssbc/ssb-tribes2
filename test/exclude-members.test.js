@@ -198,7 +198,7 @@ test('Verify that you actually get excluded from a group', async (t) => {
   await Promise.all([alice.tribes2.start(), bob.tribes2.start()])
   t.pass('tribes2 started for both alice and bob')
 
-  const [aliceId, bobId] = await getRootIds([alice, bob], t)
+  const [, bobId] = await getRootIds([alice, bob], t)
 
   await replicate(alice, bob)
   t.pass('alice and bob replicate their trees')
@@ -323,7 +323,7 @@ test("If you're not the excluder nor the excludee then you should still be in th
   ])
   t.pass('tribes2 started for everyone')
 
-  const [aliceId, bobId, carolId] = await getRootIds([alice, bob, carol], t)
+  const [, bobId, carolId] = await getRootIds([alice, bob, carol], t)
 
   await replicate(alice, bob)
   await replicate(alice, carol)
@@ -450,7 +450,7 @@ test('Get added to an old epoch but still find newer epochs', async (t) => {
   ])
   t.pass('tribes2 started for everyone')
 
-  const [aliceId, bobId, carolId] = await getRootIds([alice, bob, carol], t)
+  const [, bobId, carolId] = await getRootIds([alice, bob, carol], t)
 
   await replicate(alice, bob)
   await replicate(alice, carol)
@@ -605,4 +605,89 @@ test('Can exclude a person in a group with a lot of members', async (t) => {
     .catch(() => t.fail('Others got excluded from the group'))
 
   await Promise.all(all.map((peer) => p(peer.close)(true)))
+})
+
+test("restarting the client doesn't make us rejoin old stuff", async (t) => {
+  const alice = Testbot({
+    keys: ssbKeys.generate(null, 'alice'),
+    mfSeed: Buffer.from(
+      '000000000000000000000000000000000000000000000000000000000000a1ce',
+      'hex'
+    ),
+  })
+  let bob = Testbot({
+    name: 'bobrestart',
+    keys: ssbKeys.generate(null, 'bob'),
+    mfSeed: Buffer.from(
+      '0000000000000000000000000000000000000000000000000000000000000b0b',
+      'hex'
+    ),
+  })
+
+  await Promise.all([alice.tribes2.start(), bob.tribes2.start()])
+
+  const bobRoot = await p(bob.metafeeds.findOrCreate)()
+
+  await replicate(alice, bob).catch(t.error)
+
+  const { id: groupId } = await alice.tribes2
+    .create()
+    .catch((err) => t.error(err, 'alice failed to create group'))
+
+  await alice.tribes2
+    .addMembers(groupId, [bobRoot.id])
+    .then(() => t.pass('added bob'))
+    .catch((err) => t.error(err, 'add bob fail'))
+
+  await replicate(alice, bob).catch(t.error)
+
+  await bob.tribes2.acceptInvite(groupId)
+
+  await replicate(alice, bob).catch(t.error)
+
+  await alice.tribes2
+    .excludeMembers(groupId, [bobRoot.id])
+    .then(() => t.pass('alice excluded bob'))
+    .catch((err) => t.error(err, 'remove member fail'))
+
+  await replicate(alice, bob).catch(t.error)
+
+  const beforeGroup = await bob.tribes2.get(groupId)
+  t.equals(beforeGroup.id, groupId, 'correct group id')
+  t.true(
+    beforeGroup.excluded,
+    "bob knows he's excluded from the group before restart"
+  )
+
+  await p(bob.close)(true).then(() => t.pass("bob's client was closed"))
+  bob = Testbot({
+    rimraf: false,
+    name: 'bobrestart',
+    keys: ssbKeys.generate(null, 'bob'),
+    mfSeed: Buffer.from(
+      '0000000000000000000000000000000000000000000000000000000000000b0b',
+      'hex'
+    ),
+  })
+  t.pass('bob got a new client')
+  await bob.tribes2.start().then(() => t.pass('bob restarted'))
+
+  t.true(
+    (await bob.tribes2.get(groupId)).excluded,
+    "bob knows he's excluded from the group after restart"
+  )
+
+  const list = await pull(bob.tribes2.list(), pull.collectAsPromise())
+  t.equal(list.length, 0, "there aren't any groups in bob's group list anymore")
+
+  const invites = await pull(bob.tribes2.listInvites(), pull.collectAsPromise())
+  t.equal(invites.length, 0, "bob doesn't have any invites")
+
+  await bob.tribes2
+    .acceptInvite(groupId)
+    .then(() => t.fail("bob didn't error when trying to accept invalid invite"))
+    .catch(() => t.pass("bob couldn't accept old invite we were excluded from"))
+
+  await p(alice.close)(true)
+  await p(bob.close)(true)
 })

@@ -503,7 +503,10 @@ module.exports = {
           pull.drain(
             (msg) => {
               const groupId = msg.value.content.recps[0]
-              ssb.box2.excludeGroupInfo(groupId, null)
+              ssb.box2.excludeGroupInfo(groupId, (err) => {
+                // prettier-ignore
+                if (err) return cb(clarify(err, 'Error on excluding group info after finding exclusion of ourselves'))
+              })
             },
             (err) => {
               // prettier-ignore
