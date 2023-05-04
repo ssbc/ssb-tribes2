@@ -198,15 +198,19 @@ test("create reuses a group feed that hasn't had members yet (because of an earl
           createEmptyGroupFeed({ server, root }, (err, groupFeed) => {
             if (err) t.fail(err)
 
-            const content = {
-              type: 'group/init',
-              tangles: {
-                group: { root: null, previous: null },
-              },
-            }
             const secret = new SecretKey(
               Buffer.from(groupFeed.purpose, 'base64')
             )
+            const content = {
+              type: 'group/init',
+              version: 'v2',
+              groupKey: groupFeed.purpose,
+              tangles: {
+                group: { root: null, previous: null },
+                members: { root: null, previous: null },
+                epoch: { root: null, previous: null },
+              },
+            }
             const recps = [
               { key: secret.toBuffer(), scheme: keySchemes.private_group },
               root.id,
@@ -230,7 +234,10 @@ test("create reuses a group feed that hasn't had members yet (because of an earl
                   )
 
                   server.tribes2.create(null, (err) => {
-                    if (err) t.fail(err)
+                    if (err) {
+                      console.log('fail create', err)
+                      t.fail(err)
+                    }
 
                     countGroupFeeds(server, (err, num) => {
                       if (err) t.fail(err)
