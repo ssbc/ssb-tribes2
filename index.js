@@ -35,7 +35,7 @@ const addTangles = require('./lib/tangles/add-tangles')
 const publishAndPrune = require('./lib/prune-publish')
 const MetaFeedHelpers = require('./lib/meta-feed-helpers')
 const { groupRecp } = require('./lib/operators')
-// const Epochs = require('./lib/epochs')
+const Epochs = require('./lib/epochs')
 
 module.exports = {
   name: 'tribes2',
@@ -60,7 +60,7 @@ module.exports = {
       findOrCreateGroupWithoutMembers,
       getRootFeedIdFromMsgId,
     } = MetaFeedHelpers(ssb)
-    // const { getEpochs } = Epochs(ssb)
+    const { getTipEpochs } = Epochs(ssb)
 
     function create(opts = {}, cb) {
       if (cb === undefined) return promisify(create)(opts)
@@ -143,7 +143,7 @@ module.exports = {
         return cb(new Error('addMembers only supports bendybutt-v1 feed IDs'))
       }
 
-      get(groupId, (err, { writeKey, root }) => {
+      get(groupId, (err, { root }) => {
         // prettier-ignore
         if (err) return cb(clarify(err, `Failed to get group details when adding members`))
 
@@ -151,36 +151,44 @@ module.exports = {
           // prettier-ignore
           if (err) return cb(clarify(err, "couldn't get root id of author of root msg"))
 
-          // TODO: one content/publish per epoch tip
-          const content = {
-            type: 'group/add-member',
-            version: 'v2',
-            groupKey: writeKey.key.toString('base64'),
-            // TODO: also attach every past secret for all predecessor epochs
-            root,
-            creator: rootAuthorId,
-            recps: [groupId, ...feedIds],
-          }
-
-          if (opts.text) content.text = opts.text
-
-          const getFeed = opts?._feedKeys
-            ? (cb) => cb(null, { keys: opts._feedKeys })
-            : findOrCreateAdditionsFeed
-
-          getFeed((err, additionsFeed) => {
+          getTipEpochs(groupId, (err, tipEpochs) => {
             // prettier-ignore
-            if (err) return cb(clarify(err, 'Failed to find or create additions feed when adding members'))
+            if (err) return cb(clarify(err, 'todo'))
 
-            const options = {
-              isValid: isAddMember,
-              tangles: ['members'],
-              feedKeys: additionsFeed.keys,
-            }
-            publish(content, options, (err, msg) => {
+            const contents = tipEpochs.map((tipEpoch) => ({
+              type: 'group/add-member',
+              version: 'v2',
+              groupKey: tipEpoch.secret.toString('base64'),
+              // TODO: also attach every past secret for all predecessor epochs
+              root,
+              creator: rootAuthorId,
+              text: opts?.text,
+              recps: [groupId, ...feedIds],
+            }))
+
+            const getFeed = opts?._feedKeys
+              ? (cb) => cb(null, { keys: opts._feedKeys })
+              : findOrCreateAdditionsFeed
+
+            getFeed((err, additionsFeed) => {
               // prettier-ignore
-              if (err) return cb(clarify(err, 'Failed to publish add-member message'))
-              return cb(null, msg)
+              if (err) return cb(clarify(err, 'Failed to find or create additions feed when adding members'))
+
+              const options = {
+                isValid: isAddMember,
+                tangles: ['members'],
+                feedKeys: additionsFeed.keys,
+              }
+              pull(
+                pull.values(contents),
+                pull.asyncMap((content, cb) => publish(content, options, cb)),
+                pull.collect((err, msgs) => {
+                  // prettier-ignore
+                  if (err) return cb(clarify(err, 'Failed to publish add-member message(s)'))
+
+                  return cb(null, msgs)
+                })
+              )
             })
           })
         })

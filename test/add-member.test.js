@@ -116,7 +116,7 @@ test('add member', async (t) => {
 
     const newMembers = [newPersonRoot.id]
 
-    const encryptedInvite = await kaitiaki.tribes2.addMembers(
+    const [encryptedInvite] = await kaitiaki.tribes2.addMembers(
       group.id,
       newMembers,
       {
