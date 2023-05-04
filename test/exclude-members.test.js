@@ -117,7 +117,7 @@ test('add and exclude a person, post on the new feed', async (t) => {
 
   const excludeMsg = firstContents[1]
 
-  t.equal(excludeMsg.type, 'group/exclude')
+  t.equal(excludeMsg.type, 'group/exclude-member')
   t.deepEqual(excludeMsg.excludes, [bobId])
   t.deepEqual(excludeMsg.recps, [groupId])
   t.deepEqual(excludeMsg.tangles.members, {
