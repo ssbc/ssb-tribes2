@@ -208,7 +208,7 @@ test('get-tangle with branch', async (t) => {
   const group = await p(alice.tribes2.create)(null).catch(t.fail)
   t.pass('alice created a group')
 
-  const invite = await p(alice.tribes2.addMembers)(group.id, [bobRoot.id], {
+  const [invite] = await p(alice.tribes2.addMembers)(group.id, [bobRoot.id], {
     text: 'ahoy',
   }).catch(t.fail)
   t.pass('alice invited bob')
@@ -278,9 +278,13 @@ test('members tangle works', async (t) => {
   const group = await alice.tribes2.create().catch(t.fail)
   t.pass('alice created a group')
 
-  const bobInvite = await p(alice.tribes2.addMembers)(group.id, [bobRoot.id], {
-    text: 'ahoy',
-  }).catch(t.fail)
+  const [bobInvite] = await p(alice.tribes2.addMembers)(
+    group.id,
+    [bobRoot.id],
+    {
+      text: 'ahoy',
+    }
+  ).catch(t.fail)
   await replicate(alice, bob)
   await bob.tribes2.acceptInvite(group.id)
   const bobPost = await bob.tribes2.publish({
@@ -309,7 +313,7 @@ test('members tangle works', async (t) => {
     'members tangle is correct'
   )
 
-  const carolInviteEnc = await p(alice.tribes2.addMembers)(
+  const [carolInviteEnc] = await p(alice.tribes2.addMembers)(
     group.id,
     [carolRoot.id],
     {

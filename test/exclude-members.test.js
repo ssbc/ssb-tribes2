@@ -55,7 +55,7 @@ test('add and exclude a person, post on the new feed', async (t) => {
     .create()
     .catch((err) => t.error(err, 'alice failed to create group'))
 
-  const addBobMsg = await alice.tribes2
+  const [addBobMsg] = await alice.tribes2
     .addMembers(groupId, [bobId])
     .catch((err) => t.error(err, 'add member fail'))
 

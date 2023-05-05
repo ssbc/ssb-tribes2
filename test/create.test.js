@@ -234,10 +234,7 @@ test("create reuses a group feed that hasn't had members yet (because of an earl
                   )
 
                   server.tribes2.create(null, (err) => {
-                    if (err) {
-                      console.log('fail create', err)
-                      t.fail(err)
-                    }
+                    if (err) t.fail(err)
 
                     countGroupFeeds(server, (err, num) => {
                       if (err) t.fail(err)
