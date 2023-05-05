@@ -39,7 +39,7 @@ test('create more', async (t) => {
   t.true(isIdentityGroupSSBURI(group.id), 'returns group identifier - groupId')
   t.true(
     Buffer.isBuffer(group.writeKey.key) && group.writeKey.key.length === 32,
-    'returns group symmetric key - groupKey'
+    'returns group symmetric key - groupSecret'
   )
 
   const msgVal = await p(ssb.db.get)(group.root).catch(t.fail)
@@ -51,7 +51,7 @@ test('create more', async (t) => {
     {
       type: 'group/init',
       version: 'v2',
-      groupKey: group.writeKey.key.toString('base64'),
+      secret: group.writeKey.key.toString('base64'),
       tangles: {
         group: { root: null, previous: null },
         epoch: { root: null, previous: null },
@@ -71,7 +71,7 @@ test('create more', async (t) => {
     {
       type: 'group/add-member',
       version: 'v2',
-      groupKey: group.writeKey.key.toString('base64'),
+      secret: group.writeKey.key.toString('base64'),
       creator: rootFeed.id,
       root: group.root,
       recps: [group.id, root.id], // me being added to the group
@@ -204,7 +204,7 @@ test("create reuses a group feed that hasn't had members yet (because of an earl
             const content = {
               type: 'group/init',
               version: 'v2',
-              groupKey: groupFeed.purpose,
+              secret: groupFeed.purpose,
               tangles: {
                 group: { root: null, previous: null },
                 members: { root: null, previous: null },

@@ -113,7 +113,7 @@ test('add and exclude a person, post on the new feed', async (t) => {
   const firstInit = firstContents[0]
 
   t.equal(firstInit.type, 'group/init')
-  t.equal(firstInit.groupKey, writeKey1.key.toString('base64'))
+  t.equal(firstInit.secret, writeKey1.key.toString('base64'))
 
   const excludeMsg = firstContents[1]
 
@@ -138,7 +138,7 @@ test('add and exclude a person, post on the new feed', async (t) => {
 
   t.equal(secondInit.type, 'group/init')
   t.equal(secondInit.version, 'v2')
-  t.equal(secondInit.groupKey, writeKey2.key.toString('base64'))
+  t.equal(secondInit.secret, writeKey2.key.toString('base64'))
   t.deepEqual(secondInit.tangles.members, { root: null, previous: null })
   t.deepEqual(
     secondInit.tangles.epoch,

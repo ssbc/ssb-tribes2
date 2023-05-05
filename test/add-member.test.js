@@ -129,7 +129,7 @@ test('add member', async (t) => {
     const expected = {
       type: 'group/add-member',
       version: 'v2',
-      groupKey: group.writeKey.key.toString('base64'),
+      secret: group.writeKey.key.toString('base64'),
       root: group.root,
       creator: kaitiakiRoot.id,
 
@@ -273,7 +273,7 @@ test('addMembers too many members', async (t) => {
   await p(alice.close)(true)
 })
 
-test.only('addMembers adds to all the tip epochs and gives keys to all the old epochs as well', async (t) => {
+test('addMembers adds to all the tip epochs and gives keys to all the old epochs as well', async (t) => {
   // alice adds bob and carol
   // alice and bob remove carol at the same time, creating forked epochs
   // everyone still replicates and sees the fork

@@ -60,7 +60,7 @@ module.exports = {
       findOrCreateGroupWithoutMembers,
       getRootFeedIdFromMsgId,
     } = MetaFeedHelpers(ssb)
-    const { getTipEpochs } = Epochs(ssb)
+    const { getTipEpochs, getPredecessorEpochs } = Epochs(ssb)
 
     function create(opts = {}, cb) {
       if (cb === undefined) return promisify(create)(opts)
@@ -76,7 +76,7 @@ module.exports = {
         const data = {
           id: buildGroupId({
             groupInitMsg,
-            groupKey: secret.toBuffer(),
+            secret: secret.toBuffer(),
           }),
           writeKey: {
             key: secret.toBuffer(),
@@ -155,17 +155,6 @@ module.exports = {
             // prettier-ignore
             if (err) return cb(clarify(err, 'todo'))
 
-            const contents = tipEpochs.map((tipEpoch) => ({
-              type: 'group/add-member',
-              version: 'v2',
-              groupKey: tipEpoch.secret.toString('base64'),
-              // TODO: also attach every past secret for all predecessor epochs
-              root,
-              creator: rootAuthorId,
-              text: opts?.text,
-              recps: [groupId, ...feedIds],
-            }))
-
             const getFeed = opts?._feedKeys
               ? (cb) => cb(null, { keys: opts._feedKeys })
               : findOrCreateAdditionsFeed
@@ -180,7 +169,31 @@ module.exports = {
                 feedKeys: additionsFeed.keys,
               }
               pull(
-                pull.values(contents),
+                pull.values(tipEpochs),
+                pull.asyncMap((tipEpoch, cb) => {
+                  getPredecessorEpochs(
+                    groupId,
+                    tipEpoch.id,
+                    (err, predecessors) => {
+                      // prettier-ignore
+                      if (err) return cb(clarify(err, 'todo'))
+
+                      const content = {
+                        type: 'group/add-member',
+                        version: 'v2',
+                        secret: tipEpoch.secret.toString('base64'),
+                        oldSecrets: predecessors.map((pred) =>
+                          pred.secret.toString('base64')
+                        ),
+                        root,
+                        creator: rootAuthorId,
+                        text: opts?.text,
+                        recps: [groupId, ...feedIds],
+                      }
+                      return cb(null, content)
+                    }
+                  )
+                }),
                 pull.asyncMap((content, cb) => publish(content, options, cb)),
                 pull.collect((err, msgs) => {
                   // prettier-ignore
@@ -225,15 +238,15 @@ module.exports = {
               const remainingMembers = beforeMembers.filter(
                 (member) => !feedIds.includes(member)
               )
-              const newGroupKey = new SecretKey()
-              const addInfo = { key: newGroupKey.toBuffer() }
+              const newSecret = new SecretKey()
+              const addInfo = { key: newSecret.toBuffer() }
 
               ssb.box2.addGroupInfo(groupId, addInfo, (err) => {
                 // prettier-ignore
                 if (err) return cb(clarify(err, "Couldn't store new key when excluding members"))
 
                 const newKey = {
-                  key: newGroupKey.toBuffer(),
+                  key: newSecret.toBuffer(),
                   scheme: keySchemes.private_group,
                 }
                 ssb.box2.pickGroupWriteKey(groupId, newKey, (err) => {
@@ -243,7 +256,7 @@ module.exports = {
                   const newEpochContent = {
                     type: 'group/init',
                     version: 'v2',
-                    groupKey: newGroupKey.toString('base64'),
+                    secret: newSecret.toString('base64'),
                     tangles: {
                       members: { root: null, previous: null },
                     },
@@ -429,7 +442,7 @@ module.exports = {
           pull.drain(
             (msg) => {
               root ||= msg.value.content.root
-              secrets.add(msg.value.content.groupKey)
+              secrets.add(msg.value.content.secret)
             },
             (err) => {
               if (err) return cb(err)
@@ -555,7 +568,7 @@ module.exports = {
             (msg) => {
               const groupId = msg.value.content.recps[0]
 
-              const newKey = Buffer.from(msg.value.content.groupKey, 'base64')
+              const newKey = Buffer.from(msg.value.content.secret, 'base64')
               ssb.box2.addGroupInfo(groupId, { key: newKey }, (err) => {
                 // prettier-ignore
                 if (err) return cb(clarify(err, 'Error adding new epoch key that we found'))
