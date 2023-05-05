@@ -272,3 +272,125 @@ test('addMembers too many members', async (t) => {
 
   await p(alice.close)(true)
 })
+
+test.only('addMembers adds to all the tip epochs and gives keys to all the old epochs as well', async (t) => {
+  // alice adds bob and carol
+  // alice and bob remove carol at the same time, creating forked epochs
+  // everyone still replicates and sees the fork
+  // alice adds david to the group, and he should see both forks and the original epoch
+  const alice = Testbot({
+    keys: ssbKeys.generate(null, 'alice'),
+    mfSeed: Buffer.from(
+      '000000000000000000000000000000000000000000000000000000000000a1ce',
+      'hex'
+    ),
+  })
+  const bob = Testbot({
+    keys: ssbKeys.generate(null, 'bob'),
+    mfSeed: Buffer.from(
+      '0000000000000000000000000000000000000000000000000000000000000b0b',
+      'hex'
+    ),
+  })
+  const carol = Testbot({
+    keys: ssbKeys.generate(null, 'carol'),
+    mfSeed: Buffer.from(
+      '00000000000000000000000000000000000000000000000000000000000ca201',
+      'hex'
+    ),
+  })
+  const david = Testbot({
+    keys: ssbKeys.generate(null, 'david'),
+    mfSeed: Buffer.from(
+      '00000000000000000000000000000000000000000000000000000000000da71d',
+      'hex'
+    ),
+  })
+
+  await Promise.all([
+    alice.tribes2.start(),
+    bob.tribes2.start(),
+    carol.tribes2.start(),
+    david.tribes2.start(),
+  ])
+
+  const [, bobRootId, carolRootId, davidRootId] = (
+    await Promise.all(
+      [alice, bob, carol, david].map((peer) => p(peer.metafeeds.findOrCreate)())
+    )
+  ).map((root) => root.id)
+
+  await Promise.all([
+    replicate(alice, bob),
+    replicate(alice, carol),
+    replicate(alice, david),
+  ])
+
+  const { id: groupId } = await alice.tribes2.create()
+
+  const { key: firstEpochPostId } = await alice.tribes2.publish({
+    type: 'test',
+    text: 'first post',
+    recps: [groupId],
+  })
+
+  await alice.tribes2.addMembers(groupId, [bobRootId, carolRootId])
+
+  await Promise.all([
+    replicate(alice, bob),
+    replicate(alice, carol),
+    replicate(alice, david),
+  ])
+
+  await bob.tribes2.acceptInvite(groupId)
+
+  await Promise.all([
+    alice.tribes2.excludeMembers(groupId, [carolRootId]),
+    bob.tribes2.excludeMembers(groupId, [carolRootId]),
+  ])
+
+  const { key: aliceForkPostId } = await alice.tribes2.publish({
+    type: 'test',
+    text: 'alice fork post',
+    recps: [groupId],
+  })
+
+  const { key: bobForkPostId } = await bob.tribes2.publish({
+    type: 'test',
+    text: 'bob fork post',
+    recps: [groupId],
+  })
+
+  await Promise.all([
+    replicate(alice, bob),
+    replicate(alice, carol),
+    replicate(alice, david),
+  ])
+
+  await alice.tribes2.addMembers(groupId, [davidRootId])
+
+  await replicate(alice, david)
+
+  await david.tribes2.acceptInvite(groupId)
+
+  const bobForkMsg = await p(david.db.get)(bobForkPostId)
+  t.notEquals(
+    typeof bobForkMsg.content,
+    'string',
+    "david decrypted the msg in bob's fork"
+  )
+
+  const aliceForkMsg = await p(david.db.get)(aliceForkPostId)
+  t.notEquals(
+    typeof aliceForkMsg.content,
+    'string',
+    "david decrypted the msg in alice's fork"
+  )
+
+  const firstEpochMsg = await p(david.db.get)(firstEpochPostId)
+  t.notEquals(
+    typeof firstEpochMsg.content,
+    'string',
+    'david decrypted the msg in the first epoch'
+  )
+})
