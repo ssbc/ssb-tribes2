@@ -174,6 +174,7 @@ test('live list groups', async (t) => {
   t.pass('bob accepted invite')
 
   await p(setTimeout)(2000)
+  console.log('groups', JSON.stringify(groups, null, 2))
   t.equal(groups.length, 1, 'bob now finds the group in the group list')
   t.equal(groups[0].id, group.id, 'id matches')
   t.equal(groups[0].root, group.root, 'root matches')

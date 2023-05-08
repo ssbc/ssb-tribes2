@@ -72,6 +72,7 @@ test('create more', async (t) => {
       type: 'group/add-member',
       version: 'v2',
       secret: group.writeKey.key.toString('base64'),
+      oldSecrets: [],
       creator: rootFeed.id,
       root: group.root,
       recps: [group.id, root.id], // me being added to the group
