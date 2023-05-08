@@ -327,7 +327,8 @@ test('addMembers adds to all the tip epochs and gives keys to all the old epochs
     replicate(alice, david),
   ])
 
-  const { id: groupId } = await alice.tribes2.create()
+  const { id: groupId, writeKey: firstEpochKey } = await alice.tribes2.create()
+  const firstEpochSecret = firstEpochKey.key.toString('base64')
 
   const { key: firstEpochPostId } = await alice.tribes2.publish({
     type: 'test',
@@ -355,12 +356,16 @@ test('addMembers adds to all the tip epochs and gives keys to all the old epochs
     text: 'alice fork post',
     recps: [groupId],
   })
+  const { writeKey: aliceForkKey } = await alice.tribes2.get(groupId)
+  const aliceForkSecret = aliceForkKey.key.toString('base64')
 
   const { key: bobForkPostId } = await bob.tribes2.publish({
     type: 'test',
     text: 'bob fork post',
     recps: [groupId],
   })
+  const { writeKey: bobForkKey } = await bob.tribes2.get(groupId)
+  const bobForkSecret = bobForkKey.key.toString('base64')
 
   await Promise.all([
     replicate(alice, bob),
@@ -368,7 +373,47 @@ test('addMembers adds to all the tip epochs and gives keys to all the old epochs
     replicate(alice, david),
   ])
 
-  await alice.tribes2.addMembers(groupId, [davidRootId])
+  const addDavid = await alice.tribes2
+    .addMembers(groupId, [davidRootId])
+    .then((res) => {
+      t.pass('david got added to the group by alice')
+      return res
+    })
+
+  t.equal(addDavid.length, 2, 'David got added to both forks')
+
+  const adds = await Promise.all(
+    addDavid.map((add) => p(alice.db.get)(add.key))
+  )
+  const addContents = adds.map((add) => add.content)
+
+  const addAliceFork = addContents.find(
+    (content) => content.secret === aliceForkSecret
+  )
+  t.equal(
+    addAliceFork.secret,
+    aliceForkSecret,
+    "gave david the secret to alice's fork"
+  )
+  t.deepEqual(
+    addAliceFork.oldSecrets,
+    [firstEpochSecret],
+    "gave david the secret to the initial epoch, in the addition to alice's fork"
+  )
+
+  const addBobFork = addContents.find(
+    (content) => content.secret === bobForkSecret
+  )
+  t.equal(
+    addBobFork.secret,
+    bobForkSecret,
+    "gave david the secret to bob's fork"
+  )
+  t.deepEqual(
+    addBobFork.oldSecrets,
+    [firstEpochSecret],
+    "gave david the secret to the initial epoch, in the addition to bob's fork"
+  )
 
   await replicate(alice, david)
 
