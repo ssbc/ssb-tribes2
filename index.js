@@ -426,6 +426,7 @@ module.exports = {
       function getGroupInviteData(groupId, cb) {
         let root
         const secrets = new Set()
+        let writeSecret = null
 
         pull(
           ssb.db.query(
@@ -442,7 +443,13 @@ module.exports = {
           pull.drain(
             (msg) => {
               root ||= msg.value.content.root
-              secrets.add(msg.value.content.secret)
+              const oldSecrets = msg.value.content.oldSecrets
+              if (oldSecrets) {
+                oldSecrets.forEach((oldSecret) => secrets.add(oldSecret))
+              }
+              const latestSecret = msg.value.content.secret
+              secrets.add(latestSecret)
+              writeSecret = latestSecret
             },
             (err) => {
               if (err) return cb(err)
@@ -455,6 +462,10 @@ module.exports = {
                 id: groupId,
                 root,
                 readKeys,
+                writeKey: {
+                  key: Buffer.from(writeSecret, 'base64'),
+                  scheme: keySchemes.private_group,
+                },
               }
               return cb(null, invite)
             }
@@ -477,8 +488,8 @@ module.exports = {
           if (!inviteInfos.length) return cb(new Error("Didn't find invite for that group id"))
 
           // TODO: which writeKey should be picked??
-          // this will essentially pick a random write key
-          const { id, root, readKeys } = inviteInfos[0]
+          // this will essentially pick a random write key from the current epoch tips
+          const { id, root, readKeys, writeKey } = inviteInfos[0]
           pull(
             pull.values(readKeys),
             pull.asyncMap((readKey, cb) => {
@@ -487,10 +498,15 @@ module.exports = {
             pull.collect((err) => {
               // prettier-ignore
               if (err) return cb(clarify(err, 'Failed to add group info when accepting an invite'))
-              ssb.db.reindexEncrypted((err) => {
+              ssb.box2.pickGroupWriteKey(id, writeKey, (err) => {
                 // prettier-ignore
-                if (err) cb(clarify(err, 'Failed to reindex encrypted messages when accepting an invite'))
-                else cb(null, inviteInfos[0])
+                if (err) return cb(clarify(err, 'Failed to pick a write key when accepting invite to a group'))
+
+                ssb.db.reindexEncrypted((err) => {
+                  // prettier-ignore
+                  if (err) cb(clarify(err, 'Failed to reindex encrypted messages when accepting an invite'))
+                  else cb(null, inviteInfos[0])
+                })
               })
             })
           )

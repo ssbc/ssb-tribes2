@@ -130,6 +130,7 @@ test('add member', async (t) => {
       type: 'group/add-member',
       version: 'v2',
       secret: group.writeKey.key.toString('base64'),
+      oldSecrets: [],
       root: group.root,
       creator: kaitiakiRoot.id,
 
@@ -393,4 +394,11 @@ test('addMembers adds to all the tip epochs and gives keys to all the old epochs
     'string',
     'david decrypted the msg in the first epoch'
   )
+
+  await Promise.all([
+    p(alice.close)(true),
+    p(bob.close)(true),
+    p(carol.close)(true),
+    p(david.close)(true),
+  ])
 })
