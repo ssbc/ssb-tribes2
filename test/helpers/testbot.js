@@ -39,6 +39,10 @@ module.exports = function createSbot(opts = {}) {
     ebt: {
       // logging: true,
     },
+    db2: opts.db2 || {
+      flushDebounce: 10,
+      writeTimeout: 10,
+    },
     metafeeds: {
       seed: opts.mfSeed,
     },

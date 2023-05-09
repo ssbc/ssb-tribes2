@@ -268,8 +268,10 @@ test('members tangle works', async (t) => {
     carol.tribes2.start(),
   ])
 
-  const bobRoot = await p(bob.metafeeds.findOrCreate)()
-  const carolRoot = await p(carol.metafeeds.findOrCreate)()
+  const [bobRoot, carolRoot] = await Promise.all([
+    p(bob.metafeeds.findOrCreate)(),
+    p(carol.metafeeds.findOrCreate)(),
+  ])
 
   await replicate(alice, bob)
   await replicate(alice, carol)
