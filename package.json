@@ -43,7 +43,7 @@
     "jitdb": "^7.0.7",
     "lodash.chunk": "^4.2.0",
     "lodash.set": "^4.3.2",
-    "private-group-spec": "github:ssbc/private-group-spec#old-secrets",
+    "private-group-spec": "^8.0.0",
     "pull-defer": "^0.2.3",
     "pull-paramap": "^1.2.2",
     "pull-stream": "^3.7.0",
