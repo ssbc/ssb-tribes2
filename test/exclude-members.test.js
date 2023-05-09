@@ -12,7 +12,7 @@ const Testbot = require('./helpers/testbot')
 const replicate = require('./helpers/replicate')
 const countGroupFeeds = require('./helpers/count-group-feeds')
 
-function getRootIds(peers, t) {
+async function getRootIds(peers, t) {
   return Promise.all(peers.map((peer) => p(peer.metafeeds.findOrCreate)()))
     .then((peerRoots) => peerRoots.map((root) => root.id))
     .catch((err) => t.error(err, 'Error getting root feeds for peers'))
@@ -537,34 +537,48 @@ test('Get added to an old epoch but still find newer epochs', async (t) => {
 })
 
 test('Can exclude a person in a group with a lot of members', async (t) => {
-  const alice = Testbot({
+  // NOTE: taking db2 debounces/timeouts out breaks this test, so run default
+  // db2 config for stability
+  const _Testbot = (opts) => Testbot({ ...opts, db2: {} })
+  const alice = _Testbot({
     keys: ssbKeys.generate(null, 'alice'),
     mfSeed: Buffer.from(
       '000000000000000000000000000000000000000000000000000000000000a1ce',
       'hex'
     ),
+    db2: {},
   })
 
-  const peers = Array.from({ length: 20 }, Testbot)
+  const peers = Array.from({ length: 20 }, _Testbot)
   const all = [alice, ...peers]
 
   async function sync() {
     await Promise.all(peers.map((peer) => replicate(alice, peer)))
   }
 
-  await Promise.all(all.map((peer) => peer.tribes2.start()))
+  await Promise.all(all.map((peer) => peer.tribes2.start())).then(() =>
+    t.pass('tribes2 started')
+  )
+
   const peerRootIds = await getRootIds(peers, t)
 
   const { id: groupId } = await alice.tribes2.create()
+  t.pass('created a group')
 
   await sync()
 
-  await alice.tribes2.addMembers(groupId, peerRootIds.slice(0, 10))
-  await alice.tribes2.addMembers(groupId, peerRootIds.slice(10))
+  await alice.tribes2
+    .addMembers(groupId, peerRootIds.slice(0, 10))
+    .then(() => t.pass(`invited ${peerRootIds.slice(0, 10).length} peers`))
+  await alice.tribes2
+    .addMembers(groupId, peerRootIds.slice(10))
+    .then(() => t.pass(`invited ${peerRootIds.slice(10).length} peers`))
 
   await sync()
 
-  await Promise.all(peers.map((peer) => peer.tribes2.acceptInvite(groupId)))
+  await Promise.all(
+    peers.map((peer) => peer.tribes2.acceptInvite(groupId))
+  ).then(() => t.pass('peers accept invites'))
 
   await alice.tribes2
     .excludeMembers(groupId, [peerRootIds[0]])
