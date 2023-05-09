@@ -353,23 +353,25 @@ module.exports = {
     function listInvites() {
       const deferedSource = pullDefer.source()
 
-      getMyGroups((err, myGroups) => {
+      getMyReadKeys((err, myReadKeys) => {
         // prettier-ignore
-        if (err) return deferedSource.abort(clarify(err, 'Failed to list group IDs when listing invites'))
+        if (err) return deferedSource.abort(clarify(err, 'Failed to list group readKeys when listing invites'))
 
         const source = pull(
-          // get all the groupIds we've heard of from invites
+          // get all the additions we've heard of
           ssb.db.query(
             where(and(isDecrypted('box2'), type('group/add-member'))),
             toPullStream()
           ),
           pull.filter((msg) => isAddMember(msg)),
-          pull.map((msg) => msg.value.content.recps[0]),
-          pull.unique(),
+          pull.map((msg) => msg.value.content),
+          pull.unique('groupKey'),
 
-          // drop those we're a part of already
-          pull.filter((groupId) => !myGroups.has(groupId)),
+          // drop those we're grabbed secrets from already (in case we've been in the group before)
+          pull.filter((content) => !myReadKeys.has(content.groupKey)),
 
+          // groupId
+          pull.map((content) => content.recps[0]),
           // gather all the data required for each group-invite
           pull.asyncMap(getGroupInviteData)
         )
@@ -381,8 +383,8 @@ module.exports = {
 
       // listInvites helpers
 
-      function getMyGroups(cb) {
-        const myGroups = new Set()
+      function getMyReadKeys(cb) {
+        const myReadKeys = new Set()
 
         pull(
           pullMany([
@@ -390,11 +392,15 @@ module.exports = {
             ssb.box2.listGroupIds({ excluded: true }),
           ]),
           pull.flatten(),
+          pull.asyncMap((groupId, cb) => ssb.box2.getGroupInfo(groupId, cb)),
           pull.drain(
-            (groupId) => myGroups.add(groupId),
+            (groupInfo) =>
+              groupInfo.readKeys
+                .map((readKey) => readKey.key.toString('base64'))
+                .forEach((readKeyString) => myReadKeys.add(readKeyString)),
             (err) => {
               if (err) return cb(err)
-              return cb(null, myGroups)
+              return cb(null, myReadKeys)
             }
           )
         )
@@ -503,6 +509,7 @@ module.exports = {
           pull.drain(
             (msg) => {
               const groupId = msg.value.content.recps[0]
+              // TODO: also check if it's in one of the epoch tips
               ssb.box2.excludeGroupInfo(groupId, (err) => {
                 // prettier-ignore
                 if (err) return cb(clarify(err, 'Error on excluding group info after finding exclusion of ourselves'))

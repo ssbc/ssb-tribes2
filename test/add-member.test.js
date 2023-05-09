@@ -273,7 +273,7 @@ test('addMembers too many members', async (t) => {
   await p(alice.close)(true)
 })
 
-test.only('can or cannot add someone back into a group', async (t) => {
+test('can or cannot add someone back into a group', async (t) => {
   const alice = Testbot({
     keys: ssbKeys.generate(null, 'alice'),
     mfSeed: Buffer.from(
