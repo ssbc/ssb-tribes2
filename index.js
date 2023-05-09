@@ -501,6 +501,7 @@ module.exports = {
             live({ old: true }),
             toPullStream()
           ),
+          pull.through((msg) => console.log('exclude msg', msg.value.content)),
           pull.filter(isExcludeMember),
           pull.filter((msg) =>
             // it's an exclusion of us

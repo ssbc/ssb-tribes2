@@ -281,7 +281,8 @@ test('can or cannot add someone back into a group', async (t) => {
       'hex'
     ),
   })
-  const bob = Testbot({
+  let bob = Testbot({
+    name: 'bobrestart',
     keys: ssbKeys.generate(null, 'bob'),
     mfSeed: Buffer.from(
       '0000000000000000000000000000000000000000000000000000000000000b0b',
@@ -324,7 +325,42 @@ test('can or cannot add someone back into a group', async (t) => {
 
   await replicate(alice, bob).catch(t.error)
 
+  // TODO: test listinvite
   await bob.tribes2.acceptInvite(groupId).catch(t.error)
+
+  async function verifyInGroup(peer) {
+    // TODO: test listInvites
+
+    await peer.tribes2
+      .acceptInvite(groupId)
+      .then(() => t.fail('consumed invite twice'))
+      .catch(() => t.pass("can't consume invite twice"))
+
+    const list = await pull(peer.tribes2.list(), pull.collectAsPromise())
+    t.equal(list.length, 1, 'one group')
+    t.equal(list[0].id, groupId, 'id in list is correct')
+
+    // TODO: test if writeKey is there
+
+    // TODO: test if `excluded` is there
+  }
+
+  await verifyInGroup(bob)
+
+  await p(bob.close)(true).then(() => t.pass("bob's client was closed"))
+  bob = Testbot({
+    rimraf: false,
+    name: 'bobrestart',
+    keys: ssbKeys.generate(null, 'bob'),
+    mfSeed: Buffer.from(
+      '0000000000000000000000000000000000000000000000000000000000000b0b',
+      'hex'
+    ),
+  })
+  t.pass('bob got a new client')
+  await bob.tribes2.start().then(() => t.pass('bob restarted'))
+
+  await verifyInGroup(bob)
 
   await p(alice.close)(true)
   await p(bob.close)(true)

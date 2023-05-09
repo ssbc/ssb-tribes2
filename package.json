@@ -49,7 +49,7 @@
     "pull-stream": "^3.7.0",
     "set.prototype.difference": "^1.0.2",
     "ssb-bfe": "^3.7.0",
-    "ssb-box2": "^7.0.0",
+    "ssb-box2": "ssbc/ssb-box2#un-exclude",
     "ssb-crut": "^4.6.2",
     "ssb-db2": "^7.1.0",
     "ssb-meta-feeds": "^0.39.0",
