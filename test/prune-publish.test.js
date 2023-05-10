@@ -60,7 +60,7 @@ test('prune a message with way too big `previous`', async (t) => {
 
 test('publish many messages that might need pruning', (t) => {
   const n = 5000
-  const ssb = Testbot()
+  const ssb = Testbot({ db2: {} })
 
   const publishArray = new Array(n).fill().map((item, i) => i)
 
