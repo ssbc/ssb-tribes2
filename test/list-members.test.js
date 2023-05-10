@@ -115,14 +115,12 @@ test('live list members', async (t) => {
   const group = await p(alice.tribes2.create)(null).catch(t.fail)
   t.pass('alice created a group')
 
-  const members = []
+  let members = []
   pull(
     alice.tribes2.listMembers(group.id, { live: true }),
-    pull.map((info) => info.added),
-    pull.flatten(),
     pull.drain(
-      (member) => {
-        members.push(member)
+      (update) => {
+        members = update.added
       },
       (err) => {
         if (err) t.fail(err)
@@ -198,21 +196,22 @@ test('listMembers works with exclusion', async (t) => {
     .catch((err) => t.error(err, 'alice failed to create group'))
 
   t.pass('  --- listMembers (live) started ---  ')
-  const liveMembers = new Set()
+  let liveMembers
   pull(
     alice.tribes2.listMembers(groupId, { live: true }),
     pull.drain(
       (update) => {
-        update.added.forEach((feedId) => liveMembers.add(feedId))
-        update.toExclude.forEach((feedId) => liveMembers.delete(feedId))
+        liveMembers = update.added
       },
-      (err) => t.error(err)
+      (err) => {
+        if (err) t.error(err)
+      }
     )
   )
 
   await p(setTimeout)(1000)
 
-  t.deepEquals([...liveMembers], [aliceRoot.id], 'only alice is in the group')
+  t.deepEquals(liveMembers, [aliceRoot.id], 'only alice is in the group')
 
   await alice.tribes2
     .addMembers(groupId, [bobRoot.id, carolRoot.id])
@@ -220,7 +219,7 @@ test('listMembers works with exclusion', async (t) => {
 
   await p(setTimeout)(500)
   t.deepEquals(
-    [...liveMembers].sort(),
+    liveMembers.sort(),
     [aliceRoot.id, bobRoot.id, carolRoot.id].sort(),
     'alice bob and carol are in the group'
   )
@@ -246,7 +245,7 @@ test('listMembers works with exclusion', async (t) => {
 
   await p(setTimeout)(500)
   t.deepEquals(
-    [...liveMembers].sort(),
+    liveMembers.sort(),
     [aliceRoot.id, carolRoot.id].sort(),
     'bob is out of the group'
   )
@@ -284,21 +283,18 @@ test('listMembers works with exclusion', async (t) => {
     'carol gets the correct members list'
   )
 
+  const msg =
+    "Bob gets an error when trying to list members of the group he's excluded from"
   await pull(bob.tribes2.listMembers(groupId), pull.collectAsPromise())
-    .then(() =>
-      t.fail(
-        "Bob didn't get an error when trying to list members of the group he's excluded from"
-      )
-    )
-    .catch(() =>
-      t.pass(
-        "Bob gets an error when trying to list members of the group he's excluded from"
-      )
-    )
+    .then((res) => {
+      console.log(res)
+      t.fail(msg)
+    })
+    .catch(() => t.pass(msg))
 
   await p(setTimeout)(500)
   t.deepEquals(
-    [...liveMembers].sort(),
+    liveMembers.sort(),
     [aliceRoot.id, carolRoot.id, davidRoot.id].sort(),
     'adding david to new epoch got detected live'
   )

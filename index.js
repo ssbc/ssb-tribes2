@@ -7,6 +7,7 @@ const pull = require('pull-stream')
 const paraMap = require('pull-paramap')
 const pullMany = require('pull-many')
 const pullFlatMerge = require('pull-flat-merge')
+const pullAbortable = require('pull-abortable')
 const pullDefer = require('pull-defer')
 const chunk = require('lodash.chunk')
 const clarify = require('clarify-error')
@@ -323,33 +324,45 @@ module.exports = {
 
     function listMembers(groupId, opts = {}) {
       const { live } = opts
+      const deferredSource = pullDefer.source()
 
-      if (!live) {
-        const deferredSource = pullDefer.source()
+      get(groupId, (err, group) => {
+        // prettier-ignore
+        if (err) return deferredSource.abort(clarify(err, 'Failed to get group info when listing members'))
+        // prettier-ignore
+        if (group.excluded) return deferredSource.abort( new Error("We're excluded from this group, can't list members"))
 
-        getPreferredEpoch(groupId, (err, epoch) => {
-          if (err)
-            return deferredSource.abort(
-              clarify('failed to load preferred epoch')
-            )
+        if (!live) {
+          getPreferredEpoch(groupId, (err, epoch) => {
+            // prettier-ignore
+            if (err) return deferredSource.abort(clarify(err, 'failed to load preferred epoch'))
 
-          const source = pull(
-            getMembers.stream(epoch.id),
-            // if it's not live, only include added entries
-            pull.filter((update) => update.added)
-          )
-          deferredSource.resolve(source)
-        })
+            getMembers(epoch.id, (err, res) => {
+              // prettier-ignore
+              if (err) return deferredSource.abort(clarify(err, 'error getting members'))
 
-        return deferredSource
-      }
+              const source = pull.once(res)
+              deferredSource.resolve(source)
+            })
+          })
+          return
+        }
 
-      return pull(
-        getPreferredEpoch.stream(groupId, { live }),
-        pull.map((epoch) => getMembers.stream(epoch.id, { live })),
-        pullFlatMerge()
-        // NOTE pullFlatMerge needed in live case otherwise new streams don't get a word in!
-      )
+        let abortable = pullAbortable()
+        const source = pull(
+          getPreferredEpoch.stream(groupId, { live }),
+          pull.map((epoch) => {
+            abortable.abort()
+            abortable = pullAbortable()
+
+            return pull(getMembers.stream(epoch.id, { live }), abortable)
+          }),
+          pullFlatMerge()
+        )
+        deferredSource.resolve(source)
+      })
+
+      return deferredSource
     }
 
     function listInvites() {
