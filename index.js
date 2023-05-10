@@ -396,10 +396,10 @@ module.exports = {
           ),
           pull.filter((msg) => isAddMember(msg)),
           pull.map((msg) => msg.value.content),
-          pull.unique('groupKey'),
+          pull.unique('secret'),
 
           // drop those we're grabbed secrets from already (in case we've been in the group before)
-          pull.filter((content) => !myReadKeys.has(content.groupKey)),
+          pull.filter((content) => !myReadKeys.has(content.secret)),
 
           // groupId
           pull.map((content) => content.recps[0]),
