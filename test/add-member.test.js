@@ -448,7 +448,7 @@ test('addMembers adds to all the tip epochs and gives keys to all the old epochs
   ])
 })
 
-test.only('can or cannot add someone back into a group', async (t) => {
+test('can or cannot add someone back into a group', async (t) => {
   const alice = Testbot({
     keys: ssbKeys.generate(null, 'alice'),
     mfSeed: Buffer.from(
