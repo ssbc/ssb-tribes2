@@ -548,7 +548,6 @@ module.exports = {
             live({ old: true }),
             toPullStream()
           ),
-          pull.through((msg) => console.log('exclude msg', msg.value.content)),
           pull.filter(isExcludeMember),
           pull.filter((msg) =>
             // it's an exclusion of us
@@ -557,10 +556,24 @@ module.exports = {
           pull.drain(
             (msg) => {
               const groupId = msg.value.content.recps[0]
-              // TODO: also check if it's in one of the epoch tips
-              ssb.box2.excludeGroupInfo(groupId, (err) => {
+              getTipEpochs(groupId, (err, tipEpochs) => {
                 // prettier-ignore
-                if (err) return cb(clarify(err, 'Error on excluding group info after finding exclusion of ourselves'))
+                if (err) return cb(clarify(err, 'Error on getting tip epochs after finding exclusion of ourselves'))
+
+                const excludeEpochRootId =
+                  msg.value.content.tangles.members.root
+
+                const excludeIsInTipEpoch = tipEpochs
+                  .map((tip) => tip.id)
+                  .includes(excludeEpochRootId)
+
+                // ignore the exclude if it's an old one (we were added back to the group later)
+                if (!excludeIsInTipEpoch) return
+
+                ssb.box2.excludeGroupInfo(groupId, (err) => {
+                  // prettier-ignore
+                  if (err) return cb(clarify(err, 'Error on excluding group info after finding exclusion of ourselves'))
+                })
               })
             },
             (err) => {
