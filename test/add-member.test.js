@@ -522,6 +522,7 @@ test('can or cannot add someone back into a group', async (t) => {
 
   await verifyInGroup(bob)
 
+  await p(setTimeout)(500)
   await p(bob.close)(true).then(() => t.pass("bob's client was closed"))
   bob = Testbot({
     rimraf: false,
