@@ -132,6 +132,8 @@ module.exports = {
     function addMembers(groupId, feedIds, opts = {}, cb) {
       if (cb === undefined) return promisify(addMembers)(groupId, feedIds, opts)
 
+      opts.oldSecrets ??= true
+
       if (!feedIds || feedIds.length === 0) {
         return cb(new Error('No feedIds provided to addMembers'))
       }
@@ -153,7 +155,7 @@ module.exports = {
 
           getTipEpochs(groupId, (err, tipEpochs) => {
             // prettier-ignore
-            if (err) return cb(clarify(err, 'todo'))
+            if (err) return cb(clarify(err, "Couldn't get tip epochs when adding members"))
 
             const getFeed = opts?._feedKeys
               ? (cb) => cb(null, { keys: opts._feedKeys })
@@ -176,15 +178,16 @@ module.exports = {
                     tipEpoch.id,
                     (err, predecessors) => {
                       // prettier-ignore
-                      if (err) return cb(clarify(err, 'todo'))
+                      if (err) return cb(clarify(err, "Couldn't get predecessor epochs when adding members"))
 
+                      const oldSecrets = predecessors.map((pred) =>
+                        pred.secret.toString('base64')
+                      )
                       const content = {
                         type: 'group/add-member',
                         version: 'v2',
                         secret: tipEpoch.secret.toString('base64'),
-                        oldSecrets: predecessors.map((pred) =>
-                          pred.secret.toString('base64')
-                        ),
+                        oldSecrets: opts.oldSecrets ? oldSecrets : undefined,
                         root,
                         creator: rootAuthorId,
                         text: opts?.text,
@@ -273,7 +276,12 @@ module.exports = {
                     pull(
                       pull.values(chunk(remainingMembers, 15)),
                       pull.asyncMap((membersToAdd, cb) =>
-                        addMembers(groupId, membersToAdd, {}, cb)
+                        addMembers(
+                          groupId,
+                          membersToAdd,
+                          { oldSecrets: false },
+                          cb
+                        )
                       ),
                       pull.collect((err) => {
                         // prettier-ignore

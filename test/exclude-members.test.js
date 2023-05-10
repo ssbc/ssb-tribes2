@@ -165,6 +165,16 @@ test('add and exclude a person, post on the new feed', async (t) => {
 
   t.equal(reinviteMsg.type, 'group/add-member')
   t.deepEqual(reinviteMsg.recps, [groupId, aliceId])
+  t.equal(
+    reinviteMsg.secret,
+    writeKey2.key.toString('base64'),
+    're-addition gives secret to new epoch'
+  )
+  t.equal(
+    reinviteMsg.oldSecrets,
+    undefined,
+    "re-addition doesn't send secrets to old epochs"
+  )
 
   const secondInitKey = fromMessageSigil(msgsFromSecond[0].key)
   t.deepEqual(
