@@ -22,7 +22,7 @@ const {
     group: {
       addMember: isAddMember,
       content: isContent,
-      exclude: isExclude,
+      excludeMember: isExcludeMember,
       initEpoch: isInitEpoch,
     },
   },
@@ -194,13 +194,13 @@ module.exports = {
         if (err) return cb(clarify(err, "Couldn't get own root when excluding members"))
 
         const excludeContent = {
-          type: 'group/exclude',
+          type: 'group/exclude-member',
           excludes: feedIds,
           recps: [groupId],
         }
         const excludeOpts = {
           tangles: ['members'],
-          isValid: isExclude,
+          isValid: isExcludeMember,
         }
         publish(excludeContent, excludeOpts, (err) => {
           // prettier-ignore
@@ -476,11 +476,11 @@ module.exports = {
         // check if we've been excluded
         pull(
           ssb.db.query(
-            where(and(isDecrypted('box2'), type('group/exclude'))),
+            where(and(isDecrypted('box2'), type('group/exclude-member'))),
             live({ old: true }),
             toPullStream()
           ),
-          pull.filter(isExclude),
+          pull.filter(isExcludeMember),
           pull.filter((msg) =>
             // it's an exclusion of us
             msg.value.content.excludes.includes(myRoot.id)
@@ -488,7 +488,10 @@ module.exports = {
           pull.drain(
             (msg) => {
               const groupId = msg.value.content.recps[0]
-              ssb.box2.excludeGroupInfo(groupId, null)
+              ssb.box2.excludeGroupInfo(groupId, (err) => {
+                // prettier-ignore
+                if (err) return cb(clarify(err, 'Error on excluding group info after finding exclusion of ourselves'))
+              })
             },
             (err) => {
               // prettier-ignore
