@@ -65,6 +65,12 @@ module.exports = {
     } = MetaFeedHelpers(ssb)
     const { getPreferredEpoch, getMembers } = Epochs(ssb)
 
+    let isClosed = false
+    ssb.close.hook((close, args) => {
+      isClosed = true
+      close.apply(ssb, args)
+    })
+
     function create(opts = {}, cb) {
       if (cb === undefined) return promisify(create)(opts)
 
@@ -503,7 +509,7 @@ module.exports = {
 
       ssb.metafeeds.findOrCreate((err, myRoot) => {
         // prettier-ignore
-        if (err) return console.log(clarify(err, 'Error getting own root in start()'))
+        if (err) return console.error(clarify(err, 'Error getting own root in start()'))
 
         // check if we've been excluded
         pull(
@@ -522,12 +528,12 @@ module.exports = {
               const groupId = msg.value.content.recps[0]
               ssb.box2.excludeGroupInfo(groupId, (err) => {
                 // prettier-ignore
-                if (err) return console.log(clarify(err, 'Error on excluding group info after finding exclusion of ourselves'))
+                if (err) return console.error(clarify(err, 'Error on excluding group info after finding exclusion of ourselves'))
               })
             },
             (err) => {
               // prettier-ignore
-              if (err) return console.log(clarify(err, 'Error on looking for exclude messages excluding us'))
+              if (err) return console.error(clarify(err, 'Error on looking for exclude messages excluding us'))
             }
           )
         )
@@ -565,7 +571,7 @@ module.exports = {
               const secret = Buffer.from(msg.value.content.groupKey, 'base64')
               ssb.box2.addGroupInfo(groupId, { key: secret }, (err) => {
                 // prettier-ignore
-                if (err) return console.error(clarify(err, 'Error adding new epoch key that we found'))
+                if (err && !isClosed) return console.error(clarify(err, 'Cannot add new epoch key that we found'))
 
                 const newKeyPick = {
                   key: secret,
@@ -574,18 +580,18 @@ module.exports = {
                 // TODO: naively guessing that this is the latest key for now
                 ssb.box2.pickGroupWriteKey(groupId, newKeyPick, (err) => {
                   // prettier-ignore
-                  if (err) return console.error(clarify(err, 'Error switching to new epoch key that we found'))
+                  if (err && !isClosed) return console.error(clarify(err, 'Error switching to new epoch key that we found'))
 
                   ssb.db.reindexEncrypted((err) => {
                     // prettier-ignore
-                    if (err) console.error(clarify(err, 'Error reindexing after finding new epoch'))
+                    if (err && !isClosed) console.error(clarify(err, 'Error reindexing after finding new epoch'))
                   })
                 })
               })
             },
             (err) => {
               // prettier-ignore
-              if (err) return console.error(clarify(err, "Error finding new epochs we've been added to"))
+              if (err && !isClosed) return console.error(clarify(err, "Error finding new epochs we've been added to"))
             }
           )
         )
@@ -601,15 +607,13 @@ module.exports = {
           pull.map((msg) => msg.value.content.recps[0]),
           pull.drain((groupId) => {
             ssb.box2.getGroupInfo(groupId, (err, groupInfo) => {
-              if (err)
-                return console.error(
-                  clarify(err, 'fatal error in live updating groupInfo')
-                )
+              // prettier-ignore
+              if (err && !isClosed) return console.error(clarify(err, 'fatal error in live updating groupInfo'))
               if (!groupInfo) return // group that we've not accepted an invite to yet
               if (!groupInfo.writeKey) return // group where we were excluded
 
               getPreferredEpoch(groupId, (err, epochInfo) => {
-                if (err)
+                if (err && !isClosed)
                   return console.error(
                     clarify(err, 'fatal error getting preferred epoch')
                   )
@@ -620,21 +624,19 @@ module.exports = {
                   { key: epochInfo.secret },
                   (err) => {
                     // prettier-ignore
-                    if (err) return console.error(clarify(err, 'Error adding new epoch key'))
+                    if (err && !isClosed) return console.error(clarify(err, 'Error adding new epoch key'))
 
                     const newKeyPick = {
                       key: epochInfo.secret,
                       scheme: keySchemes.private_group,
                     }
                     ssb.box2.pickGroupWriteKey(groupId, newKeyPick, (err) => {
-                      if (err)
-                        return console.error(
-                          clarify(err, 'Error picking group write key')
-                        )
+                      // prettier-ignore
+                      if (err && !isClosed) return console.error(clarify(err, 'Error picking group write key'))
 
                       ssb.db.reindexEncrypted((err) => {
                         // prettier-ignore
-                        if (err) console.log(clarify(err, 'Error reindexing after finding new epoch'))
+                        if (err && !isClosed) console.error(clarify(err, 'Error reindexing after finding new epoch'))
                       })
                     })
                   }
