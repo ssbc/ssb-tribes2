@@ -448,7 +448,7 @@ test('addMembers adds to all the tip epochs and gives keys to all the old epochs
   ])
 })
 
-test('can or cannot add someone back into a group', async (t) => {
+test.only('can or cannot add someone back into a group', async (t) => {
   const alice = Testbot({
     keys: ssbKeys.generate(null, 'alice'),
     mfSeed: Buffer.from(
@@ -500,11 +500,17 @@ test('can or cannot add someone back into a group', async (t) => {
 
   await replicate(alice, bob).catch(t.error)
 
-  // TODO: test listinvite
+  const invites = await pull(bob.tribes2.listInvites(), pull.collectAsPromise())
+  t.equal(invites.length, 1, 'got a reinvite')
+  t.equal(invites[0].id, groupId, 'got invite to correct group')
   await bob.tribes2.acceptInvite(groupId).catch(t.error)
 
   async function verifyInGroup(peer) {
-    // TODO: test listInvites
+    const noInvites = await pull(
+      bob.tribes2.listInvites(),
+      pull.collectAsPromise()
+    )
+    t.deepEqual(noInvites, [], "we used the invite so there aren't any left")
 
     await peer.tribes2
       .acceptInvite(groupId)
@@ -515,9 +521,9 @@ test('can or cannot add someone back into a group', async (t) => {
     t.equal(list.length, 1, 'one group')
     t.equal(list[0].id, groupId, 'id in list is correct')
 
-    // TODO: test if writeKey is there
-
-    // TODO: test if `excluded` is there
+    const group = await bob.tribes2.get(groupId)
+    t.notEqual(group.writeKey, undefined, 'bob got writeKey back')
+    t.equal(group.excluded, undefined, 'bob is not excluded')
   }
 
   await verifyInGroup(bob)
