@@ -662,6 +662,8 @@ test("restarting the client doesn't make us rejoin old stuff", async (t) => {
   )
 
   await p(bob.close)(true).then(() => t.pass("bob's client was closed"))
+  await p(setTimeout)(500)
+
   bob = Testbot({
     rimraf: false,
     name: 'bobrestart',
