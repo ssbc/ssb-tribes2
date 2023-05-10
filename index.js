@@ -606,7 +606,7 @@ module.exports = {
                   clarify(err, 'fatal error in live updating groupInfo')
                 )
               if (!groupInfo) return // group that we've not accepted an invite to yet
-              if (!groupInfo.writeKey) return console.log('woops', groupInfo)
+              if (!groupInfo.writeKey) return // group where we were excluded
 
               getPreferredEpoch(groupId, (err, epochInfo) => {
                 if (err)
@@ -627,7 +627,6 @@ module.exports = {
                       scheme: keySchemes.private_group,
                     }
                     ssb.box2.pickGroupWriteKey(groupId, newKeyPick, (err) => {
-                      console.log('BOOP updated write key!')
                       if (err)
                         return console.error(
                           clarify(err, 'Error picking group write key')
