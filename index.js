@@ -377,7 +377,7 @@ module.exports = {
         const source = pull(
           // get all the groupIds we've heard of from invites
           ssb.db.query(
-            where(or(isDecrypted('box2'), type('group/add-member'))),
+            where(and(isDecrypted('box2'), type('group/add-member'))),
             toPullStream()
           ),
           pull.filter((msg) => isAddMember(msg)),
