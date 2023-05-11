@@ -261,8 +261,7 @@ module.exports = {
                       pull.collect((err) => {
                         // prettier-ignore
                         if (err) return cb(clarify(err, "Couldn't re-add remaining members when excluding members"))
-
-                        return cb()
+                        cb(null)
                       })
                     )
                   })
