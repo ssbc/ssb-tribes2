@@ -6,15 +6,17 @@ const { promisify } = require('util')
 const pull = require('pull-stream')
 const paraMap = require('pull-paramap')
 const pullMany = require('pull-many')
+const pullFlatMerge = require('pull-flat-merge')
+const pullAbortable = require('pull-abortable')
 const pullDefer = require('pull-defer')
 const chunk = require('lodash.chunk')
 const clarify = require('clarify-error')
 const {
   where,
   and,
+  or,
   isDecrypted,
   type,
-  live,
   toPullStream,
 } = require('ssb-db2/operators')
 const {
@@ -30,6 +32,8 @@ const {
 } = require('private-group-spec')
 const { SecretKey } = require('ssb-private-group-keys')
 const { fromMessageSigil, isBendyButtV1FeedSSBURI } = require('ssb-uri2')
+
+const startListeners = require('./listeners')
 const buildGroupId = require('./lib/build-group-id')
 const addTangles = require('./lib/tangles/add-tangles')
 const publishAndPrune = require('./lib/prune-publish')
@@ -60,7 +64,7 @@ module.exports = {
       findOrCreateGroupWithoutMembers,
       getRootFeedIdFromMsgId,
     } = MetaFeedHelpers(ssb)
-    const { getPickedEpoch, getMemberUpdates } = Epochs(ssb)
+    const { getPreferredEpoch, getMembers } = Epochs(ssb)
 
     function create(opts = {}, cb) {
       if (cb === undefined) return promisify(create)(opts)
@@ -208,6 +212,8 @@ module.exports = {
 
           pull(
             listMembers(groupId),
+            pull.map((info) => info.added),
+            pull.flatten(),
             pull.collect((err, beforeMembers) => {
               // prettier-ignore
               if (err) return cb(clarify(err, "Couldn't get old member list when excluding members"))
@@ -319,33 +325,59 @@ module.exports = {
     }
 
     function listMembers(groupId, opts = {}) {
-      return pull(
-        getPickedEpoch(groupId, { live: !!opts?.live }),
-        pull.map((pickedEpoch) => {
-          console.log('pickedEPoch', pickedEpoch)
-          return getMemberUpdates(pickedEpoch.id, { live: !!opts?.live })
-        }),
-        pull.flatten(),
-        pull.map((update) => {
-          if (update.added) return update.added
-          return update
-        }),
-        // if it's not live, only include adds
-        pull.filter((update) => opts?.live || !update.excluded)
-      )
+      const { live } = opts
+      const deferredSource = pullDefer.source()
+
+      get(groupId, (err, group) => {
+        // prettier-ignore
+        if (err) return deferredSource.abort(clarify(err, 'Failed to get group info when listing members'))
+        // prettier-ignore
+        if (group.excluded) return deferredSource.abort( new Error("We're excluded from this group, can't list members"))
+
+        if (!live) {
+          getPreferredEpoch(groupId, (err, epoch) => {
+            // prettier-ignore
+            if (err) return deferredSource.abort(clarify(err, 'failed to load preferred epoch'))
+
+            getMembers(epoch.id, (err, res) => {
+              // prettier-ignore
+              if (err) return deferredSource.abort(clarify(err, 'error getting members'))
+
+              const source = pull.once(res)
+              deferredSource.resolve(source)
+            })
+          })
+          return
+        }
+
+        let abortable = pullAbortable()
+        const source = pull(
+          getPreferredEpoch.stream(groupId, { live }),
+          pull.map((epoch) => {
+            abortable.abort()
+            abortable = pullAbortable()
+
+            return pull(getMembers.stream(epoch.id, { live }), abortable)
+          }),
+          pullFlatMerge()
+        )
+        deferredSource.resolve(source)
+      })
+
+      return deferredSource
     }
 
     function listInvites() {
-      const deferedSource = pullDefer.source()
+      const deferredSource = pullDefer.source()
 
       getMyGroups((err, myGroups) => {
         // prettier-ignore
-        if (err) return deferedSource.abort(clarify(err, 'Failed to list group IDs when listing invites'))
+        if (err) return deferredSource.abort(clarify(err, 'Failed to list group IDs when listing invites'))
 
         const source = pull(
           // get all the groupIds we've heard of from invites
           ssb.db.query(
-            where(and(isDecrypted('box2'), type('group/add-member'))),
+            where(or(isDecrypted('box2'), type('group/add-member'))),
             toPullStream()
           ),
           pull.filter((msg) => isAddMember(msg)),
@@ -359,10 +391,10 @@ module.exports = {
           pull.asyncMap(getGroupInviteData)
         )
 
-        deferedSource.resolve(source)
+        deferredSource.resolve(source)
       })
 
-      return deferedSource
+      return deferredSource
 
       // listInvites helpers
 
@@ -370,6 +402,7 @@ module.exports = {
         const myGroups = new Set()
 
         pull(
+          // TODO replace with pull.values (unless want "round-robbin" sampling)
           pullMany([
             ssb.box2.listGroupIds(),
             ssb.box2.listGroupIds({ excluded: true }),
@@ -466,97 +499,8 @@ module.exports = {
       findOrCreateAdditionsFeed((err) => {
         // prettier-ignore
         if (err) return cb(clarify(err, 'Error finding or creating additions feed when starting ssb-tribes2'))
-        return cb()
-      })
-
-      ssb.metafeeds.findOrCreate((err, myRoot) => {
-        // prettier-ignore
-        if (err) return cb(clarify(err, 'Error getting own root in start()'))
-
-        // check if we've been excluded
-        pull(
-          ssb.db.query(
-            where(and(isDecrypted('box2'), type('group/exclude-member'))),
-            live({ old: true }),
-            toPullStream()
-          ),
-          pull.filter(isExcludeMember),
-          pull.filter((msg) =>
-            // it's an exclusion of us
-            msg.value.content.excludes.includes(myRoot.id)
-          ),
-          pull.drain(
-            (msg) => {
-              const groupId = msg.value.content.recps[0]
-              ssb.box2.excludeGroupInfo(groupId, (err) => {
-                // prettier-ignore
-                if (err) return cb(clarify(err, 'Error on excluding group info after finding exclusion of ourselves'))
-              })
-            },
-            (err) => {
-              // prettier-ignore
-              if (err) return cb(clarify(err, 'Error on looking for exclude messages excluding us'))
-            }
-          )
-        )
-
-        // look for new epochs that we're added to
-        pull(
-          ssb.db.query(
-            where(and(isDecrypted('box2'), type('group/add-member'))),
-            live({ old: true }),
-            toPullStream()
-          ),
-          pull.filter(isAddMember),
-          // groups/epochs we're added to
-          pull.filter((msg) => {
-            return msg.value.content.recps.includes(myRoot.id)
-          }),
-          // to find new epochs we only check groups we've accepted the invite to
-          paraMap((msg, cb) => {
-            pull(
-              ssb.box2.listGroupIds(),
-              pull.filter((groupId) => groupId === msg.value.content.recps[0]),
-              pull.take(1),
-              pull.collect((err, groupIds) => {
-                // prettier-ignore
-                if (err) return cb(clarify(err, "Error getting groups we're already in when looking for new epochs"))
-                cb(null, groupIds.length ? msg : null)
-              })
-            )
-          }, 4),
-          pull.filter(Boolean),
-          pull.drain(
-            (msg) => {
-              const groupId = msg.value.content.recps[0]
-
-              const newKey = Buffer.from(msg.value.content.groupKey, 'base64')
-              ssb.box2.addGroupInfo(groupId, { key: newKey }, (err) => {
-                // prettier-ignore
-                if (err) return cb(clarify(err, 'Error adding new epoch key that we found'))
-
-                const newKeyPick = {
-                  key: newKey,
-                  scheme: keySchemes.private_group,
-                }
-                // TODO: naively guessing that this is the latest key for now
-                ssb.box2.pickGroupWriteKey(groupId, newKeyPick, (err) => {
-                  // prettier-ignore
-                  if (err) return cb(clarify(err, 'Error switching to new epoch key that we found'))
-
-                  ssb.db.reindexEncrypted((err) => {
-                    // prettier-ignore
-                    if (err) cb(clarify(err, 'Error reindexing after finding new epoch'))
-                  })
-                })
-              })
-            },
-            (err) => {
-              // prettier-ignore
-              if (err) return cb(clarify(err, "Error finding new epochs we've been added to"))
-            }
-          )
-        )
+        cb(null)
+        startListeners(ssb, getPreferredEpoch, console.error)
       })
     }
 
