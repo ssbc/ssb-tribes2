@@ -64,6 +64,8 @@ test('list members', async (t) => {
   await new Promise((res) => {
     pull(
       alice.tribes2.listMembers(group.id),
+      pull.map((info) => info.added),
+      pull.flatten(),
       pull.collect((err, members) => {
         t.error(err, 'returned members')
 
@@ -113,12 +115,12 @@ test('live list members', async (t) => {
   const group = await p(alice.tribes2.create)(null).catch(t.fail)
   t.pass('alice created a group')
 
-  const members = []
+  let members = []
   pull(
     alice.tribes2.listMembers(group.id, { live: true }),
     pull.drain(
-      (member) => {
-        members.push(member)
+      (update) => {
+        members = update.added
       },
       (err) => {
         if (err) t.fail(err)
@@ -137,4 +139,170 @@ test('live list members', async (t) => {
   t.deepEqual(members, [aliceRoot.id, bobRoot.id], 'bob add was detected live')
 
   await Promise.all([p(alice.close)(true), p(bob.close)(true)])
+})
+
+test('listMembers works with exclusion', async (t) => {
+  const alice = Testbot({
+    keys: ssbKeys.generate(null, 'alice'),
+    mfSeed: Buffer.from(
+      '000000000000000000000000000000000000000000000000000000000000a1ce',
+      'hex'
+    ),
+  })
+  const bob = Testbot({
+    keys: ssbKeys.generate(null, 'bob'),
+    mfSeed: Buffer.from(
+      '0000000000000000000000000000000000000000000000000000000000000b0b',
+      'hex'
+    ),
+  })
+  const carol = Testbot({
+    keys: ssbKeys.generate(null, 'carol'),
+    mfSeed: Buffer.from(
+      '00000000000000000000000000000000000000000000000000000000000ca201',
+      'hex'
+    ),
+  })
+  const david = Testbot({
+    keys: ssbKeys.generate(null, 'david'),
+    mfSeed: Buffer.from(
+      '00000000000000000000000000000000000000000000000000000000000da71d',
+      'hex'
+    ),
+  })
+
+  await Promise.all([
+    alice.tribes2.start(),
+    bob.tribes2.start(),
+    carol.tribes2.start(),
+    david.tribes2.start(),
+  ]).then(() => t.pass('tribes2 started for everyone'))
+
+  const [aliceRoot, bobRoot, carolRoot, davidRoot] = await Promise.all([
+    p(alice.metafeeds.findOrCreate)(),
+    p(bob.metafeeds.findOrCreate)(),
+    p(carol.metafeeds.findOrCreate)(),
+    p(david.metafeeds.findOrCreate)(),
+  ])
+
+  await Promise.all([
+    replicate(alice, bob),
+    replicate(alice, carol),
+    replicate(alice, david),
+  ]).then(() => t.pass('everyone replicates their trees'))
+
+  const { id: groupId } = await alice.tribes2
+    .create()
+    .catch((err) => t.error(err, 'alice failed to create group'))
+
+  t.pass('  --- listMembers (live) started ---  ')
+  let liveMembers
+  pull(
+    alice.tribes2.listMembers(groupId, { live: true }),
+    pull.drain(
+      (update) => {
+        liveMembers = update.added
+      },
+      (err) => {
+        if (err) t.error(err)
+      }
+    )
+  )
+
+  await p(setTimeout)(1000)
+
+  t.deepEquals(liveMembers, [aliceRoot.id], 'only alice is in the group')
+
+  await alice.tribes2
+    .addMembers(groupId, [bobRoot.id, carolRoot.id])
+    .catch((err) => t.error(err, 'add bob and carol fail'))
+
+  await p(setTimeout)(500)
+  t.deepEquals(
+    liveMembers.sort(),
+    [aliceRoot.id, bobRoot.id, carolRoot.id].sort(),
+    'alice bob and carol are in the group'
+  )
+
+  await Promise.all([replicate(alice, bob), replicate(alice, carol)])
+
+  await Promise.all([
+    bob.tribes2.acceptInvite(groupId),
+    carol.tribes2.acceptInvite(groupId),
+  ])
+
+  await Promise.all([replicate(alice, bob), replicate(alice, carol)])
+
+  await alice.tribes2
+    .excludeMembers(groupId, [bobRoot.id])
+    .then((res) => {
+      t.pass('alice excluded bob')
+      return res
+    })
+    .catch((err) => t.error(err, 'remove member fail'))
+
+  await Promise.all([replicate(alice, bob), replicate(alice, carol)])
+
+  await p(setTimeout)(500)
+  t.deepEquals(
+    liveMembers.sort(),
+    [aliceRoot.id, carolRoot.id].sort(),
+    'bob is out of the group'
+  )
+
+  await alice.tribes2
+    .addMembers(groupId, [davidRoot.id])
+    .then(() => t.pass('david added to group'))
+    .catch((err) => t.error(err, 'add david fail'))
+
+  await Promise.all([replicate(alice, bob), replicate(alice, carol)])
+
+  const aliceMembers = await pull(
+    alice.tribes2.listMembers(groupId),
+    pull.map((update) => update.added),
+    pull.flatten(),
+    pull.unique(),
+    pull.collectAsPromise()
+  )
+  t.deepEquals(
+    aliceMembers.sort(),
+    [aliceRoot.id, carolRoot.id, davidRoot.id].sort(),
+    'alice gets the correct members list'
+  )
+
+  const carolMembers = await pull(
+    carol.tribes2.listMembers(groupId),
+    pull.map((update) => update.added),
+    pull.flatten(),
+    pull.unique(),
+    pull.collectAsPromise()
+  )
+  t.deepEquals(
+    carolMembers.sort(),
+    [aliceRoot.id, carolRoot.id, davidRoot.id].sort(),
+    'carol gets the correct members list'
+  )
+
+  const msg =
+    "Bob gets an error when trying to list members of the group he's excluded from"
+  await pull(bob.tribes2.listMembers(groupId), pull.collectAsPromise())
+    .then((res) => {
+      console.log(res)
+      t.fail(msg)
+    })
+    .catch(() => t.pass(msg))
+
+  await p(setTimeout)(500)
+  t.deepEquals(
+    liveMembers.sort(),
+    [aliceRoot.id, carolRoot.id, davidRoot.id].sort(),
+    'adding david to new epoch got detected live'
+  )
+
+  await Promise.all([
+    p(alice.close)(true),
+    p(bob.close)(true),
+    p(carol.close)(true),
+    p(david.close)(true),
+  ])
 })

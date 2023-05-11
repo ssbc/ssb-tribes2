@@ -162,7 +162,22 @@ Publishes any kind of message encrypted to the group. The function wraps `ssb.db
 
 ### `ssb.tribes2.listMembers(groupId, { live }) => source`
 
-Returns a pull stream source listing every known member of the group with id `groupId`. Note: lists members whether or not they've accepted the invite. If `live` is true, then it keeps the stream open and also outputs new members.
+Returns a pull stream source listing the root feed id of every member of the
+group with id `groupId`. Note: lists members whether or not they've accepted the
+invite.
+
+If `live` is true, then it keeps the stream open and also outputs updates to
+membership as new members are added / excluded.
+
+Each update emitted from the source is the updated complete state for the
+current preferred epoch of the group in the format:
+
+```js
+{
+  added: [feedId, feedId, ...],
+  toExclude: [feedId, ...]
+}
+```
 
 ### `ssb.tribes2.listInvites() => source`
 
