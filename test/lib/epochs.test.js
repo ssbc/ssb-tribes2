@@ -72,11 +72,20 @@ test('lib/epochs (getEpochs, getMembers)', async (t) => {
     ],
     'there is 1 epoch'
   )
+
+  let liveMembers = []
+  pull(
+    Epochs(alice).getMembers.stream(group.root, { live: true }), // epoch zero root
+    pull.drain((state) => liveMembers.unshift(state))
+  )
+  const excpected0 = { added: [aliceId], toExclude: [] }
+  // group.root = epoch zero id
   t.deepEqual(
-    await Epochs(alice).getMembers(group.root), // epoch zero root
-    { added: [aliceId], toExclude: [] },
+    await Epochs(alice).getMembers(group.root),
+    excpected0,
     'group members: alice'
   )
+  t.deepEqual(liveMembers[0], excpected0, 'group members: alice (live)')
 
   await sync('to get Additions feeds')
 
@@ -90,10 +99,16 @@ test('lib/epochs (getEpochs, getMembers)', async (t) => {
     Promise.all(others.map((peer) => peer.tribes2.acceptInvite(group.id)))
   )
   await sync('to see acceptance')
+  const expected1 = { added: [aliceId, bobId, oscarId], toExclude: [] }
   t.deepEqual(
-    await Epochs(alice).getMembers(group.root), // epoch zero root
-    { added: [aliceId, bobId, oscarId], toExclude: [] },
+    await Epochs(alice).getMembers(group.root),
+    expected1,
     'epoch 0 members: alice, bob, oscar'
+  )
+  t.deepEqual(
+    liveMembers[0],
+    expected1,
+    'epoch 0 members: alice, bob, oscar (live)'
   )
 
   // alice removes oscar
@@ -105,16 +120,13 @@ test('lib/epochs (getEpochs, getMembers)', async (t) => {
 
   const epochs = await Epochs(alice).getEpochs(group.id)
   const groupUpdated = await alice.tribes2.get(group.id)
-  const lastGroupInitId = await new Promise((resolve, reject) => {
-    pull(
-      alice.db.query(where(type('group/init')), descending(), toPullStream()),
-      pull.map((m) => fromMessageSigil(m.key)),
-      pull.take(1),
-      pull.collect((err, keys) => {
-        err ? reject(err) : resolve(keys[0])
-      })
-    )
-  })
+  const [lastGroupInitId] = await pull(
+    alice.db.query(where(type('group/init')), descending(), toPullStream()),
+    pull.map((m) => fromMessageSigil(m.key)),
+    pull.take(1),
+    pull.collectAsPromise()
+  )
+
   t.deepEqual(
     epochs,
     [
@@ -133,10 +145,17 @@ test('lib/epochs (getEpochs, getMembers)', async (t) => {
     ],
     'there are 2 epochs'
   )
+
+  const expected2 = { added: [aliceId, bobId, oscarId], toExclude: [oscarId] }
   t.deepEqual(
     await Epochs(alice).getMembers(epochs[0].id),
-    { added: [aliceId, bobId, oscarId], toExclude: [oscarId] },
+    expected2,
     'epoch 0 members: alice, bob, oscar (note toExclude oscar)'
+  )
+  t.deepEqual(
+    liveMembers[0],
+    expected2,
+    'epoch 0 members: alice, bob, oscar (note toExclude oscar) (live)'
   )
   t.deepEqual(
     await Epochs(alice).getMembers(epochs[1].id),
@@ -197,7 +216,6 @@ test('lib/epochs (getMissingMembers)', async (t) => {
     if (content.type === 'group/add-member') {
       content.recps = content.recps.filter((recp) => recp !== bobId)
     }
-    // console.log('create', args[0].content)
     create.apply(this, args)
   })
   await run(
@@ -292,6 +310,31 @@ test('lib/epochs (getPreferredEpoch - 4.4. same membership)', async (t) => {
     ])
   )
 
+  const livePreferredEpochs = []
+  let testsRunning = true
+  pull(
+    Epochs(oscar).getPreferredEpoch.stream(group.id, { live: true }),
+    pull.drain(
+      (epoch) => livePreferredEpochs.unshift(epoch),
+      (err) => {
+        if (err && testsRunning) t.error(err, 'getPreferredEpoch.stream smooth')
+      }
+    )
+  )
+
+  const epochs0 = await Epochs(oscar).getEpochs(group.id)
+
+  t.deepEqual(
+    await Epochs(oscar).getPreferredEpoch(group.id),
+    epochs0[0],
+    'getPreferredEpoch (before exclusion)'
+  )
+  t.deepEqual(
+    livePreferredEpochs[0],
+    epochs0[0],
+    'getPreferredEpoch (before exclusion) (live)'
+  )
+
   await run(
     'bob and oscar both exclude alice (mutiny, fork)!',
     Promise.all([
@@ -299,22 +342,41 @@ test('lib/epochs (getPreferredEpoch - 4.4. same membership)', async (t) => {
       oscar.tribes2.excludeMembers(group.id, [aliceId], {}),
     ])
   )
-
-  await run('(sync exclusion)', replicate(bob, oscar))
-
-  const epochs = await Epochs(oscar)
+  const epochs1 = await Epochs(oscar)
     .getEpochs(group.id)
     .then((epochs) => epochs.filter((epoch) => epoch.author != aliceId))
-  const preferredEpoch = Epochs({}).tieBreak(epochs)
+  const expected1 = epochs1[0]
 
   t.deepEqual(
     await Epochs(oscar).getPreferredEpoch(group.id),
-    preferredEpoch,
+    expected1,
+    'getPreferredEpoch (before fork sync)'
+  )
+  t.deepEqual(
+    livePreferredEpochs[0],
+    expected1,
+    'getPreferredEpoch (before fork sync) (live)'
+  )
+
+  await run('(sync exclusion)', replicate(bob, oscar))
+
+  await p(setTimeout)(500)
+
+  const epochs2 = await Epochs(oscar)
+    .getEpochs(group.id)
+    .then((epochs) => epochs.filter((epoch) => epoch.author !== aliceId))
+  const expected2 = Epochs({}).tieBreak(epochs2)
+
+  t.deepEqual(
+    await Epochs(oscar).getPreferredEpoch(group.id),
+    expected2,
     'getPreferredEpoch'
   )
+  t.deepEqual(livePreferredEpochs[0], expected2, 'getPreferredEpoch (live)')
 
   // TODO need to test epochs > 2
 
+  testsRunning = false
   t.end()
 })
 

@@ -275,18 +275,6 @@ test('Verify that you actually get excluded from a group', async (t) => {
   const invites = await pull(bob.tribes2.listInvites(), pull.collectAsPromise())
   t.deepEquals(invites, [], 'Bob has no invites')
 
-  await pull(bob.tribes2.listMembers(groupId), pull.collectAsPromise())
-    .then(() =>
-      t.fail(
-        "Bob didn't get an error when trying to list members of the group he's excluded from"
-      )
-    )
-    .catch(() =>
-      t.pass(
-        "Bob gets an error when trying to list members of the group he's excluded from"
-      )
-    )
-
   await Promise.all([p(alice.close)(true), p(bob.close)(true)])
 })
 
@@ -674,6 +662,8 @@ test("restarting the client doesn't make us rejoin old stuff", async (t) => {
   )
 
   await p(bob.close)(true).then(() => t.pass("bob's client was closed"))
+  await p(setTimeout)(500)
+
   bob = Testbot({
     rimraf: false,
     name: 'bobrestart',

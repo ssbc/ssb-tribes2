@@ -94,7 +94,7 @@ test('get-tangle-data unit test', (t) => {
                             },
                             'adding message to tip'
                           )
-                          server.close(true, t.end)
+                          server.close(true, () => t.end())
                         }
                       )
                     })
@@ -147,7 +147,7 @@ test(`get-tangle-${n}-publishes`, (t) => {
             'We expect bounded branching with fast publishing'
           )
 
-          server.close(true, t.end)
+          server.close(true, () => t.end())
         }
       )
     )
@@ -186,7 +186,7 @@ test('get-tangle', (t) => {
             'auto adds group tangle (auto added tangles.group)'
           )
 
-          ssb.close(true, t.end)
+          ssb.close(true, () => t.end())
         })
       })
     })
@@ -255,6 +255,7 @@ test('get-tangle with branch', async (t) => {
   t.deepEqual(aliceTangle2.previous.length, 2, 'There should be two tips')
 
   await Promise.all([p(alice.close)(true), p(bob.close)(true)])
+  t.end()
 })
 
 test('members tangle works', async (t) => {
@@ -359,4 +360,5 @@ test('members tangle works', async (t) => {
     p(bob.close)(true),
     p(carol.close)(true),
   ])
+  t.end()
 })
