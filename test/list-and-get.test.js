@@ -37,7 +37,7 @@ test('tribes.list + tribes.get', (t) => {
 
           t.deepEqual(actualGroup, expectedGroup, 'gets group data')
 
-          server.close((err) => {
+          server.close(true, (err) => {
             t.error(err, 'closes server')
 
             server = Testbot({ name, rimraf: false, keys })
@@ -51,7 +51,7 @@ test('tribes.list + tribes.get', (t) => {
                   list,
                   'list returns save results after restart'
                 )
-                server.close(true, t.end)
+                server.close(true, () => t.end())
               })
             )
           })
@@ -80,6 +80,7 @@ test('get', async (t) => {
   t.equal(root, group.root)
 
   await p(ssb.close)(true)
+  t.end()
 })
 
 test('list', (t) => {
@@ -109,7 +110,7 @@ test('list', (t) => {
               t.equal(groups2[0].writeKey.key, writeKey1.key)
               t.equal(groups2[1].id, id2)
 
-              ssb.close(true, t.end)
+              ssb.close(true, () => t.end())
             })
           )
         })
@@ -180,4 +181,5 @@ test('live list groups', async (t) => {
   t.true(groups[0].writeKey.key.equals(group.writeKey.key), 'secret matches')
 
   await Promise.all([p(alice.close)(true), p(bob.close)(true)])
+  t.end()
 })
