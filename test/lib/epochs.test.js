@@ -188,7 +188,7 @@ test('lib/epochs (getMissingMembers)', async (t) => {
   const rootFeeds = await Promise.all(
     peers.map((peer) => p(peer.metafeeds.findOrCreate)())
   )
-  const [aliceId, bobId, oscarId] = rootFeeds.map((feed) => feed.id)
+  const [, bobId, oscarId] = rootFeeds.map((feed) => feed.id)
 
   const group = await run('alice creates a group', alice.tribes2.create({}))
   await sync('to get Additions feeds')

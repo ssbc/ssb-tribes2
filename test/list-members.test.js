@@ -286,10 +286,7 @@ test('listMembers works with exclusion', async (t) => {
   const msg =
     "Bob gets an error when trying to list members of the group he's excluded from"
   await pull(bob.tribes2.listMembers(groupId), pull.collectAsPromise())
-    .then((res) => {
-      console.log(res)
-      t.fail(msg)
-    })
+    .then(() => t.fail(msg))
     .catch(() => t.pass(msg))
 
   await p(setTimeout)(500)
