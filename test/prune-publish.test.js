@@ -59,28 +59,31 @@ test('prune a message with way too big `previous`', async (t) => {
   t.end()
 })
 
-test('publish many messages that might need pruning', async (t) => {
-  const n = 5000
-  const ssb = Testbot({ db2: {} })
+test(
+  'publish many messages that might need pruning',
+  { timeout: 60 * 1000 },
+  async (t) => {
+    const n = 5000
+    const ssb = Testbot({ db2: {} })
 
-  const group = await p(ssb.tribes2.create)(null)
+    const group = await p(ssb.tribes2.create)(null)
 
-  const start = Date.now()
-  let count = 0
-  await Promise.all(
-    Array.from({ length: n }, (_, i) => {
-      const content = { type: 'potato', count: i, recps: [group.id] }
-      return ssb.tribes2.publish(content, null).then(() => {
-        count++
-        if (count % 500 === 0) t.pass(count)
+    const start = Date.now()
+    let count = 0
+    await Promise.all(
+      Array.from({ length: n }, (_, i) => {
+        const content = { type: 'potato', count: i, recps: [group.id] }
+        return ssb.tribes2.publish(content, null).then(() => {
+          count++
+          if (count % 500 === 0) t.pass(count)
+        })
       })
-    })
-  )
-    .then(() => {
-      t.pass(`published ${n} messages in ${Date.now() - start}ms`)
-    })
-    .catch(t.error)
+    )
+      .then(() => {
+        t.pass(`published ${n} messages in ${Date.now() - start}ms`)
+      })
+      .catch(t.error)
 
-  await p(ssb.close)(true)
-  t.end()
-})
+    await p(ssb.close)(true)
+  }
+)
