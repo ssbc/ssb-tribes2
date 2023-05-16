@@ -428,9 +428,15 @@ test('addMembers adds to all the tip epochs and gives keys to all the old epochs
     replicate(alice, bob),
     replicate(alice, carol),
     replicate(alice, david),
+    replicate(bob, carol),
+    replicate(bob, david),
+    replicate(carol, david),
   ])
     .then(() => t.pass('replicated'))
-    .catch((err) => t.error(err))
+    .catch((err) => {
+      console.error('replication failed:', err)
+      t.error(err)
+    })
 
   p(setTimeout)(2000)
 
