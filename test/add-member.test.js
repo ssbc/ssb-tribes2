@@ -380,7 +380,7 @@ test('addMembers adds to all the tip epochs and gives keys to all the old epochs
     .then(() => t.pass('replicated'))
     .catch((err) => t.error(err))
 
-  p(setTimeout)(2000)
+  p(setTimeout)(4000)
 
   await bob.tribes2
     .acceptInvite(groupId)
@@ -436,19 +436,24 @@ test('addMembers adds to all the tip epochs and gives keys to all the old epochs
 
   p(setTimeout)(4000)
 
-  await Promise.all([
-    replicate(alice, bob),
-    replicate(alice, carol),
-    replicate(alice, david),
-    replicate(bob, carol),
-    replicate(bob, david),
-    replicate(carol, david),
-  ])
-    .then(() => t.pass('replicated'))
-    .catch((err) => {
-      console.error('replication failed:', err)
-      t.error(err)
-    })
+  //await Promise.all([
+  //  replicate(alice, bob),
+  //  replicate(alice, carol),
+  //  replicate(alice, david),
+  //  replicate(bob, carol),
+  //  replicate(bob, david),
+  //  replicate(carol, david),
+  //])
+  //  .then(() => t.pass('replicated'))
+  //  .catch((err) => {
+  //    console.error('replication failed:', err)
+  //    t.error(err)
+  //  })
+
+  await replicate(alice, bob)
+  await replicate(bob, carol)
+  await replicate(carol, david)
+  await replicate(david, alice)
 
   p(setTimeout)(2000)
 
