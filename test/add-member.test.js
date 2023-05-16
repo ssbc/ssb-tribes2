@@ -332,6 +332,9 @@ test('addMembers adds to all the tip epochs and gives keys to all the old epochs
     replicate(alice, bob),
     replicate(alice, carol),
     replicate(alice, david),
+    replicate(bob, carol),
+    replicate(bob, david),
+    replicate(carol, david),
   ])
     .then(() => t.pass('replicated'))
     .catch((err) => t.error(err))
@@ -366,9 +369,14 @@ test('addMembers adds to all the tip epochs and gives keys to all the old epochs
     replicate(alice, bob),
     replicate(alice, carol),
     replicate(alice, david),
+    replicate(bob, carol),
+    replicate(bob, david),
+    replicate(carol, david),
   ])
     .then(() => t.pass('replicated'))
     .catch((err) => t.error(err))
+
+  p(setTimeout)(2000)
 
   await bob.tribes2
     .acceptInvite(groupId)
@@ -422,7 +430,7 @@ test('addMembers adds to all the tip epochs and gives keys to all the old epochs
     .catch((err) => t.error(err))
   const bobForkSecret = bobForkKey.key.toString('base64')
 
-  p(setTimeout)(2000)
+  p(setTimeout)(4000)
 
   await Promise.all([
     replicate(alice, bob),
