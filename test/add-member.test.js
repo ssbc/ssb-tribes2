@@ -540,6 +540,5 @@ test('can add someone back into a group', async (t) => {
 
   await verifyInGroup(bob)
 
-  await p(alice.close)(true)
-  await p(bob.close)(true)
+  await Promise.all([p(alice.close)(true), p(bob.close)(true)])
 })
