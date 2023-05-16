@@ -19,7 +19,7 @@
     "ssb"
   ],
   "engines": {
-    "node": ">=12"
+    "node": ">=16"
   },
   "main": "index.js",
   "files": [
@@ -79,7 +79,7 @@
     "test:raw": "tape 'test/**/*.test.js'",
     "test:only": "if grep -r --exclude-dir=node_modules --exclude-dir=.git --color 'test\\.only' ; then exit 1; fi",
     "test:bail": "npm run test:raw | tap-arc --bail",
-    "test": "npm run test:raw | tap-arc && npm run test:only",
+    "test": "npm run test:raw | tap-arc && npm run test:only && npm run lint",
     "lint": "eslint .",
     "format-code": "prettier --write \"**/*.js\"",
     "format-code-staged": "pretty-quick --staged --pattern \"**/*.js\"",
