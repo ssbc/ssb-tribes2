@@ -422,7 +422,6 @@ test('addMembers adds to all the tip epochs and gives keys to all the old epochs
     .catch((err) => t.error(err))
   const bobForkSecret = bobForkKey.key.toString('base64')
 
-  //TODO: ?
   p(setTimeout)(2000)
 
   await Promise.all([
@@ -433,7 +432,6 @@ test('addMembers adds to all the tip epochs and gives keys to all the old epochs
     .then(() => t.pass('replicated'))
     .catch((err) => t.error(err))
 
-  //TODO: ?
   p(setTimeout)(2000)
 
   const addDavid = await alice.tribes2
