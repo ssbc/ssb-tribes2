@@ -314,11 +314,18 @@ test('addMembers adds to all the tip epochs and gives keys to all the old epochs
     carol.tribes2.start(),
     david.tribes2.start(),
   ])
+    .then(() => t.pass('clients started'))
+    .catch((err) => t.error(err))
 
   const [, bobRootId, carolRootId, davidRootId] = (
     await Promise.all(
       [alice, bob, carol, david].map((peer) => p(peer.metafeeds.findOrCreate)())
     )
+      .then((res) => {
+        t.pass('got peer roots')
+        return res
+      })
+      .catch((err) => t.error(err))
   ).map((root) => root.id)
 
   await Promise.all([
@@ -326,45 +333,93 @@ test('addMembers adds to all the tip epochs and gives keys to all the old epochs
     replicate(alice, carol),
     replicate(alice, david),
   ])
+    .then(() => t.pass('replicated'))
+    .catch((err) => t.error(err))
 
-  const { id: groupId, writeKey: firstEpochKey } = await alice.tribes2.create()
+  const { id: groupId, writeKey: firstEpochKey } = await alice.tribes2
+    .create()
+    .then((res) => {
+      t.pass('alice created group')
+      return res
+    })
+    .catch((err) => t.error(err))
   const firstEpochSecret = firstEpochKey.key.toString('base64')
 
-  const { key: firstEpochPostId } = await alice.tribes2.publish({
-    type: 'test',
-    text: 'first post',
-    recps: [groupId],
-  })
+  const { key: firstEpochPostId } = await alice.tribes2
+    .publish({
+      type: 'test',
+      text: 'first post',
+      recps: [groupId],
+    })
+    .then((res) => {
+      t.pass('alice published in first epoch')
+      return res
+    })
+    .catch((err) => t.error(err))
 
-  await alice.tribes2.addMembers(groupId, [bobRootId, carolRootId])
+  await alice.tribes2
+    .addMembers(groupId, [bobRootId, carolRootId])
+    .then(() => t.pass('alice added bob and carol'))
+    .catch((err) => t.error(err))
 
   await Promise.all([
     replicate(alice, bob),
     replicate(alice, carol),
     replicate(alice, david),
   ])
+    .then(() => t.pass('replicated'))
+    .catch((err) => t.error(err))
 
-  await bob.tribes2.acceptInvite(groupId)
+  await bob.tribes2
+    .acceptInvite(groupId)
+    .then(() => t.pass('bob accepted invite'))
+    .catch((err) => t.error(err))
 
   await Promise.all([
     alice.tribes2.excludeMembers(groupId, [carolRootId]),
     bob.tribes2.excludeMembers(groupId, [carolRootId]),
   ])
+    .then(() => t.pass('alice and bob excluded carol'))
+    .catch((err) => t.error(err))
 
-  const { key: aliceForkPostId } = await alice.tribes2.publish({
-    type: 'test',
-    text: 'alice fork post',
-    recps: [groupId],
-  })
-  const { writeKey: aliceForkKey } = await alice.tribes2.get(groupId)
+  const { key: aliceForkPostId } = await alice.tribes2
+    .publish({
+      type: 'test',
+      text: 'alice fork post',
+      recps: [groupId],
+    })
+    .then((res) => {
+      t.pass('alice published in her fork')
+      return res
+    })
+    .catch((err) => t.error(err))
+  const { writeKey: aliceForkKey } = await alice.tribes2
+    .get(groupId)
+    .then((res) => {
+      t.pass('alice got info on her fork')
+      return res
+    })
+    .catch((err) => t.error(err))
   const aliceForkSecret = aliceForkKey.key.toString('base64')
 
-  const { key: bobForkPostId } = await bob.tribes2.publish({
-    type: 'test',
-    text: 'bob fork post',
-    recps: [groupId],
-  })
-  const { writeKey: bobForkKey } = await bob.tribes2.get(groupId)
+  const { key: bobForkPostId } = await bob.tribes2
+    .publish({
+      type: 'test',
+      text: 'bob fork post',
+      recps: [groupId],
+    })
+    .then((res) => {
+      t.pass('bob posted in his fork')
+      return res
+    })
+    .catch((err) => t.error(err))
+  const { writeKey: bobForkKey } = await bob.tribes2
+    .get(groupId)
+    .then((res) => {
+      t.pass('bob got info on his fork')
+      return res
+    })
+    .catch((err) => t.error(err))
   const bobForkSecret = bobForkKey.key.toString('base64')
 
   await Promise.all([
@@ -372,6 +427,8 @@ test('addMembers adds to all the tip epochs and gives keys to all the old epochs
     replicate(alice, carol),
     replicate(alice, david),
   ])
+    .then(() => t.pass('replicated'))
+    .catch((err) => t.error(err))
 
   const addDavid = await alice.tribes2
     .addMembers(groupId, [davidRootId])
@@ -379,12 +436,18 @@ test('addMembers adds to all the tip epochs and gives keys to all the old epochs
       t.pass('david got added to the group by alice')
       return res
     })
+    .catch((err) => t.error(err))
 
   t.equal(addDavid.length, 2, 'David got added to both forks')
 
   const adds = await Promise.all(
     addDavid.map((add) => p(alice.db.get)(add.key))
   )
+    .then((res) => {
+      t.pass('alice got her additions of david')
+      return res
+    })
+    .catch((err) => t.error(err))
   const addContents = adds.map((add) => add.content)
 
   const addAliceFork = addContents.find(
@@ -416,10 +479,20 @@ test('addMembers adds to all the tip epochs and gives keys to all the old epochs
   )
 
   await replicate(alice, david)
+    .then(() => t.pass('replicated'))
+    .catch((err) => t.error(err))
 
-  await david.tribes2.acceptInvite(groupId)
+  await david.tribes2
+    .acceptInvite(groupId)
+    .then(() => t.pass('david accepted invite'))
+    .catch((err) => t.error(err))
 
   const bobForkMsg = await p(david.db.get)(bobForkPostId)
+    .then((res) => {
+      t.pass("david got bob's post in his fork")
+      return res
+    })
+    .catch((err) => t.error(err))
   t.notEquals(
     typeof bobForkMsg.content,
     'string',
@@ -427,6 +500,11 @@ test('addMembers adds to all the tip epochs and gives keys to all the old epochs
   )
 
   const aliceForkMsg = await p(david.db.get)(aliceForkPostId)
+    .then((res) => {
+      t.pass("david got alice's post in her fork")
+      return res
+    })
+    .catch((err) => t.error(err))
   t.notEquals(
     typeof aliceForkMsg.content,
     'string',
@@ -434,6 +512,11 @@ test('addMembers adds to all the tip epochs and gives keys to all the old epochs
   )
 
   const firstEpochMsg = await p(david.db.get)(firstEpochPostId)
+    .then((res) => {
+      t.pass("david got alice's post in the initial epoch")
+      return res
+    })
+    .catch((err) => t.error(err))
   t.notEquals(
     typeof firstEpochMsg.content,
     'string',
@@ -446,4 +529,6 @@ test('addMembers adds to all the tip epochs and gives keys to all the old epochs
     p(carol.close)(true),
     p(david.close)(true),
   ])
+    .then(() => t.pass('clients got closed'))
+    .catch((err) => t.error(err))
 })
