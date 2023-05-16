@@ -285,6 +285,7 @@ test('addMembers adds to all the tip epochs and gives keys to all the old epochs
       '000000000000000000000000000000000000000000000000000000000000a1ce',
       'hex'
     ),
+    db2: {},
   })
   const bob = Testbot({
     keys: ssbKeys.generate(null, 'bob'),
@@ -292,6 +293,7 @@ test('addMembers adds to all the tip epochs and gives keys to all the old epochs
       '0000000000000000000000000000000000000000000000000000000000000b0b',
       'hex'
     ),
+    db2: {},
   })
   const carol = Testbot({
     keys: ssbKeys.generate(null, 'carol'),
@@ -299,6 +301,7 @@ test('addMembers adds to all the tip epochs and gives keys to all the old epochs
       '00000000000000000000000000000000000000000000000000000000000ca201',
       'hex'
     ),
+    db2: {},
   })
   const david = Testbot({
     keys: ssbKeys.generate(null, 'david'),
@@ -306,6 +309,7 @@ test('addMembers adds to all the tip epochs and gives keys to all the old epochs
       '00000000000000000000000000000000000000000000000000000000000da71d',
       'hex'
     ),
+    db2: {},
   })
 
   await Promise.all([
