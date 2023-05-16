@@ -448,7 +448,7 @@ test('addMembers adds to all the tip epochs and gives keys to all the old epochs
   ])
 })
 
-test('can or cannot add someone back into a group', async (t) => {
+test('can add someone back into a group', async (t) => {
   const alice = Testbot({
     keys: ssbKeys.generate(null, 'alice'),
     mfSeed: Buffer.from(
@@ -456,14 +456,15 @@ test('can or cannot add someone back into a group', async (t) => {
       'hex'
     ),
   })
-  let bob = Testbot({
+  const bobConfig = {
     name: 'bobrestart',
     keys: ssbKeys.generate(null, 'bob'),
     mfSeed: Buffer.from(
       '0000000000000000000000000000000000000000000000000000000000000b0b',
       'hex'
     ),
-  })
+  }
+  let bob = Testbot(bobConfig)
 
   await Promise.all([alice.tribes2.start(), bob.tribes2.start()])
 
@@ -531,13 +532,8 @@ test('can or cannot add someone back into a group', async (t) => {
   await p(setTimeout)(500)
   await p(bob.close)(true).then(() => t.pass("bob's client was closed"))
   bob = Testbot({
+    ...bobConfig,
     rimraf: false,
-    name: 'bobrestart',
-    keys: ssbKeys.generate(null, 'bob'),
-    mfSeed: Buffer.from(
-      '0000000000000000000000000000000000000000000000000000000000000b0b',
-      'hex'
-    ),
   })
   t.pass('bob got a new client')
   await bob.tribes2.start().then(() => t.pass('bob restarted'))
