@@ -40,6 +40,17 @@ function setupFeedRequests(person1, person2) {
     ]),
     pull.flatten(),
     pull.map((feedDetails) => feedDetails.id),
+    pull.asyncMap((feedId, cb) => {
+      p(person1.getVectorClock)().then((p1Vectors) => {
+        p(person2.getVectorClock)().then((p2Vectors) => {
+          const p1Feeds = Object.keys(p1Vectors)
+          const p2Feeds = Object.keys(p2Vectors)
+
+          cb(null, [feedId, ...p1Feeds, ...p2Feeds])
+        })
+      })
+    }),
+    pull.flatten(),
     pull.unique(),
     pull.asyncMap((feedId, cb) => {
       // skip re-requesting if not needed

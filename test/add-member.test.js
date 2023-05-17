@@ -333,17 +333,6 @@ test('addMembers adds to all the tip epochs and gives keys to all the old epochs
   ).map((root) => root.id)
 
   async function replicateAll() {
-    //await Promise.all([
-    //  replicate(alice, bob),
-    //  replicate(alice, carol),
-    //  replicate(alice, david),
-    //  replicate(bob, carol),
-    //  replicate(bob, david),
-    //  replicate(carol, david),
-    //])
-    //  .then(() => t.pass('replicated'))
-    //  .catch((err) => t.error(err))
-
     await p(setTimeout)(4000)
 
     const fail = (err, a, b) => {
