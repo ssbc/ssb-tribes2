@@ -81,6 +81,6 @@ test('publish many messages that might need pruning', async (t) => {
     })
     .catch(t.error)
 
-  await p(ssb.close)(true)
+  await p(ssb.close)()
   t.end()
 })

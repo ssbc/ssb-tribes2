@@ -12,17 +12,21 @@ const deepEqual = require('fast-deep-equal')
  */
 module.exports = async function replicate(person1, person2) {
   // Establish a network connection
-  const conn = await p(person1.connect)(person2.getAddress())
+  const conn = await p(person1.connect)(person2.getAddress()).catch(
+    console.error
+  )
 
-  const isSync = await ebtReplicate()
+  const isSync = await ebtReplicate(person1, person2).catch((err) =>
+    console.error('Error with ebtReplicate:\n', err)
+  )
+
+  await p(conn.close)(true).catch(console.error)
 
   if (!isSync) {
     console.error('EBT failed to replicate! Final state:')
     console.log(person1.id, await p(person1.getVectorClock)())
     console.log(person2.id, await p(person2.getVectorClock)())
   }
-
-  await p(conn.close)(true)
 }
 
 async function ebtReplicate(person1, person2) {

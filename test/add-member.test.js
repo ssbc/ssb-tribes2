@@ -6,10 +6,11 @@ const test = require('tape')
 const pull = require('pull-stream')
 const { promisify: p } = require('util')
 const ssbKeys = require('ssb-keys')
-const Testbot = require('./helpers/testbot')
-const replicate = require('./helpers/replicate')
+const { Testbot, replicate, Run } = require('./helpers')
 
 test('get added to a group', async (t) => {
+  const run = Run(t)
+
   const alice = Testbot({
     keys: ssbKeys.generate(null, 'alice'),
     mfSeed: Buffer.from(
@@ -25,63 +26,41 @@ test('get added to a group', async (t) => {
     ),
   })
 
-  await Promise.all([alice.tribes2.start(), bob.tribes2.start()])
-  t.pass('tribes2 started for both alice and bob')
+  await run(
+    'tribes2 started for both alice and bob',
+    Promise.all([alice.tribes2.start(), bob.tribes2.start()])
+  )
 
   await p(alice.metafeeds.findOrCreate)()
   const bobRoot = await p(bob.metafeeds.findOrCreate)()
 
-  await replicate(alice, bob)
-  t.pass('alice and bob replicate their trees')
+  await run('alice and bob replicate their trees', replicate(alice, bob))
 
   const {
     id: groupId,
     writeKey,
     root,
-  } = await alice.tribes2.create().catch((err) => {
-    console.error('alice failed to create group', err)
-    t.fail(err)
-  })
-  t.pass('alice created a group')
+  } = await run('alice created a group', alice.tribes2.create())
 
-  await alice.tribes2.addMembers(groupId, [bobRoot.id]).catch((err) => {
-    console.error('add member fail', err)
-    t.fail(err)
-  })
-  t.pass('alice added bob to the group')
-
-  await replicate(alice, bob)
-    .then(() =>
-      t.pass('alice and bob replicate after bob getting added to the group')
-    )
-    .catch((err) => {
-      console.error(
-        'failed to replicate after alice added bob to the group',
-        err
-      )
-      t.error(err)
-    })
-
-  await bob.tribes2.acceptInvite(groupId).catch((err) => {
-    console.error('failed to accept invite', err)
-    t.fail(err)
-  })
-
-  t.pass('bob accepted invite')
-
-  await new Promise((res) =>
-    pull(
-      bob.tribes2.list(),
-      pull.collect((err, bobList) => {
-        t.equal(bobList.length, 1, 'bob is a member of a group now')
-        const group = bobList[0]
-        t.equal(group.id, groupId, 'group id is correct')
-        t.true(group.writeKey.key.equals(writeKey.key))
-        t.equal(group.root, root)
-        res()
-      })
-    )
+  await run(
+    'alice added bob to the group',
+    alice.tribes2.addMembers(groupId, [bobRoot.id])
   )
+
+  await run(
+    'alice and bob replicate after bob getting added to the group',
+    replicate(alice, bob)
+  )
+
+  await run('bob accepted invite', bob.tribes2.acceptInvite(groupId))
+
+  const bobList = await pull(bob.tribes2.list(), pull.collectAsPromise())
+
+  t.equal(bobList.length, 1, 'bob is a member of a group now')
+  const group = bobList[0]
+  t.equal(group.id, groupId, 'group id is correct')
+  t.true(group.writeKey.key.equals(writeKey.key))
+  t.equal(group.root, root)
 
   await Promise.all([p(alice.close)(true), p(bob.close)(true)])
 })
