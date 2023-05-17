@@ -14,21 +14,34 @@ module.exports = async function replicate(person1, person2) {
   // Establish a network connection
   const conn = await p(person1.connect)(person2.getAddress())
 
+  const isSync = await ebtReplicate()
+
+  if (!isSync) {
+    console.error('EBT failed to replicate! Final state:')
+    console.log(person1.id, await p(person1.getVectorClock)())
+    console.log(person2.id, await p(person2.getVectorClock)())
+  }
+
+  await p(conn.close)(true)
+}
+
+async function ebtReplicate(person1, person2) {
   // ensure persons are replicating all the trees in their forests,
   // from top to bottom
   const stream = setupFeedRequests(person1, person2)
 
   // Wait until both have replicated all feeds in full (are in sync)
-  await retryUntil(async () => {
+  const isSync = async () => {
     const clocks = await Promise.all([
       p(person1.getVectorClock)(),
       p(person2.getVectorClock)(),
     ])
     return deepEqual(...clocks)
-  })
+  }
+  const isSuccess = await retryUntil(isSync)
 
   stream.abort()
-  await p(conn.close)(true)
+  return isSuccess
 }
 
 function setupFeedRequests(person1, person2) {
@@ -60,13 +73,16 @@ function setupFeedRequests(person1, person2) {
   return drain
 }
 
+// try an async task up to 100 times till it returns true
+// if success retryUntil returns true, otherwise false
 async function retryUntil(checkIsDone) {
   let isDone = false
   for (let i = 0; i < 100; i++) {
     isDone = await checkIsDone()
-    if (isDone) return
+    if (isDone) return true
 
     await p(setTimeout)(100)
   }
-  if (!isDone) throw new Error('retryUntil timed out')
+
+  return false
 }
