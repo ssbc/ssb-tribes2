@@ -346,12 +346,26 @@ test('addMembers adds to all the tip epochs and gives keys to all the old epochs
 
     await p(setTimeout)(4000)
 
+    const fail = (err, a, b) => {
+      console.error(`Replication between ${a} and ${b} failed:`, err)
+      t.error(err)
+    }
+
     await replicate(alice, bob)
-      .then(() => replicate(bob, carol))
-      .then(() => replicate(carol, david))
-      .then(() => replicate(david, alice))
-      .then(() => t.pass('replicated'))
-      .catch((err) => t.error(err))
+      .then(() => t.pass('replicated alice and bob'))
+      .catch((err) => fail(err, 'alice', 'bob'))
+
+    await replicate(bob, carol)
+      .then(() => t.pass('replicated bob and carol'))
+      .catch((err) => fail(err, 'bob', 'carol'))
+
+    await replicate(carol, david)
+      .then(() => t.pass('replicated carol and david'))
+      .catch((err) => fail(err, 'carol', 'david'))
+
+    await replicate(david, alice)
+      .then(() => t.pass('replicated david and alice'))
+      .catch((err) => fail(err, 'david', 'alice'))
 
     await p(setTimeout)(4000)
   }
