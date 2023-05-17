@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2022 Mix Irving
+//
+// SPDX-License-Identifier: Unlicense
+
 module.exports = function Run(t) {
   // this function takes care of running a promise and logging
   // (or testing) that it happens and any errors are handled
