@@ -6,6 +6,7 @@ const { promisify: p } = require('util')
 const pull = require('pull-stream')
 const pullMany = require('pull-many')
 const deepEqual = require('fast-deep-equal')
+const { replicate } = require('scuttle-testbot')
 
 /**
  * Fully replicates person1's metafeed tree to person2 and vice versa
@@ -26,6 +27,9 @@ module.exports = async function replicate(person1, person2) {
     console.error('EBT failed to replicate! Final state:')
     console.log(person1.id, await p(person1.getVectorClock)())
     console.log(person2.id, await p(person2.getVectorClock)())
+
+    console.error('falling back to legacyReplicate')
+    await legacyReplicate(person1, person2)
   }
 }
 
@@ -89,4 +93,40 @@ async function retryUntil(checkIsDone) {
   }
 
   return false
+}
+
+async function legacyReplicate(person1, person2) {
+  await pull(
+    person1.metafeeds.branchStream({ old: true }),
+    pull.map((feedDetails) => feedDetails.id),
+    pull.asyncMap((feedId, cb) => {
+      replicate(
+        {
+          feedId,
+          from: person1,
+          to: person2,
+          // log: false,
+        },
+        cb
+      )
+    }),
+    pull.collectAsPromise()
+  ).catch((err) => console.error('Error in legacyReplicate', err))
+
+  await pull(
+    person2.metafeeds.branchStream({ old: true }),
+    pull.map((feedDetails) => feedDetails.id),
+    pull.asyncMap((feedId, cb) => {
+      replicate(
+        {
+          feedId,
+          from: person2,
+          to: person1,
+          // log: false,
+        },
+        cb
+      )
+    }),
+    pull.collectAsPromise()
+  ).catch((err) => console.error('Error in legacyReplicate', err))
 }

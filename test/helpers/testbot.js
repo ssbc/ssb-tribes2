@@ -30,6 +30,7 @@ module.exports = function createSbot(opts = {}) {
     .use(require('ssb-box2'))
     .use(require('ssb-db2/compat/feedstate'))
     .use(require('ssb-db2/compat/ebt'))
+    .use(require('ssb-db2/compat/history-stream')) // for legacy replicate
     .use(require('ssb-ebt'))
     .use(require('../..'))
 

@@ -72,7 +72,7 @@ test('publish many messages that might need pruning', async (t) => {
       const content = { type: 'potato', count: i, recps: [group.id] }
       return ssb.tribes2.publish(content, null).then(() => {
         count++
-        if (count % 500 === 0) t.pass(count)
+        if (count % 1000 === 0) t.pass(count)
       })
     })
   )
@@ -81,6 +81,7 @@ test('publish many messages that might need pruning', async (t) => {
     })
     .catch(t.error)
 
+  await p(setTimeout)(100)
   await p(ssb.close)()
   t.end()
 })
