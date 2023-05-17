@@ -19,11 +19,16 @@ module.exports = async function replicate(person1, person2) {
   const stream = setupFeedRequests(person1, person2)
 
   // Wait until both have replicated all feeds in full (are in sync)
+  let i = 0
   await retryUntil(async () => {
+    i++
     const clocks = await Promise.all([
       p(person1.getVectorClock)(),
       p(person2.getVectorClock)(),
     ])
+    if (i === 100) {
+      console.log('clocks', ...clocks)
+    }
     return deepEqual(...clocks)
   })
 
@@ -40,19 +45,21 @@ function setupFeedRequests(person1, person2) {
     ]),
     pull.flatten(),
     pull.map((feedDetails) => feedDetails.id),
-    pull.asyncMap((feedId, cb) => {
-      p(person1.getVectorClock)().then((p1Vectors) => {
-        p(person2.getVectorClock)().then((p2Vectors) => {
-          const p1Feeds = Object.keys(p1Vectors)
-          const p2Feeds = Object.keys(p2Vectors)
+    //pull.asyncMap((feedId, cb) => {
+    //  p(person1.getVectorClock)().then((p1Vectors) => {
+    //    p(person2.getVectorClock)().then((p2Vectors) => {
+    //      const p1Feeds = Object.keys(p1Vectors)
+    //      const p2Feeds = Object.keys(p2Vectors)
 
-          cb(null, [feedId, ...p1Feeds, ...p2Feeds])
-        })
-      })
-    }),
+    //      cb(null, [feedId, ...p1Feeds, ...p2Feeds])
+    //    })
+    //  })
+    //}),
     pull.flatten(),
     pull.unique(),
     pull.asyncMap((feedId, cb) => {
+      //console.log('feedId', feedId)
+
       // skip re-requesting if not needed
       // if (feedId in clock1 && feedId in clock2) return cb(null, null)
 

@@ -321,7 +321,7 @@ test('addMembers adds to all the tip epochs and gives keys to all the old epochs
     .then(() => t.pass('clients started'))
     .catch((err) => t.error(err))
 
-  const [, bobRootId, carolRootId, davidRootId] = (
+  const [aliceRootId, bobRootId, carolRootId, davidRootId] = (
     await Promise.all(
       [alice, bob, carol, david].map((peer) => p(peer.metafeeds.findOrCreate)())
     )
@@ -344,9 +344,23 @@ test('addMembers adds to all the tip epochs and gives keys to all the old epochs
       .then(() => t.pass('replicated alice and bob'))
       .catch((err) => fail(err, 'alice', 'bob'))
 
+    await replicate(alice, carol)
+      .then(() => t.pass('replicated alice and carol'))
+      .catch((err) => fail(err, 'alice', 'carol'))
+
+    await replicate(alice, david)
+      .then(() => t.pass('replicated alice and david'))
+      .catch((err) => fail(err, 'alice', 'david'))
+
     await replicate(bob, carol)
       .then(() => t.pass('replicated bob and carol'))
-      .catch((err) => fail(err, 'bob', 'carol'))
+      .catch((err) => {
+        p(bob.metafeeds.printTree)(bobRootId, { id: true })
+        p(bob.metafeeds.printTree)(aliceRootId, { id: true })
+        p(carol.metafeeds.printTree)(carolRootId, { id: true })
+        p(carol.metafeeds.printTree)(aliceRootId, { id: true })
+        fail(err, 'bob', 'carol')
+      })
 
     await replicate(carol, david)
       .then(() => t.pass('replicated carol and david'))
