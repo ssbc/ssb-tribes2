@@ -69,7 +69,6 @@
     "scuttle-testbot": "^2.1.0",
     "secret-stack": "^6.4.1",
     "ssb-bendy-butt": "^1.0.2",
-    "ssb-caps": "^1.1.0",
     "ssb-classic": "^1.1.0",
     "ssb-ebt": "^9.1.2",
     "ssb-keys": "^8.5.0",

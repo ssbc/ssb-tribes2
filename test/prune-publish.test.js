@@ -81,7 +81,8 @@ test('publish many messages that might need pruning', async (t) => {
     })
     .catch(t.error)
 
-  await p(setTimeout)(100)
-  await p(ssb.close)()
+  await p(setTimeout)(1000)
+  await p(ssb.close)(true)
+
   t.end()
 })
