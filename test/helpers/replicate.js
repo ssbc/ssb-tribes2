@@ -7,33 +7,73 @@ const pull = require('pull-stream')
 const pullMany = require('pull-many')
 const deepEqual = require('fast-deep-equal')
 
+module.exports = async function replicate(...peers) {
+  if (peers.length === 1 && Array.isArray(peers[0])) peers = peers[0]
+  if (peers.length === 2) return replicatePair(...peers)
+
+  return pull(
+    pull.values(peers),
+    pull.asyncMap((person1, cb) => {
+      pull(
+        pull.values(peers),
+        pull.asyncMap((person2, cb) => {
+          if (person1.id === person2.id) return cb(null, true)
+
+          replicatePair(person1, person2)
+            .then((res) => cb(null, true))
+            .catch((err) => cb(err))
+        }),
+        pull.collect(cb)
+      )
+    }),
+    pull.collectAsPromise()
+  )
+}
+
 /**
  * Fully replicates person1's metafeed tree to person2 and vice versa
  */
-module.exports = async function replicate(person1, person2) {
+async function replicatePair(person1, person2) {
+  // const start = Date.now()
+  // const ID = [person1, person2]
+  //   .map(p => p.name || p.id.slice(0, 10))
+  //   .join('-')
+
   // Establish a network connection
   const conn = await p(person1.connect)(person2.getAddress())
 
+  const isSync = await ebtReplicate(person1, person2).catch((err) =>
+    console.error('Error with ebtReplicate:\n', err)
+  )
+  if (!isSync) {
+    console.error('EBT failed to replicate! Final state:')
+    console.log(person1.id, await p(person1.getVectorClock)())
+    console.log(person2.id, await p(person2.getVectorClock)())
+  }
+
+  await p(conn.close)(true).catch(console.error)
+  // const time = Date.now() - start
+  // const length = Math.max(Math.round(time / 100), 1)
+  // console.log(ID, Array(length).fill('▨').join(''), time + 'ms')
+}
+
+async function ebtReplicate(person1, person2) {
   // ensure persons are replicating all the trees in their forests,
   // from top to bottom
   const stream = setupFeedRequests(person1, person2)
 
   // Wait until both have replicated all feeds in full (are in sync)
-  let i = 0
-  await retryUntil(async () => {
-    i++
+  const isSync = async () => {
     const clocks = await Promise.all([
       p(person1.getVectorClock)(),
       p(person2.getVectorClock)(),
     ])
-    if (i === 100) {
-      console.log('clocks', ...clocks)
-    }
     return deepEqual(...clocks)
-  })
+  }
+  const isSuccess = await retryUntil(isSync)
 
   stream.abort()
-  await p(conn.close)(true)
+  return isSuccess
 }
 
 function setupFeedRequests(person1, person2) {
@@ -45,21 +85,8 @@ function setupFeedRequests(person1, person2) {
     ]),
     pull.flatten(),
     pull.map((feedDetails) => feedDetails.id),
-    //pull.asyncMap((feedId, cb) => {
-    //  p(person1.getVectorClock)().then((p1Vectors) => {
-    //    p(person2.getVectorClock)().then((p2Vectors) => {
-    //      const p1Feeds = Object.keys(p1Vectors)
-    //      const p2Feeds = Object.keys(p2Vectors)
-
-    //      cb(null, [feedId, ...p1Feeds, ...p2Feeds])
-    //    })
-    //  })
-    //}),
-    pull.flatten(),
     pull.unique(),
     pull.asyncMap((feedId, cb) => {
-      //console.log('feedId', feedId)
-
       // skip re-requesting if not needed
       // if (feedId in clock1 && feedId in clock2) return cb(null, null)
 
@@ -78,13 +105,16 @@ function setupFeedRequests(person1, person2) {
   return drain
 }
 
+// try an async task up to 100 times till it returns true
+// if success retryUntil returns true, otherwise false
 async function retryUntil(checkIsDone) {
   let isDone = false
   for (let i = 0; i < 100; i++) {
     isDone = await checkIsDone()
-    if (isDone) return
+    if (isDone) return true
 
     await p(setTimeout)(100)
   }
-  if (!isDone) throw new Error('retryUntil timed out')
+
+  return false
 }

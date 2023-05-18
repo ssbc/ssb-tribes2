@@ -20,8 +20,7 @@ const Testbot = require('../../helpers/testbot')
 const replicate = require('../../helpers/replicate')
 
 test('get-tangle-data unit test', (t) => {
-  const name = `get-group-tangle-${Date.now()}`
-  const server = Testbot({ name })
+  const server = Testbot()
 
   server.metafeeds.findOrCreate(
     { purpose: 'group/additions' },

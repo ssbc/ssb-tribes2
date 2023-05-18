@@ -11,9 +11,7 @@ const Testbot = require('./helpers/testbot')
 const replicate = require('./helpers/replicate')
 
 test('tribes.list + tribes.get', (t) => {
-  const name = `list-and-get-groups-${Date.now()}`
-  let server = Testbot({ name })
-  const keys = server.keys
+  let server = Testbot({ name: 'alice' })
 
   server.tribes2.create(null, (err, group) => {
     t.error(err, 'create group')
@@ -40,7 +38,7 @@ test('tribes.list + tribes.get', (t) => {
           server.close(true, (err) => {
             t.error(err, 'closes server')
 
-            server = Testbot({ name, rimraf: false, keys })
+            server = Testbot({ name: 'alice', rimraf: false })
             pull(
               server.tribes2.list(),
               pull.collect((err, newList) => {

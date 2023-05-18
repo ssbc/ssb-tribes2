@@ -620,21 +620,8 @@ test('Can exclude a person in a group with a lot of members', async (t) => {
 })
 
 test("restarting the client doesn't make us rejoin old stuff", async (t) => {
-  const alice = Testbot({
-    keys: ssbKeys.generate(null, 'alice'),
-    mfSeed: Buffer.from(
-      '000000000000000000000000000000000000000000000000000000000000a1ce',
-      'hex'
-    ),
-  })
-  let bob = Testbot({
-    name: 'bobrestart',
-    keys: ssbKeys.generate(null, 'bob'),
-    mfSeed: Buffer.from(
-      '0000000000000000000000000000000000000000000000000000000000000b0b',
-      'hex'
-    ),
-  })
+  const alice = Testbot({ name: 'alice' })
+  let bob = Testbot({ name: 'bob' })
 
   await Promise.all([alice.tribes2.start(), bob.tribes2.start()])
 
@@ -674,15 +661,7 @@ test("restarting the client doesn't make us rejoin old stuff", async (t) => {
   await p(bob.close)(true).then(() => t.pass("bob's client was closed"))
   await p(setTimeout)(500)
 
-  bob = Testbot({
-    rimraf: false,
-    name: 'bobrestart',
-    keys: ssbKeys.generate(null, 'bob'),
-    mfSeed: Buffer.from(
-      '0000000000000000000000000000000000000000000000000000000000000b0b',
-      'hex'
-    ),
-  })
+  bob = Testbot({ name: 'bob', rimraf: false })
   t.pass('bob got a new client')
   await bob.tribes2.start().then(() => t.pass('bob restarted'))
 
