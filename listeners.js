@@ -25,8 +25,11 @@ const {
 const pull = require('pull-stream')
 const paraMap = require('pull-paramap')
 const clarify = require('clarify-error')
+const Epochs = require('./lib/epochs')
 
-module.exports = function startListeners(ssb, getPreferredEpoch, onError) {
+module.exports = function startListeners(ssb, onError) {
+  const { getTipEpochs, getPreferredEpoch } = Epochs(ssb)
+
   let isClosed = false
   ssb.close.hook((close, args) => {
     isClosed = true
@@ -52,9 +55,23 @@ module.exports = function startListeners(ssb, getPreferredEpoch, onError) {
       pull.drain(
         (msg) => {
           const groupId = msg.value.content.recps[0]
-          ssb.box2.excludeGroupInfo(groupId, (err) => {
+          getTipEpochs(groupId, (err, tipEpochs) => {
             // prettier-ignore
-            if (err && !isClosed) return onError(clarify(err, 'Error on excluding group info after finding exclusion of ourselves'))
+            if (err) return onError(clarify(err, 'Error on getting tip epochs after finding exclusion of ourselves'))
+
+            const excludeEpochRootId = msg.value.content.tangles.members.root
+
+            const excludeIsInTipEpoch = tipEpochs
+              .map((tip) => tip.id)
+              .includes(excludeEpochRootId)
+
+            // ignore the exclude if it's an old one (we were added back to the group later)
+            if (!excludeIsInTipEpoch) return
+
+            ssb.box2.excludeGroupInfo(groupId, (err) => {
+              // prettier-ignore
+              if (err) return onError(clarify(err, 'Error on excluding group info after finding exclusion of ourselves'))
+            })
           })
         },
         (err) => {

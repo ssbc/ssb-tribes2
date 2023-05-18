@@ -445,3 +445,98 @@ test('addMembers adds to all the tip epochs and gives keys to all the old epochs
     .then(() => t.pass('clients close'))
     .catch((err) => t.error(err))
 })
+
+test('can add someone back into a group', async (t) => {
+  const alice = Testbot({
+    keys: ssbKeys.generate(null, 'alice'),
+    mfSeed: Buffer.from(
+      '000000000000000000000000000000000000000000000000000000000000a1ce',
+      'hex'
+    ),
+  })
+  const bobConfig = {
+    name: 'bobrestart',
+    keys: ssbKeys.generate(null, 'bob'),
+    mfSeed: Buffer.from(
+      '0000000000000000000000000000000000000000000000000000000000000b0b',
+      'hex'
+    ),
+  }
+  let bob = Testbot(bobConfig)
+
+  await Promise.all([alice.tribes2.start(), bob.tribes2.start()])
+
+  const bobRoot = await p(bob.metafeeds.findOrCreate)()
+
+  await replicate(alice, bob).catch(t.error)
+
+  const { id: groupId } = await alice.tribes2
+    .create()
+    .catch((err) => t.error(err, 'alice failed to create group'))
+
+  await alice.tribes2
+    .addMembers(groupId, [bobRoot.id])
+    .then(() => t.pass('added bob'))
+    .catch((err) => t.error(err, 'add bob fail'))
+
+  await replicate(alice, bob).catch(t.error)
+
+  await bob.tribes2.acceptInvite(groupId)
+
+  await replicate(alice, bob).catch(t.error)
+
+  await alice.tribes2
+    .excludeMembers(groupId, [bobRoot.id])
+    .then(() => t.pass('alice excluded bob'))
+    .catch((err) => t.error(err, 'remove member fail'))
+
+  await replicate(alice, bob).catch(t.error)
+
+  await alice.tribes2
+    .addMembers(groupId, [bobRoot.id])
+    .then(() => t.pass('added bob back in again'))
+    .catch((err) => t.error(err, 'add bob back fail'))
+
+  await replicate(alice, bob).catch(t.error)
+
+  const invites = await pull(bob.tribes2.listInvites(), pull.collectAsPromise())
+  t.equal(invites.length, 1, 'got a reinvite')
+  t.equal(invites[0].id, groupId, 'got invite to correct group')
+  await bob.tribes2.acceptInvite(groupId).catch(t.error)
+
+  async function verifyInGroup(peer) {
+    const noInvites = await pull(
+      bob.tribes2.listInvites(),
+      pull.collectAsPromise()
+    )
+    t.deepEqual(noInvites, [], "we used the invite so there aren't any left")
+
+    await peer.tribes2
+      .acceptInvite(groupId)
+      .then(() => t.fail('consumed invite twice'))
+      .catch(() => t.pass("can't consume invite twice"))
+
+    const list = await pull(peer.tribes2.list(), pull.collectAsPromise())
+    t.equal(list.length, 1, 'one group')
+    t.equal(list[0].id, groupId, 'id in list is correct')
+
+    const group = await bob.tribes2.get(groupId)
+    t.notEqual(group.writeKey, undefined, 'bob got writeKey back')
+    t.equal(group.excluded, undefined, 'bob is not excluded')
+  }
+
+  await verifyInGroup(bob)
+
+  await p(setTimeout)(500)
+  await p(bob.close)(true).then(() => t.pass("bob's client was closed"))
+  bob = Testbot({
+    ...bobConfig,
+    rimraf: false,
+  })
+  t.pass('bob got a new client')
+  await bob.tribes2.start().then(() => t.pass('bob restarted'))
+
+  await verifyInGroup(bob)
+
+  await Promise.all([p(alice.close)(true), p(bob.close)(true)])
+})
