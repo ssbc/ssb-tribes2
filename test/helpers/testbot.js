@@ -88,6 +88,11 @@ function mfSeedFromName(name) {
         '00000000000000000000000000000000000000000000000000000000000da71d',
         'hex'
       )
+    case 'oscar':
+      return Buffer.from(
+        '0000000000000000000000000000000000000000000000000000000000005ca4',
+        'hex'
+      )
 
     default:
       throw new Error('no mfSeed set up for ' + name)

@@ -261,10 +261,10 @@ test('addMembers adds to all the tip epochs and gives keys to all the old epochs
 
   const run = Run(t)
 
-  const alice = Testbot({ name: 'alice', db2: {} })
-  const bob = Testbot({ name: 'bob', db2: {} })
-  const carol = Testbot({ name: 'carol', db2: {} })
-  const david = Testbot({ name: 'david', db2: {} })
+  const alice = Testbot({ name: 'alice' })
+  const bob = Testbot({ name: 'bob' })
+  const carol = Testbot({ name: 'carol' })
+  const david = Testbot({ name: 'david' })
 
   await run(
     'clients started',
