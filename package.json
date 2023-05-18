@@ -1,6 +1,6 @@
 {
   "name": "ssb-tribes2",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "SSB private groups with ssb-db2",
   "repository": {
     "type": "git",
