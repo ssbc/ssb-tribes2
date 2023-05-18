@@ -276,7 +276,7 @@ test('addMembers adds to all the tip epochs and gives keys to all the old epochs
     ])
   )
 
-  const [aliceRootId, bobRootId, carolRootId, davidRootId] = (
+  const [, bobRootId, carolRootId, davidRootId] = (
     await run(
       'got peer roots',
       Promise.all(

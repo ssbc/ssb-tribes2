@@ -7,6 +7,11 @@ const pull = require('pull-stream')
 const pullMany = require('pull-many')
 const deepEqual = require('fast-deep-equal')
 
+/**
+ * Fully replicates between two or more peers
+ *
+ * Known bug: If you're e.g. created a group and posted in it but not invited anyone before replicating, then the group creator has to be the first peer listed. This is because we use branchStream (which only lists feeds you can decrypt the metafeed tree reference to) to figure out what to replicate, but we use getVectorClock (which lists *every* feed you have) to figure out when replication is done. So doing bob<->alice (where alice created the group) then bob<->carol fails, because bob can't pass along the group feed that alice posted on.
+ */
 module.exports = async function replicate(...peers) {
   if (peers.length === 1 && Array.isArray(peers[0])) peers = peers[0]
   if (peers.length === 2) return replicatePair(...peers)
@@ -20,7 +25,7 @@ module.exports = async function replicate(...peers) {
           if (person1.id === person2.id) return cb(null, true)
 
           replicatePair(person1, person2)
-            .then((res) => cb(null, true))
+            .then(() => cb(null, true))
             .catch((err) => cb(err))
         }),
         pull.collect(cb)
@@ -30,9 +35,6 @@ module.exports = async function replicate(...peers) {
   )
 }
 
-/**
- * Fully replicates person1's metafeed tree to person2 and vice versa
- */
 async function replicatePair(person1, person2) {
   // const start = Date.now()
   // const ID = [person1, person2]
@@ -47,8 +49,8 @@ async function replicatePair(person1, person2) {
   )
   if (!isSync) {
     console.error('EBT failed to replicate! Final state:')
-    console.log(person1.id, await p(person1.getVectorClock)())
-    console.log(person2.id, await p(person2.getVectorClock)())
+    console.error(person1.id, await p(person1.getVectorClock)())
+    console.error(person2.id, await p(person2.getVectorClock)())
   }
 
   await p(conn.close)(true).catch(console.error)
