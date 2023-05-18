@@ -75,7 +75,7 @@ test(
         const content = { type: 'potato', count: i, recps: [group.id] }
         return ssb.tribes2.publish(content, null).then(() => {
           count++
-          if (count % 500 === 0) t.pass(count)
+          if (count % 1000 === 0) t.pass(count)
         })
       })
     )
@@ -84,6 +84,9 @@ test(
       })
       .catch(t.error)
 
+    await p(setTimeout)(1000)
     await p(ssb.close)(true)
+
+    t.end()
   }
 )
