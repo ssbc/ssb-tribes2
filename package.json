@@ -52,7 +52,7 @@
     "set.prototype.difference": "^1.0.2",
     "ssb-bfe": "^3.7.0",
     "ssb-box2": "^7.1.0",
-    "ssb-db2": "^7.1.0",
+    "ssb-db2": "^7.1.1",
     "ssb-meta-feeds": "^0.39.0",
     "ssb-private-group-keys": "^1.1.2",
     "ssb-ref": "^2.16.0",

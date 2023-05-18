@@ -61,7 +61,7 @@ test('prune a message with way too big `previous`', async (t) => {
 
 test('publish many messages that might need pruning', async (t) => {
   const n = 5000
-  const ssb = Testbot()
+  const ssb = Testbot({ db2: {} })
 
   const group = await p(ssb.tribes2.create)(null)
 
