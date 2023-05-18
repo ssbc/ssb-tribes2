@@ -110,11 +110,11 @@ NOTE: If `create` finds an empty (i.e. seemingly unused) group feed, it will sta
 
   - `id` _GroupUri_ - an SSB URI that's safe to use publicly to name the group, and is used in `recps` to trigger encrypting messages to that group
   - `subfeed` _Keys_ - the keys of the subfeed you should publish group data to
-  - `writeKey` _GroupKey_ - the current key used for publishing new messages to the group. It is one of the `readKeys`.
-  - `readKeys` _[GroupKey]_ - an array of all keys used to read messages for this group.
+  - `writeKey` _GroupSecret_ - the current key used for publishing new messages to the group. It is one of the `readKeys`.
+  - `readKeys` _[GroupSecret]_ - an array of all keys used to read messages for this group.
   - `root` _MessagedId_ - the MessageId of the `group/init` message of the group, encoded as an ssb-uri.
 
-  where _GroupKey_ is an object of the format
+  where _GroupSecret_ is an object of the format
 
   - `key` _Buffer_ - the symmetric key used by the group for encryption
   - `scheme` _String_ - the scheme for this key
@@ -139,7 +139,7 @@ Publish `group/add-member` messages to a group of peers, which gives them all th
 - `feedIds` _[FeedId]_ - an Array of 1-15 different ids for peers (accepts ssb-uri or sigil feed ids)
 - `opts` _Object_ - with the options:
   - `text` _String_ - A piece of text attached to the addition. Visible to the whole group and the newly added people.
-- `cb` _Function_ - a callback of signature `(err, msg)`
+- `cb` _Function_ - a callback of signature `(err, Array<msg>)`
 
 ### `ssb.tribes2.excludeMembers(groupId, feedIds, opts, cb)
 

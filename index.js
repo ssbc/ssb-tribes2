@@ -14,7 +14,6 @@ const clarify = require('clarify-error')
 const {
   where,
   and,
-  or,
   isDecrypted,
   type,
   toPullStream,
@@ -64,7 +63,12 @@ module.exports = {
       findOrCreateGroupWithoutMembers,
       getRootFeedIdFromMsgId,
     } = MetaFeedHelpers(ssb)
-    const { getPreferredEpoch, getMembers } = Epochs(ssb)
+    const {
+      getTipEpochs,
+      getPredecessorEpochs,
+      getPreferredEpoch,
+      getMembers,
+    } = Epochs(ssb)
 
     function create(opts = {}, cb) {
       if (cb === undefined) return promisify(create)(opts)
@@ -80,7 +84,7 @@ module.exports = {
         const data = {
           id: buildGroupId({
             groupInitMsg,
-            groupKey: secret.toBuffer(),
+            secret: secret.toBuffer(),
           }),
           writeKey: {
             key: secret.toBuffer(),
@@ -136,6 +140,8 @@ module.exports = {
     function addMembers(groupId, feedIds, opts = {}, cb) {
       if (cb === undefined) return promisify(addMembers)(groupId, feedIds, opts)
 
+      opts.oldSecrets ??= true
+
       if (!feedIds || feedIds.length === 0) {
         return cb(new Error('No feedIds provided to addMembers'))
       }
@@ -147,7 +153,7 @@ module.exports = {
         return cb(new Error('addMembers only supports bendybutt-v1 feed IDs'))
       }
 
-      get(groupId, (err, { writeKey, root }) => {
+      get(groupId, (err, { root }) => {
         // prettier-ignore
         if (err) return cb(clarify(err, `Failed to get group details when adding members`))
 
@@ -155,34 +161,58 @@ module.exports = {
           // prettier-ignore
           if (err) return cb(clarify(err, "couldn't get root id of author of root msg"))
 
-          const content = {
-            type: 'group/add-member',
-            version: 'v2',
-            groupKey: writeKey.key.toString('base64'),
-            root,
-            creator: rootAuthorId,
-            recps: [groupId, ...feedIds],
-          }
-
-          if (opts.text) content.text = opts.text
-
-          const getFeed = opts?._feedKeys
-            ? (cb) => cb(null, { keys: opts._feedKeys })
-            : findOrCreateAdditionsFeed
-
-          getFeed((err, additionsFeed) => {
+          getTipEpochs(groupId, (err, tipEpochs) => {
             // prettier-ignore
-            if (err) return cb(clarify(err, 'Failed to find or create additions feed when adding members'))
+            if (err) return cb(clarify(err, "Couldn't get tip epochs when adding members"))
 
-            const options = {
-              isValid: isAddMember,
-              tangles: ['members'],
-              feedKeys: additionsFeed.keys,
-            }
-            publish(content, options, (err, msg) => {
+            const getFeed = opts?._feedKeys
+              ? (cb) => cb(null, { keys: opts._feedKeys })
+              : findOrCreateAdditionsFeed
+
+            getFeed((err, additionsFeed) => {
               // prettier-ignore
-              if (err) return cb(clarify(err, 'Failed to publish add-member message'))
-              return cb(null, msg)
+              if (err) return cb(clarify(err, 'Failed to find or create additions feed when adding members'))
+
+              const options = {
+                isValid: isAddMember,
+                tangles: ['members'],
+                feedKeys: additionsFeed.keys,
+              }
+              pull(
+                pull.values(tipEpochs),
+                pull.asyncMap((tipEpoch, cb) => {
+                  getPredecessorEpochs(
+                    groupId,
+                    tipEpoch.id,
+                    (err, predecessors) => {
+                      // prettier-ignore
+                      if (err) return cb(clarify(err, "Couldn't get predecessor epochs when adding members"))
+
+                      const oldSecrets = predecessors.map((pred) =>
+                        pred.secret.toString('base64')
+                      )
+                      const content = {
+                        type: 'group/add-member',
+                        version: 'v2',
+                        secret: tipEpoch.secret.toString('base64'),
+                        oldSecrets: opts.oldSecrets ? oldSecrets : undefined,
+                        root,
+                        creator: rootAuthorId,
+                        text: opts?.text,
+                        recps: [groupId, ...feedIds],
+                      }
+                      return cb(null, content)
+                    }
+                  )
+                }),
+                pull.asyncMap((content, cb) => publish(content, options, cb)),
+                pull.collect((err, msgs) => {
+                  // prettier-ignore
+                  if (err) return cb(clarify(err, 'Failed to publish add-member message(s)'))
+
+                  return cb(null, msgs)
+                })
+              )
             })
           })
         })
@@ -221,15 +251,15 @@ module.exports = {
               const remainingMembers = beforeMembers.filter(
                 (member) => !feedIds.includes(member)
               )
-              const newGroupKey = new SecretKey()
-              const addInfo = { key: newGroupKey.toBuffer() }
+              const newSecret = new SecretKey()
+              const addInfo = { key: newSecret.toBuffer() }
 
               ssb.box2.addGroupInfo(groupId, addInfo, (err) => {
                 // prettier-ignore
                 if (err) return cb(clarify(err, "Couldn't store new key when excluding members"))
 
                 const newKey = {
-                  key: newGroupKey.toBuffer(),
+                  key: newSecret.toBuffer(),
                   scheme: keySchemes.private_group,
                 }
                 ssb.box2.pickGroupWriteKey(groupId, newKey, (err) => {
@@ -239,7 +269,7 @@ module.exports = {
                   const newEpochContent = {
                     type: 'group/init',
                     version: 'v2',
-                    groupKey: newGroupKey.toString('base64'),
+                    secret: newSecret.toString('base64'),
                     tangles: {
                       members: { root: null, previous: null },
                     },
@@ -256,7 +286,12 @@ module.exports = {
                     pull(
                       pull.values(chunk(remainingMembers, 15)),
                       pull.asyncMap((membersToAdd, cb) =>
-                        addMembers(groupId, membersToAdd, {}, cb)
+                        addMembers(
+                          groupId,
+                          membersToAdd,
+                          { oldSecrets: false },
+                          cb
+                        )
                       ),
                       pull.collect((err) => {
                         // prettier-ignore
@@ -420,6 +455,7 @@ module.exports = {
       function getGroupInviteData(groupId, cb) {
         let root
         const secrets = new Set()
+        let writeSecret = null
 
         pull(
           ssb.db.query(
@@ -436,7 +472,13 @@ module.exports = {
           pull.drain(
             (msg) => {
               root ||= msg.value.content.root
-              secrets.add(msg.value.content.groupKey)
+              const oldSecrets = msg.value.content.oldSecrets
+              if (oldSecrets) {
+                oldSecrets.forEach((oldSecret) => secrets.add(oldSecret))
+              }
+              const latestSecret = msg.value.content.secret
+              secrets.add(latestSecret)
+              writeSecret = latestSecret
             },
             (err) => {
               if (err) return cb(err)
@@ -449,6 +491,10 @@ module.exports = {
                 id: groupId,
                 root,
                 readKeys,
+                writeKey: {
+                  key: Buffer.from(writeSecret, 'base64'),
+                  scheme: keySchemes.private_group,
+                },
               }
               return cb(null, invite)
             }
@@ -471,8 +517,8 @@ module.exports = {
           if (!inviteInfos.length) return cb(new Error("Didn't find invite for that group id"))
 
           // TODO: which writeKey should be picked??
-          // this will essentially pick a random write key
-          const { id, root, readKeys } = inviteInfos[0]
+          // this will essentially pick a random write key from the current epoch tips
+          const { id, root, readKeys, writeKey } = inviteInfos[0]
           pull(
             pull.values(readKeys),
             pull.asyncMap((readKey, cb) => {
@@ -481,10 +527,15 @@ module.exports = {
             pull.collect((err) => {
               // prettier-ignore
               if (err) return cb(clarify(err, 'Failed to add group info when accepting an invite'))
-              ssb.db.reindexEncrypted((err) => {
+              ssb.box2.pickGroupWriteKey(id, writeKey, (err) => {
                 // prettier-ignore
-                if (err) cb(clarify(err, 'Failed to reindex encrypted messages when accepting an invite'))
-                else cb(null, inviteInfos[0])
+                if (err) return cb(clarify(err, 'Failed to pick a write key when accepting invite to a group'))
+
+                ssb.db.reindexEncrypted((err) => {
+                  // prettier-ignore
+                  if (err) cb(clarify(err, 'Failed to reindex encrypted messages when accepting an invite'))
+                  else cb(null, inviteInfos[0])
+                })
               })
             })
           )

@@ -55,7 +55,7 @@ test('add and exclude a person, post on the new feed', async (t) => {
     .create()
     .catch((err) => t.error(err, 'alice failed to create group'))
 
-  const addBobMsg = await alice.tribes2
+  const [addBobMsg] = await alice.tribes2
     .addMembers(groupId, [bobId])
     .catch((err) => t.error(err, 'add member fail'))
 
@@ -113,7 +113,7 @@ test('add and exclude a person, post on the new feed', async (t) => {
   const firstInit = firstContents[0]
 
   t.equal(firstInit.type, 'group/init')
-  t.equal(firstInit.groupKey, writeKey1.key.toString('base64'))
+  t.equal(firstInit.secret, writeKey1.key.toString('base64'))
 
   const excludeMsg = firstContents[1]
 
@@ -138,7 +138,7 @@ test('add and exclude a person, post on the new feed', async (t) => {
 
   t.equal(secondInit.type, 'group/init')
   t.equal(secondInit.version, 'v2')
-  t.equal(secondInit.groupKey, writeKey2.key.toString('base64'))
+  t.equal(secondInit.secret, writeKey2.key.toString('base64'))
   t.deepEqual(secondInit.tangles.members, { root: null, previous: null })
   t.deepEqual(
     secondInit.tangles.epoch,
@@ -165,6 +165,16 @@ test('add and exclude a person, post on the new feed', async (t) => {
 
   t.equal(reinviteMsg.type, 'group/add-member')
   t.deepEqual(reinviteMsg.recps, [groupId, aliceId])
+  t.equal(
+    reinviteMsg.secret,
+    writeKey2.key.toString('base64'),
+    're-addition gives secret to new epoch'
+  )
+  t.equal(
+    reinviteMsg.oldSecrets,
+    undefined,
+    "re-addition doesn't send secrets to old epochs"
+  )
 
   const secondInitKey = fromMessageSigil(msgsFromSecond[0].key)
   t.deepEqual(
@@ -610,21 +620,8 @@ test('Can exclude a person in a group with a lot of members', async (t) => {
 })
 
 test("restarting the client doesn't make us rejoin old stuff", async (t) => {
-  const alice = Testbot({
-    keys: ssbKeys.generate(null, 'alice'),
-    mfSeed: Buffer.from(
-      '000000000000000000000000000000000000000000000000000000000000a1ce',
-      'hex'
-    ),
-  })
-  let bob = Testbot({
-    name: 'bobrestart',
-    keys: ssbKeys.generate(null, 'bob'),
-    mfSeed: Buffer.from(
-      '0000000000000000000000000000000000000000000000000000000000000b0b',
-      'hex'
-    ),
-  })
+  const alice = Testbot({ name: 'alice' })
+  let bob = Testbot({ name: 'bob' })
 
   await Promise.all([alice.tribes2.start(), bob.tribes2.start()])
 
@@ -664,15 +661,7 @@ test("restarting the client doesn't make us rejoin old stuff", async (t) => {
   await p(bob.close)(true).then(() => t.pass("bob's client was closed"))
   await p(setTimeout)(500)
 
-  bob = Testbot({
-    rimraf: false,
-    name: 'bobrestart',
-    keys: ssbKeys.generate(null, 'bob'),
-    mfSeed: Buffer.from(
-      '0000000000000000000000000000000000000000000000000000000000000b0b',
-      'hex'
-    ),
-  })
+  bob = Testbot({ name: 'bob', rimraf: false })
   t.pass('bob got a new client')
   await bob.tribes2.start().then(() => t.pass('bob restarted'))
 

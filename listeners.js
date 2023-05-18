@@ -94,7 +94,7 @@ module.exports = function startListeners(ssb, getPreferredEpoch, onError) {
         (msg) => {
           const groupId = msg.value.content.recps[0]
 
-          const secret = Buffer.from(msg.value.content.groupKey, 'base64')
+          const secret = Buffer.from(msg.value.content.secret, 'base64')
           ssb.box2.addGroupInfo(groupId, { key: secret }, (err) => {
             // prettier-ignore
             if (err && !isClosed) return onError(clarify(err, 'Cannot add new epoch key that we found'))

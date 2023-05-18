@@ -8,27 +8,74 @@ const pullMany = require('pull-many')
 const deepEqual = require('fast-deep-equal')
 
 /**
- * Fully replicates person1's metafeed tree to person2 and vice versa
+ * Fully replicates between two or more peers
+ *
+ * Known bug: If you're e.g. created a group and posted in it but not invited anyone before replicating, then the group creator has to be the first peer listed. This is because we use branchStream (which only lists feeds you can decrypt the metafeed tree reference to) to figure out what to replicate, but we use getVectorClock (which lists *every* feed you have) to figure out when replication is done. So doing bob<->alice (where alice created the group) then bob<->carol fails, because bob can't pass along the group feed that alice posted on.
  */
-module.exports = async function replicate(person1, person2) {
+module.exports = async function replicate(...peers) {
+  if (peers.length === 1 && Array.isArray(peers[0])) peers = peers[0]
+  if (peers.length === 2) return replicatePair(...peers)
+
+  return pull(
+    pull.values(peers),
+    pull.asyncMap((person1, cb) => {
+      pull(
+        pull.values(peers),
+        pull.asyncMap((person2, cb) => {
+          if (person1.id === person2.id) return cb(null, true)
+
+          replicatePair(person1, person2)
+            .then(() => cb(null, true))
+            .catch((err) => cb(err))
+        }),
+        pull.collect(cb)
+      )
+    }),
+    pull.collectAsPromise()
+  )
+}
+
+async function replicatePair(person1, person2) {
+  // const start = Date.now()
+  // const ID = [person1, person2]
+  //   .map(p => p.name || p.id.slice(0, 10))
+  //   .join('-')
+
   // Establish a network connection
   const conn = await p(person1.connect)(person2.getAddress())
 
+  const isSync = await ebtReplicate(person1, person2).catch((err) =>
+    console.error('Error with ebtReplicate:\n', err)
+  )
+  if (!isSync) {
+    console.error('EBT failed to replicate! Final state:')
+    console.error(person1.id, await p(person1.getVectorClock)())
+    console.error(person2.id, await p(person2.getVectorClock)())
+  }
+
+  await p(conn.close)(true).catch(console.error)
+  // const time = Date.now() - start
+  // const length = Math.max(Math.round(time / 100), 1)
+  // console.log(ID, Array(length).fill('▨').join(''), time + 'ms')
+}
+
+async function ebtReplicate(person1, person2) {
   // ensure persons are replicating all the trees in their forests,
   // from top to bottom
   const stream = setupFeedRequests(person1, person2)
 
   // Wait until both have replicated all feeds in full (are in sync)
-  await retryUntil(async () => {
+  const isSync = async () => {
     const clocks = await Promise.all([
       p(person1.getVectorClock)(),
       p(person2.getVectorClock)(),
     ])
     return deepEqual(...clocks)
-  })
+  }
+  const isSuccess = await retryUntil(isSync)
 
   stream.abort()
-  await p(conn.close)(true)
+  return isSuccess
 }
 
 function setupFeedRequests(person1, person2) {
@@ -60,13 +107,16 @@ function setupFeedRequests(person1, person2) {
   return drain
 }
 
+// try an async task up to 100 times till it returns true
+// if success retryUntil returns true, otherwise false
 async function retryUntil(checkIsDone) {
   let isDone = false
   for (let i = 0; i < 100; i++) {
     isDone = await checkIsDone()
-    if (isDone) return
+    if (isDone) return true
 
     await p(setTimeout)(100)
   }
-  if (!isDone) throw new Error('retryUntil timed out')
+
+  return false
 }
