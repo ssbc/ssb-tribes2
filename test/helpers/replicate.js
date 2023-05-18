@@ -7,10 +7,38 @@ const pull = require('pull-stream')
 const pullMany = require('pull-many')
 const deepEqual = require('fast-deep-equal')
 
+module.exports = async function replicate(...peers) {
+  if (peers.length === 1 && Array.isArray(peers[0])) peers = peers[0]
+  if (peers.length === 2) return replicatePair(...peers)
+
+  return pull(
+    pull.values(peers),
+    pull.asyncMap((person1, cb) => {
+      pull(
+        pull.values(peers),
+        pull.asyncMap((person2, cb) => {
+          if (person1.id === person2.id) return cb(null, true)
+
+          replicatePair(person1, person2)
+            .then((res) => cb(null, true))
+            .catch((err) => cb(err))
+        }),
+        pull.collect(cb)
+      )
+    }),
+    pull.collectAsPromise()
+  )
+}
+
 /**
  * Fully replicates person1's metafeed tree to person2 and vice versa
  */
-module.exports = async function replicate(person1, person2) {
+async function replicatePair(person1, person2) {
+  // const start = Date.now()
+  // const ID = [person1, person2]
+  //   .map(p => p.name || p.id.slice(0, 10))
+  //   .join('-')
+
   // Establish a network connection
   const conn = await p(person1.connect)(person2.getAddress())
 
@@ -24,6 +52,9 @@ module.exports = async function replicate(person1, person2) {
   }
 
   await p(conn.close)(true).catch(console.error)
+  // const time = Date.now() - start
+  // const length = Math.max(Math.round(time / 100), 1)
+  // console.log(ID, Array(length).fill('▨').join(''), time + 'ms')
 }
 
 async function ebtReplicate(person1, person2) {

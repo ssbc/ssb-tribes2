@@ -25,7 +25,10 @@ module.exports = function createSbot(opts = {}) {
   const dir = opts.path || `/tmp/ssb-tribes2-tests-${opts.name || count++}`
   if (opts.rimraf !== false) rimraf.sync(dir)
 
-  const keys = opts.keys || ssbKeys.loadOrCreateSync(path.join(dir, 'secret'))
+  const keys =
+    opts.keys || opts.name
+      ? ssbKeys.generate(null, opts.name)
+      : ssbKeys.loadOrCreateSync(path.join(dir, 'secret'))
 
   const stack = SecretStack({ caps: { shs } })
     .use(require('ssb-db2/core'))
@@ -51,11 +54,42 @@ module.exports = function createSbot(opts = {}) {
       writeTimeout: 10,
     },
     metafeeds: {
-      seed: opts.mfSeed,
+      seed: opts.mfSeed || mfSeedFromName(opts.name),
     },
   })
 
+  sbot.name = opts.name
   sbot.ebt.registerFormat(bendyButtFormat)
 
   return sbot
+}
+
+function mfSeedFromName(name) {
+  if (!name) return
+
+  switch (name) {
+    case 'alice':
+      return Buffer.from(
+        '000000000000000000000000000000000000000000000000000000000000a1ce',
+        'hex'
+      )
+    case 'bob':
+      return Buffer.from(
+        '0000000000000000000000000000000000000000000000000000000000000b0b',
+        'hex'
+      )
+    case 'carol':
+      return Buffer.from(
+        '00000000000000000000000000000000000000000000000000000000000ca201',
+        'hex'
+      )
+    case 'david':
+      return Buffer.from(
+        '00000000000000000000000000000000000000000000000000000000000da71d',
+        'hex'
+      )
+
+    default:
+      throw new Error('no mfSeed set up for ' + name)
+  }
 }
