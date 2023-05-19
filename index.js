@@ -378,10 +378,8 @@ module.exports = {
 
           pull(
             ssb.db.query(
-              where(
-                and(type('group/add-member'), groupRecp(groupId)),
-                toPullStream()
-              )
+              where(and(type('group/add-member'), groupRecp(groupId))),
+              toPullStream()
             ),
             pull.filter(isAddMember),
             pull.take(1),
@@ -399,22 +397,22 @@ module.exports = {
                       slowPredicate('secret', (secret) =>
                         secrets.includes(secret)
                       )
-                    ),
-                    live ? live({ old: true }) : null,
-                    toPullStream()
+                    )
                   ),
-                  pull.filter((msg) => isInitRoot(msg) || isInitEpoch(msg)),
-                  pull.map((msg) => msg.key),
-                  pull.unique(),
-                  pull.map((epochRootId) =>
-                    getMembers.stream(epochRootId, { live })
-                  ),
-                  pullFlatMerge(),
-                  // for situations where we haven't replicated much of the group yet, we make sure to at least include the group creator here so we're sure to make progress in replication
-                  pull.map((member) => [creator, member]),
-                  pull.flatten(),
-                  pull.unique()
-                )
+                  live ? live({ old: true }) : null,
+                  toPullStream()
+                ),
+                pull.filter((msg) => isInitRoot(msg) || isInitEpoch(msg)),
+                pull.map((msg) => msg.key),
+                pull.unique(),
+                pull.map((epochRootId) =>
+                  getMembers.stream(epochRootId, { live })
+                ),
+                pullFlatMerge(),
+                // for situations where we haven't replicated much of the group yet, we make sure to at least include the group creator here so we're sure to make progress in replication
+                pull.map((member) => [creator, member]),
+                pull.flatten(),
+                pull.unique()
               )
               deferredSource.resolve(source)
             })
