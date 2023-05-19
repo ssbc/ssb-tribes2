@@ -376,27 +376,49 @@ module.exports = {
             readKey.key.toString('base64')
           )
 
-          const source = pull(
+          pull(
             ssb.db.query(
               where(
-                and(
-                  type('group/init'),
-                  slowPredicate('secret', (secret) => secrets.includes(secret))
-                ),
-                live ? live({ old: true }) : null,
+                and(type('group/add-member'), groupRecp(groupId)),
                 toPullStream()
-              ),
-              pull.filter((msg) => isInitRoot(msg) || isInitEpoch(msg)),
-              pull.map((msg) => msg.key),
-              pull.unique(),
-              pull.map((epochRootId) =>
-                getMembers.stream(epochRootId, { live })
-              ),
-              pullFlatMerge(),
-              pull.unique()
-            )
+              )
+            ),
+            pull.filter(isAddMember),
+            pull.take(1),
+            pull.collect((err, [addMsg]) => {
+              // prettier-ignore
+              if (err || !addMsg) return deferredSource.abort(clarify(err, "Couldn't get add-member message for group we're listing all members of"))
+
+              const creator = addMsg.value.content.creator
+
+              const source = pull(
+                ssb.db.query(
+                  where(
+                    and(
+                      type('group/init'),
+                      slowPredicate('secret', (secret) =>
+                        secrets.includes(secret)
+                      )
+                    ),
+                    live ? live({ old: true }) : null,
+                    toPullStream()
+                  ),
+                  pull.filter((msg) => isInitRoot(msg) || isInitEpoch(msg)),
+                  pull.map((msg) => msg.key),
+                  pull.unique(),
+                  pull.map((epochRootId) =>
+                    getMembers.stream(epochRootId, { live })
+                  ),
+                  pullFlatMerge(),
+                  // for situations where we haven't replicated much of the group yet, we make sure to at least include the group creator here so we're sure to make progress in replication
+                  pull.map((member) => [creator, member]),
+                  pull.flatten(),
+                  pull.unique()
+                )
+              )
+              deferredSource.resolve(source)
+            })
           )
-          deferredSource.resolve(source)
           return deferredSource
         }
 
