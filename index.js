@@ -24,6 +24,7 @@ const {
       addMember: isAddMember,
       content: isContent,
       excludeMember: isExcludeMember,
+      initRoot: isInitRoot,
       initEpoch: isInitEpoch,
     },
   },
@@ -39,6 +40,7 @@ const publishAndPrune = require('./lib/prune-publish')
 const MetaFeedHelpers = require('./lib/meta-feed-helpers')
 const Epochs = require('./lib/epochs')
 const { groupRecp } = require('./lib/operators')
+const { slowPredicate } = require('jitdb/operators')
 
 module.exports = {
   name: 'tribes2',
@@ -359,7 +361,7 @@ module.exports = {
     }
 
     function listMembers(groupId, opts = {}) {
-      const { live } = opts
+      const { live, allAdded } = opts
       const deferredSource = pullDefer.source()
 
       get(groupId, (err, group) => {
@@ -367,6 +369,36 @@ module.exports = {
         if (err) return deferredSource.abort(clarify(err, 'Failed to get group info when listing members'))
         // prettier-ignore
         if (group.excluded) return deferredSource.abort( new Error("We're excluded from this group, can't list members"))
+
+        if (allAdded) {
+          // TODO: make secrets live. box2 live get?
+          const secrets = group.readKeys.map((readKey) =>
+            readKey.key.toString('base64')
+          )
+
+          const source = pull(
+            ssb.db.query(
+              where(
+                and(
+                  type('group/init'),
+                  slowPredicate('secret', (secret) => secrets.includes(secret))
+                ),
+                live ? live({ old: true }) : null,
+                toPullStream()
+              ),
+              pull.filter((msg) => isInitRoot(msg) || isInitEpoch(msg)),
+              pull.map((msg) => msg.key),
+              pull.unique(),
+              pull.map((epochRootId) =>
+                getMembers.stream(epochRootId, { live })
+              ),
+              pullFlatMerge(),
+              pull.unique()
+            )
+          )
+          deferredSource.resolve(source)
+          return deferredSource
+        }
 
         if (!live) {
           getPreferredEpoch(groupId, (err, epoch) => {
