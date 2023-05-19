@@ -385,7 +385,9 @@ module.exports = {
             pull.take(1),
             pull.collect((err, [addMsg]) => {
               // prettier-ignore
-              if (err || !addMsg) return deferredSource.abort(clarify(err, "Couldn't get add-member message for group we're listing all members of"))
+              if (err) return deferredSource.abort(clarify(err, "Error getting add-member message for group we're listing all members of"))
+              // prettier-ignore
+              if (!addMsg) return deferredSource.abort(new Error("Missing add-member message for group we're listing all members of"))
 
               const creator = addMsg.value.content.creator
 
