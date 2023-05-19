@@ -404,8 +404,10 @@ module.exports = {
                   where(
                     and(
                       type('group/init'),
-                      slowPredicate('secret', (secret) =>
-                        secrets.includes(secret)
+                      slowPredicate(
+                        'secret',
+                        (secret) => secrets.includes(secret),
+                        { name: secrets.join('') }
                       )
                     )
                   ),
