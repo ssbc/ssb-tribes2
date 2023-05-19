@@ -16,6 +16,7 @@ const {
   and,
   isDecrypted,
   type,
+  live: dbLive,
   toPullStream,
 } = require('ssb-db2/operators')
 const {
@@ -378,7 +379,14 @@ module.exports = {
 
           pull(
             ssb.db.query(
-              where(and(type('group/add-member'), groupRecp(groupId))),
+              where(
+                and(
+                  isDecrypted('box2'),
+                  type('group/add-member'),
+                  groupRecp(groupId)
+                )
+              ),
+              dbLive({ old: true }),
               toPullStream()
             ),
             pull.filter(isAddMember),
@@ -401,7 +409,7 @@ module.exports = {
                       )
                     )
                   ),
-                  live ? live({ old: true }) : null,
+                  live ? dbLive({ old: true }) : null,
                   toPullStream()
                 ),
                 pull.filter((msg) => isInitRoot(msg) || isInitEpoch(msg)),
