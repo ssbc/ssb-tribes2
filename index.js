@@ -25,7 +25,6 @@ const {
       addMember: isAddMember,
       content: isContent,
       excludeMember: isExcludeMember,
-      initRoot: isInitRoot,
       initEpoch: isInitEpoch,
     },
   },
@@ -41,7 +40,6 @@ const publishAndPrune = require('./lib/prune-publish')
 const MetaFeedHelpers = require('./lib/meta-feed-helpers')
 const Epochs = require('./lib/epochs')
 const { groupRecp } = require('./lib/operators')
-const { slowPredicate } = require('jitdb/operators')
 
 module.exports = {
   name: 'tribes2',
