@@ -399,7 +399,9 @@ module.exports = {
 
               const creator = addMsg.value.content.creator
 
-              const source = pull(
+              const allAddedMembers = new Set()
+
+              const getMembersSource = pull(
                 ssb.db.query(
                   where(
                     and(
@@ -420,11 +422,22 @@ module.exports = {
                 pull.map((epochRootId) =>
                   getMembers.stream(epochRootId, { live })
                 ),
-                pullFlatMerge(),
-                // for situations where we haven't replicated much of the group yet, we make sure to at least include the group creator here so we're sure to make progress in replication
-                pull.map((member) => [creator, member]),
-                pull.flatten(),
-                pull.unique()
+                pull.through((members) =>
+                  console.log('gotten members', members)
+                ),
+                pullFlatMerge()
+              )
+
+              const source = pull(
+                pullMany([
+                  // for situations where we haven't replicated much of the group yet, we make sure to at least include the group creator here so we're sure to make progress in replication
+                  pull.once(creator),
+                  getMembersSource,
+                ]),
+                pull.unique(),
+                pull.through((member) => allAddedMembers.add(member)),
+                // return the whole list every time there's an update, to have a consistent listMembers api
+                pull.map(() => ({ added: [...allAddedMembers], toExclude: [] }))
               )
               deferredSource.resolve(source)
             })
