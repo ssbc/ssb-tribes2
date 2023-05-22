@@ -37,9 +37,8 @@ module.exports = async function replicate(...peers) {
 
 async function replicatePair(person1, person2) {
   // const start = Date.now()
-  // const ID = [person1, person2]
-  //   .map(p => p.name || p.id.slice(0, 10))
-  //   .join('-')
+  // let ID = [person1, person2].map((p) => p.name || p.id.slice(0, 10)).join('-')
+  // while (ID.length < 12) ID += ' '
 
   // Establish a network connection
   const conn = await p(person1.connect)(person2.getAddress())
@@ -54,6 +53,7 @@ async function replicatePair(person1, person2) {
   }
 
   await p(conn.close)(true).catch(console.error)
+
   // const time = Date.now() - start
   // const length = Math.max(Math.round(time / 100), 1)
   // console.log(ID, Array(length).fill('▨').join(''), time + 'ms')
@@ -62,7 +62,21 @@ async function replicatePair(person1, person2) {
 async function ebtReplicate(person1, person2) {
   // ensure persons are replicating all the trees in their forests,
   // from top to bottom
-  const stream = setupFeedRequests(person1, person2)
+  const feedIds = await getFeedsToSync(person1, person2)
+
+  pull(
+    pull.values(feedIds),
+    pull.asyncMap((feedId, cb) => {
+      // hack to make it look like we request feeds in the right order
+      // instead of just one big pile, ssb-meta-feeds operates under
+      // the assumption that we get messages in proper order
+      setTimeout(() => cb(null, feedId), 200)
+    }),
+    pull.drain((feedId) => {
+      person1.ebt.request(feedId, true)
+      person2.ebt.request(feedId, true)
+    })
+  )
 
   // Wait until both have replicated all feeds in full (are in sync)
   const isSync = async () => {
@@ -70,41 +84,24 @@ async function ebtReplicate(person1, person2) {
       p(person1.getVectorClock)(),
       p(person2.getVectorClock)(),
     ])
-    return deepEqual(...clocks)
+    return feedIds.every((feedId) => clocks[0][feedId] === clocks[1][feedId])
   }
   const isSuccess = await retryUntil(isSync)
 
-  stream.abort()
   return isSuccess
 }
 
-function setupFeedRequests(person1, person2) {
-  let drain
-  pull(
+async function getFeedsToSync(person1, person2) {
+  return pull(
     pullMany([
-      person1.metafeeds.branchStream({ old: true, live: true }),
-      person2.metafeeds.branchStream({ old: true, live: true }),
+      person1.metafeeds.branchStream({ old: true, live: false }),
+      person2.metafeeds.branchStream({ old: true, live: false }),
     ]),
     pull.flatten(),
     pull.map((feedDetails) => feedDetails.id),
     pull.unique(),
-    pull.asyncMap((feedId, cb) => {
-      // skip re-requesting if not needed
-      // if (feedId in clock1 && feedId in clock2) return cb(null, null)
-
-      // hack to make it look like we request feeds in the right order
-      // instead of just one big pile, ssb-meta-feeds operates under
-      // the assumption that we get messages in proper order
-      setTimeout(() => cb(null, feedId), 200)
-    }),
-    // pull.filter(Boolean), // filter out "null" entries
-    (drain = pull.drain((feedId) => {
-      person1.ebt.request(feedId, true)
-      person2.ebt.request(feedId, true)
-    }))
+    pull.collectAsPromise()
   )
-
-  return drain
 }
 
 // try an async task up to 100 times till it returns true

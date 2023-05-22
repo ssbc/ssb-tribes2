@@ -287,13 +287,9 @@ test('addMembers adds to all the tip epochs and gives keys to all the old epochs
     )
   ).map((root) => root.id)
 
-  async function replicateAll() {
+  async function replicateAll(msg = 'replicated all') {
     await p(setTimeout)(2000)
-
-    await replicate(alice, bob, carol, david)
-      .then(() => t.pass('replicated all'))
-      .catch((err) => t.error(err, 'replicated all'))
-
+    await run(msg, replicate(alice, bob, carol, david))
     await p(setTimeout)(2000)
   }
 
