@@ -372,11 +372,6 @@ module.exports = {
         if (group.excluded) return deferredSource.abort( new Error("We're excluded from this group, can't list members"))
 
         if (allAdded) {
-          // TODO: make secrets live. box2 live get?
-          const secrets = group.readKeys.map((readKey) =>
-            readKey.key.toString('base64')
-          )
-
           const allAddedMembers = new Set()
 
           const source = pull(
@@ -388,7 +383,7 @@ module.exports = {
                   groupRecp(groupId)
                 )
               ),
-              dbLive({ old: true }),
+              live ? dbLive({ old: true }) : null,
               toPullStream()
             ),
             pull.filter(isAddMember),
