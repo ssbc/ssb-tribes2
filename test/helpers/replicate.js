@@ -5,7 +5,6 @@
 const { promisify: p } = require('util')
 const pull = require('pull-stream')
 const pullMany = require('pull-many')
-const deepEqual = require('fast-deep-equal')
 
 /**
  * Fully replicates between two or more peers
