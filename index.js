@@ -363,6 +363,37 @@ module.exports = {
       const { live, allAdded } = opts
       const deferredSource = pullDefer.source()
 
+      const listAllAdded = () => {
+        const allAddedMembers = new Set()
+
+        const source = pull(
+          ssb.db.query(
+            where(
+              and(
+                isDecrypted('box2'),
+                type('group/add-member'),
+                groupRecp(groupId)
+              )
+            ),
+            live ? dbLive({ old: true }) : null,
+            toPullStream()
+          ),
+          pull.filter(isAddMember),
+          pull.map((msg) => msg.value.content),
+          pull.map((content) =>
+            // for situations where we haven't replicated much of the group yet, we make sure to at least include the group creator here so we're sure to make progress in replication
+            [content.creator, ...content.recps.slice(1)]
+          ),
+          pull.flatten(),
+          pull.unique(),
+          pull.through((member) => allAddedMembers.add(member)),
+          // return the whole list every time there's an update, to have a consistent listMembers api
+          pull.map(() => ({ added: [...allAddedMembers], toExclude: [] }))
+        )
+
+        deferredSource.resolve(source)
+      }
+
       get(groupId, (err, group) => {
         // prettier-ignore
         if (err) return deferredSource.abort(clarify(err, 'Failed to get group info when listing members'))
@@ -370,35 +401,8 @@ module.exports = {
         if (group.excluded) return deferredSource.abort( new Error("We're excluded from this group, can't list members"))
 
         if (allAdded) {
-          const allAddedMembers = new Set()
-
-          const source = pull(
-            ssb.db.query(
-              where(
-                and(
-                  isDecrypted('box2'),
-                  type('group/add-member'),
-                  groupRecp(groupId)
-                )
-              ),
-              live ? dbLive({ old: true }) : null,
-              toPullStream()
-            ),
-            pull.filter(isAddMember),
-            pull.map((msg) => msg.value.content),
-            pull.map((content) =>
-              // for situations where we haven't replicated much of the group yet, we make sure to at least include the group creator here so we're sure to make progress in replication
-              [content.creator, ...content.recps.slice(1)]
-            ),
-            pull.flatten(),
-            pull.unique(),
-            pull.through((member) => allAddedMembers.add(member)),
-            // return the whole list every time there's an update, to have a consistent listMembers api
-            pull.map(() => ({ added: [...allAddedMembers], toExclude: [] }))
-          )
-
-          deferredSource.resolve(source)
-          return deferredSource
+          listAllAdded()
+          return
         }
 
         if (!live) {
