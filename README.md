@@ -160,7 +160,7 @@ Publishes any kind of message encrypted to the group. The function wraps `ssb.db
   - `feedKeys` _Keys_ - By default the message is published to the currently used group feed (current epoch) but using this option you can provide keys for another feed to publish on. Note that this doesn't affect the encryption used.
 - `cb` _Function_ - a callback of signature `(err, msg)`
 
-### `ssb.tribes2.listMembers(groupId, { live }) => source`
+### `ssb.tribes2.listMembers(groupId, { live, allAdded }) => source`
 
 Returns a pull stream source listing the root feed id of every member of the
 group with id `groupId`. Note: lists members whether or not they've accepted the
@@ -169,8 +169,9 @@ invite.
 If `live` is true, then it keeps the stream open and also outputs updates to
 membership as new members are added / excluded.
 
-Each update emitted from the source is the updated complete state for the
-current preferred epoch of the group in the format:
+If `allAdded` is true then excludes are ignored and any peer that has ever been a member of the group is listed.
+
+Each update emitted from the source is the updated complete state of the group in the format:
 
 ```js
 {

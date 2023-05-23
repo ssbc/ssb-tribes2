@@ -16,6 +16,7 @@ const {
   and,
   isDecrypted,
   type,
+  live: dbLive,
   toPullStream,
 } = require('ssb-db2/operators')
 const {
@@ -359,31 +360,56 @@ module.exports = {
     }
 
     function listMembers(groupId, opts = {}) {
-      const { live } = opts
+      const { live, allAdded } = opts
       const deferredSource = pullDefer.source()
 
-      get(groupId, (err, group) => {
-        // prettier-ignore
-        if (err) return deferredSource.abort(clarify(err, 'Failed to get group info when listing members'))
-        // prettier-ignore
-        if (group.excluded) return deferredSource.abort( new Error("We're excluded from this group, can't list members"))
+      const listAllAdded = () => {
+        const allAddedMembers = new Set()
 
-        if (!live) {
-          getPreferredEpoch(groupId, (err, epoch) => {
+        const source = pull(
+          ssb.db.query(
+            where(
+              and(
+                isDecrypted('box2'),
+                type('group/add-member'),
+                groupRecp(groupId)
+              )
+            ),
+            live ? dbLive({ old: true }) : null,
+            toPullStream()
+          ),
+          pull.filter(isAddMember),
+          pull.map((msg) => msg.value.content),
+          pull.map((content) =>
+            // for situations where we haven't replicated much of the group yet, we make sure to at least include the group creator here so we're sure to make progress in replication
+            [content.creator, ...content.recps.slice(1)]
+          ),
+          pull.flatten(),
+          pull.unique(),
+          pull.through((member) => allAddedMembers.add(member)),
+          // return the whole list every time there's an update, to have a consistent listMembers api
+          pull.map(() => ({ added: [...allAddedMembers], toExclude: [] }))
+        )
+
+        deferredSource.resolve(source)
+      }
+
+      const listUnlive = () => {
+        getPreferredEpoch(groupId, (err, epoch) => {
+          // prettier-ignore
+          if (err) return deferredSource.abort(clarify(err, 'failed to load preferred epoch'))
+
+          getMembers(epoch.id, (err, res) => {
             // prettier-ignore
-            if (err) return deferredSource.abort(clarify(err, 'failed to load preferred epoch'))
+            if (err) return deferredSource.abort(clarify(err, 'error getting members'))
 
-            getMembers(epoch.id, (err, res) => {
-              // prettier-ignore
-              if (err) return deferredSource.abort(clarify(err, 'error getting members'))
-
-              const source = pull.once(res)
-              deferredSource.resolve(source)
-            })
+            const source = pull.once(res)
+            deferredSource.resolve(source)
           })
-          return
-        }
+        })
+      }
 
+      const listLive = () => {
         let abortable = pullAbortable()
         const source = pull(
           getPreferredEpoch.stream(groupId, { live }),
@@ -396,6 +422,25 @@ module.exports = {
           pullFlatMerge()
         )
         deferredSource.resolve(source)
+      }
+
+      get(groupId, (err, group) => {
+        // prettier-ignore
+        if (err) return deferredSource.abort(clarify(err, 'Failed to get group info when listing members'))
+        // prettier-ignore
+        if (group.excluded) return deferredSource.abort( new Error("We're excluded from this group, can't list members"))
+
+        if (allAdded) {
+          listAllAdded()
+          return
+        }
+
+        if (!live) {
+          listUnlive()
+          return
+        }
+
+        listLive()
       })
 
       return deferredSource
