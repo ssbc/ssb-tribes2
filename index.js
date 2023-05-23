@@ -394,33 +394,22 @@ module.exports = {
         deferredSource.resolve(source)
       }
 
-      get(groupId, (err, group) => {
-        // prettier-ignore
-        if (err) return deferredSource.abort(clarify(err, 'Failed to get group info when listing members'))
-        // prettier-ignore
-        if (group.excluded) return deferredSource.abort( new Error("We're excluded from this group, can't list members"))
+      const listUnlive = () => {
+        getPreferredEpoch(groupId, (err, epoch) => {
+          // prettier-ignore
+          if (err) return deferredSource.abort(clarify(err, 'failed to load preferred epoch'))
 
-        if (allAdded) {
-          listAllAdded()
-          return
-        }
-
-        if (!live) {
-          getPreferredEpoch(groupId, (err, epoch) => {
+          getMembers(epoch.id, (err, res) => {
             // prettier-ignore
-            if (err) return deferredSource.abort(clarify(err, 'failed to load preferred epoch'))
+            if (err) return deferredSource.abort(clarify(err, 'error getting members'))
 
-            getMembers(epoch.id, (err, res) => {
-              // prettier-ignore
-              if (err) return deferredSource.abort(clarify(err, 'error getting members'))
-
-              const source = pull.once(res)
-              deferredSource.resolve(source)
-            })
+            const source = pull.once(res)
+            deferredSource.resolve(source)
           })
-          return
-        }
+        })
+      }
 
+      const listLive = () => {
         let abortable = pullAbortable()
         const source = pull(
           getPreferredEpoch.stream(groupId, { live }),
@@ -433,6 +422,25 @@ module.exports = {
           pullFlatMerge()
         )
         deferredSource.resolve(source)
+      }
+
+      get(groupId, (err, group) => {
+        // prettier-ignore
+        if (err) return deferredSource.abort(clarify(err, 'Failed to get group info when listing members'))
+        // prettier-ignore
+        if (group.excluded) return deferredSource.abort( new Error("We're excluded from this group, can't list members"))
+
+        if (allAdded) {
+          listAllAdded()
+          return
+        }
+
+        if (!live) {
+          listUnlive()
+          return
+        }
+
+        listLive()
       })
 
       return deferredSource
