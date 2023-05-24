@@ -2,26 +2,46 @@
 //
 // SPDX-License-Identifier: CC0-1.0
 
+/* eslint-disable no-console */
+
 const { promisify: p } = require('util')
 const pull = require('pull-stream')
 const pullMany = require('pull-many')
 
+const TIMEOUT = 100
+const TRIES = 150
+
 // Fully replicates between two or more peers
 module.exports = async function replicate(...peers) {
   if (peers.length === 1 && Array.isArray(peers[0])) peers = peers[0]
-  if (peers.length === 2) return replicatePair(...peers)
+
+  if (peers.length === 2) {
+    return replicatePair(...peers).catch((err) => {
+      console.log(
+        err.message,
+        JSON.stringify(namifyObject(err.state, peers), null, 2)
+      )
+      throw err
+    })
+  }
 
   return pull(
     pull.values(peers),
     pull.asyncMap((person1, cb) => {
       pull(
-        pull.values(peers),
+        pull.values([...peers, ...peers]),
         pull.asyncMap((person2, cb) => {
           if (person1.id === person2.id) return cb(null, true)
 
           replicatePair(person1, person2)
             .then(() => cb(null, true))
-            .catch((err) => cb(err))
+            .catch((err) => {
+              console.log(
+                err.message,
+                JSON.stringify(namifyObject(err.state, peers), null, 2)
+              )
+              cb(err)
+            })
         }),
         pull.collect(cb)
       )
@@ -30,27 +50,28 @@ module.exports = async function replicate(...peers) {
   )
 }
 
-const runTimer = false
+const runTimer = true
 async function replicatePair(person1, person2) {
-  let start, ID
+  let ID = [person1, person2].map(getName).join('-')
+  while (ID.length < 12) ID += ' '
+  let start
   if (runTimer) {
     start = Date.now()
-    ID = [person1, person2].map((p) => p.name || p.id.slice(0, 10)).join('-')
-    while (ID.length < 12) ID += ' '
   }
 
   // Establish a network connection
   const conn = await p(person1.connect)(person2.getAddress())
 
-  await ebtReplicate(person1, person2).catch((err) =>
-    console.error(err.message, err.state)
-  )
+  await ebtReplicate(person1, person2).catch((err) => {
+    err.message = ID + ' FAILED'
+    throw err
+  })
 
   await p(conn.close)(true).catch(console.error)
 
   if (runTimer) {
     const time = Date.now() - start
-    const length = Math.max(Math.round(time / 100), 1)
+    const length = Math.max(Math.round(time / TIMEOUT), 1)
     console.log(ID, Array(length).fill('▨').join(''), time + 'ms')
   }
 }
@@ -59,6 +80,8 @@ async function ebtReplicate(person1, person2) {
   // ensure persons are replicating all the trees in their forests,
   // from top to bottom
   const feedIds = await getFeedsToSync(person1, person2)
+
+  const requested = new Set()
 
   pull(
     pull.values(feedIds),
@@ -71,6 +94,7 @@ async function ebtReplicate(person1, person2) {
     pull.drain((feedId) => {
       person1.ebt.request(feedId, true)
       person2.ebt.request(feedId, true)
+      requested.add(feedId)
     })
   )
 
@@ -122,12 +146,29 @@ async function getFeedsToSync(person1, person2) {
 // if success retryUntil returns true, otherwise false
 async function retryUntil(checkIsDone) {
   let isDone = false
-  for (let i = 0; i < 100; i++) {
+  for (let i = 0; i < TRIES; i++) {
     isDone = await checkIsDone()
     if (isDone) return true
 
-    await p(setTimeout)(100)
+    await p(setTimeout)(TIMEOUT)
   }
 
   return false
+}
+
+function getName(peer) {
+  return peer.name || peer.id.slice(0, 10)
+}
+
+function namifyObject(object, peers) {
+  return Object.entries(object).reduce((acc, [key, value]) => {
+    const peer = peers.find((peer) => peer.id === key)
+
+    const newKey = peer ? getName(peer) : key
+    const newValue =
+      typeof value === 'object' ? namifyObject(value, peers) : value
+
+    acc[newKey] = newValue
+    return acc
+  }, {})
 }

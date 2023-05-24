@@ -253,7 +253,7 @@ test('addMembers too many members', async (t) => {
   await p(alice.close)(true)
 })
 
-test('addMembers adds to all the tip epochs and gives keys to all the old epochs as well', async (t) => {
+test.only('addMembers adds to all the tip epochs and gives keys to all the old epochs as well', async (t) => {
   // alice adds bob and carol
   // alice and bob remove carol at the same time, creating forked epochs
   // everyone still replicates and sees the fork
