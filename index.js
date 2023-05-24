@@ -241,49 +241,48 @@ module.exports = {
           // prettier-ignore
           if (err) return cb(clarify(err, 'Failed to publish exclude msg'))
 
-          const newSecret = new SecretKey()
-          const addInfo = { key: newSecret.toBuffer() }
-
-          ssb.box2.addGroupInfo(groupId, addInfo, (err) => {
-            // prettier-ignore
-            if (err) return cb(clarify(err, "Couldn't store new key when excluding members"))
-
-            const newKey = {
-              key: newSecret.toBuffer(),
-              scheme: keySchemes.private_group,
-            }
-            ssb.box2.pickGroupWriteKey(groupId, newKey, (err) => {
+          pull(
+            listMembers(groupId),
+            pull.map((info) => info.added),
+            pull.flatten(),
+            pull.collect((err, beforeMembers) => {
               // prettier-ignore
-              if (err) return cb(clarify(err, "Couldn't switch to new key for writing when excluding members"))
+              if (err) return cb(clarify(err, "Couldn't get old member list when excluding members"))
 
-              const newEpochContent = {
-                type: 'group/init',
-                version: 'v2',
-                secret: newSecret.toString('base64'),
-                tangles: {
-                  members: { root: null, previous: null },
-                },
-                recps: [groupId, myRoot.id],
-              }
-              const newTangleOpts = {
-                tangles: ['epoch'],
-                isValid: isInitEpoch,
-              }
-              publish(newEpochContent, newTangleOpts, (err) => {
+              const remainingMembers = beforeMembers.filter(
+                (member) => !feedIds.includes(member)
+              )
+              const newSecret = new SecretKey()
+              const addInfo = { key: newSecret.toBuffer() }
+
+              ssb.box2.addGroupInfo(groupId, addInfo, (err) => {
                 // prettier-ignore
-                if (err) return cb(clarify(err, "Couldn't post init msg on new epoch when excluding members"))
+                if (err) return cb(clarify(err, "Couldn't store new key when excluding members"))
 
-                pull(
-                  listMembers(groupId),
-                  pull.map((info) => info.added),
-                  pull.flatten(),
-                  pull.collect((err, beforeMembers) => {
+                const newKey = {
+                  key: newSecret.toBuffer(),
+                  scheme: keySchemes.private_group,
+                }
+                ssb.box2.pickGroupWriteKey(groupId, newKey, (err) => {
+                  // prettier-ignore
+                  if (err) return cb(clarify(err, "Couldn't switch to new key for writing when excluding members"))
+
+                  const newEpochContent = {
+                    type: 'group/init',
+                    version: 'v2',
+                    secret: newSecret.toString('base64'),
+                    tangles: {
+                      members: { root: null, previous: null },
+                    },
+                    recps: [groupId, myRoot.id],
+                  }
+                  const newTangleOpts = {
+                    tangles: ['epoch'],
+                    isValid: isInitEpoch,
+                  }
+                  publish(newEpochContent, newTangleOpts, (err) => {
                     // prettier-ignore
-                    if (err) return cb(clarify(err, "Couldn't get old member list when excluding members"))
-
-                    const remainingMembers = beforeMembers.filter(
-                      (member) => !feedIds.includes(member)
-                    )
+                    if (err) return cb(clarify(err, "Couldn't post init msg on new epoch when excluding members"))
 
                     pull(
                       pull.values(chunk(remainingMembers, 15)),
@@ -302,10 +301,10 @@ module.exports = {
                       })
                     )
                   })
-                )
+                })
               })
             })
-          })
+          )
         })
       })
     }
