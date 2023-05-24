@@ -42,14 +42,9 @@ async function replicatePair(person1, person2) {
   // Establish a network connection
   const conn = await p(person1.connect)(person2.getAddress())
 
-  const isSync = await ebtReplicate(person1, person2).catch((err) =>
-    console.error('Error with ebtReplicate:\n', err)
+  await ebtReplicate(person1, person2).catch((err) =>
+    console.error(err.message, err.state)
   )
-  if (!isSync) {
-    console.error('EBT failed to replicate! Final state:')
-    console.error(person1.id, await p(person1.getVectorClock)())
-    console.error(person2.id, await p(person2.getVectorClock)())
-  }
 
   await p(conn.close)(true).catch(console.error)
 
@@ -79,9 +74,11 @@ async function ebtReplicate(person1, person2) {
     })
   )
 
+  let clocks
+
   // Wait until both have replicated all feeds in full (are in sync)
   const isSync = async () => {
-    const clocks = await Promise.all([
+    clocks = await Promise.all([
       p(person1.getVectorClock)(),
       p(person2.getVectorClock)(),
     ])
@@ -89,7 +86,23 @@ async function ebtReplicate(person1, person2) {
   }
   const isSuccess = await retryUntil(isSync)
 
-  return isSuccess
+  if (!isSuccess) {
+    const problemFeeds = feedIds.filter(
+      (feedId) => clocks[0][feedId] !== clocks[1][feedId]
+    )
+    const err = new Error('EBT failed to sync')
+    err.state = {
+      [person1.id]: problemFeeds.reduce((acc, feedId) => {
+        acc[feedId] = clocks[0][feedId]
+        return acc
+      }, {}),
+      [person2.id]: problemFeeds.reduce((acc, feedId) => {
+        acc[feedId] = clocks[1][feedId]
+        return acc
+      }, {}),
+    }
+    throw err
+  }
 }
 
 async function getFeedsToSync(person1, person2) {
