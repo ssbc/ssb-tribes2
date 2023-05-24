@@ -8,29 +8,8 @@ const pull = require('pull-stream')
 const { where, type, descending, toPullStream } = require('ssb-db2/operators')
 const { fromMessageSigil } = require('ssb-uri2')
 
-const Server = require('../helpers/testbot')
-const replicate = require('../helpers/replicate')
+const { Testbot: Server, replicate, Run } = require('../helpers')
 const Epochs = require('../../lib/epochs')
-
-function Run(t) {
-  // this function takes care of running a promise and logging
-  // (or testing) that it happens and any errors are handled
-  return async function run(label, promise, opts = {}) {
-    const { isTest = true, timer = false, logError = false } = opts
-
-    if (timer) console.time('> ' + label)
-    return promise
-      .then((res) => {
-        if (isTest) t.pass(label)
-        return res
-      })
-      .catch((err) => {
-        t.error(err, label)
-        if (logError) console.error(err)
-      })
-      .finally(() => timer && console.timeEnd('> ' + label))
-  }
-}
 
 function getRootIds(peers) {
   return Promise.all(
@@ -45,11 +24,7 @@ test('lib/epochs (getEpochs, getMembers)', async (t) => {
   const [alice, ...others] = peers
 
   async function sync(label) {
-    return run(
-      `(sync ${label})`,
-      Promise.all(others.map((peer) => replicate(alice, peer))),
-      { isTest: false }
-    )
+    return run(`(sync ${label})`, replicate(peers), { isTest: false })
   }
   t.teardown(() => peers.forEach((peer) => peer.close(true)))
 
@@ -73,7 +48,7 @@ test('lib/epochs (getEpochs, getMembers)', async (t) => {
     'there is 1 epoch'
   )
 
-  let liveMembers = []
+  const liveMembers = []
   pull(
     Epochs(alice).getMembers.stream(group.root, { live: true }), // epoch zero root
     pull.drain((state) => liveMembers.unshift(state))
@@ -275,7 +250,11 @@ test('lib/epochs (tieBreak)', async (t) => {
 test('lib/epochs (getPreferredEpoch - 4.4. same membership)', async (t) => {
   const run = Run(t)
 
-  const peers = [Server(), Server(), Server()]
+  const peers = [
+    Server({ name: 'alice' }),
+    Server({ name: 'bob' }),
+    Server({ name: 'oscar' }),
+  ]
   t.teardown(() => peers.forEach((peer) => peer.close(true)))
 
   const [alice, bob, oscar] = peers
@@ -287,20 +266,14 @@ test('lib/epochs (getPreferredEpoch - 4.4. same membership)', async (t) => {
 
   const group = await run('alice creates a group', alice.tribes2.create({}))
 
-  await run(
-    '(sync dm feeds)',
-    Promise.all([replicate(alice, bob), replicate(alice, oscar)])
-  )
+  await run('(sync dm feeds)', replicate(alice, bob, oscar))
 
   await run(
     'alice invites bob, oscar',
     alice.tribes2.addMembers(group.id, [bobId, oscarId], {})
   )
 
-  await run(
-    '(sync invites)',
-    Promise.all([replicate(alice, bob), replicate(alice, oscar)])
-  )
+  await run('(sync invites)', replicate(alice, bob, oscar))
 
   await run(
     'others accept invites',
@@ -380,7 +353,7 @@ test('lib/epochs (getPreferredEpoch - 4.4. same membership)', async (t) => {
   t.end()
 })
 
-test.skip('lib/epochs (getPreferredEpoch - 4.5. subset membership)', async (t) => {
+test('lib/epochs (getPreferredEpoch - 4.5. subset membership)', async (t) => {
   // the choice is the epoch which is a subset of all the others
 
   t.end()
