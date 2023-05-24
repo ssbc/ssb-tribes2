@@ -248,6 +248,11 @@ test('lib/epochs (tieBreak)', async (t) => {
 })
 
 test('lib/epochs (getPreferredEpoch - 4.4. same membership)', async (t) => {
+  // alice starts a group, adds bob + oscar
+  // simultaneously:
+  //   - alice excludes oscar
+  //   - bob exlcudes oscar
+  // there is a forked state, bob + oscar agree on which one to use
   const run = Run(t)
 
   const peers = [
@@ -258,7 +263,7 @@ test('lib/epochs (getPreferredEpoch - 4.4. same membership)', async (t) => {
   t.teardown(() => peers.forEach((peer) => peer.close(true)))
 
   const [alice, bob, oscar] = peers
-  const [aliceId, bobId, oscarId] = await getRootIds(peers)
+  const [bobId, oscarId] = await getRootIds([bob, oscar])
   await run(
     'start tribes',
     Promise.all(peers.map((peer) => peer.tribes2.start()))
@@ -286,7 +291,7 @@ test('lib/epochs (getPreferredEpoch - 4.4. same membership)', async (t) => {
   const livePreferredEpochs = []
   let testsRunning = true
   pull(
-    Epochs(oscar).getPreferredEpoch.stream(group.id, { live: true }),
+    Epochs(alice).getPreferredEpoch.stream(group.id, { live: true }),
     pull.drain(
       (epoch) => livePreferredEpochs.unshift(epoch),
       (err) => {
@@ -309,19 +314,20 @@ test('lib/epochs (getPreferredEpoch - 4.4. same membership)', async (t) => {
   )
 
   await run(
-    'bob and oscar both exclude alice (mutiny, fork)!',
+    'alice and bob both exclude oscar (fork!)',
     Promise.all([
-      bob.tribes2.excludeMembers(group.id, [aliceId], {}),
-      oscar.tribes2.excludeMembers(group.id, [aliceId], {}),
+      alice.tribes2.excludeMembers(group.id, [oscarId], {}),
+      bob.tribes2.excludeMembers(group.id, [oscarId], {}),
     ])
   )
-  const epochs1 = await Epochs(oscar)
-    .getEpochs(group.id)
-    .then((epochs) => epochs.filter((epoch) => epoch.author != aliceId))
-  const expected1 = epochs1[0]
+  // alice has not sync'd so we expect the the preferredEpoch to just be
+  // the current new tip
+  const expected1 = await Epochs(alice)
+    .getTipEpochs(group.id)
+    .then((tips) => tips[0]) // there is only one she knows about
 
   t.deepEqual(
-    await Epochs(oscar).getPreferredEpoch(group.id),
+    await Epochs(alice).getPreferredEpoch(group.id),
     expected1,
     'getPreferredEpoch (before fork sync)'
   )
@@ -331,21 +337,26 @@ test('lib/epochs (getPreferredEpoch - 4.4. same membership)', async (t) => {
     'getPreferredEpoch (before fork sync) (live)'
   )
 
-  await run('(sync exclusion)', replicate(bob, oscar))
+  await run('(sync exclusion)', replicate(alice, bob))
 
   await p(setTimeout)(500)
 
-  const epochs2 = await Epochs(oscar)
-    .getEpochs(group.id)
-    .then((epochs) => epochs.filter((epoch) => epoch.author !== aliceId))
-  const expected2 = Epochs({}).tieBreak(epochs2)
+  const expected2 = await Epochs(alice)
+    .getTipEpochs(group.id)
+    .then((tips) => Epochs(alice).tieBreak(tips))
 
   t.deepEqual(
-    await Epochs(oscar).getPreferredEpoch(group.id),
+    await Epochs(alice).getPreferredEpoch(group.id),
     expected2,
     'getPreferredEpoch'
   )
   t.deepEqual(livePreferredEpochs[0], expected2, 'getPreferredEpoch (live)')
+
+  t.deepEqual(
+    await Epochs(alice).getPreferredEpoch(group.id),
+    await Epochs(bob).getPreferredEpoch(group.id),
+    'getPreferredEpoch (alice + bob agree)'
+  )
 
   // TODO need to test epochs > 2
 
@@ -354,7 +365,11 @@ test('lib/epochs (getPreferredEpoch - 4.4. same membership)', async (t) => {
 })
 
 test('lib/epochs (getPreferredEpoch - 4.5. subset membership)', async (t) => {
-  // the choice is the epoch which is a subset of all the others
+  // alice starts a group, adds bob, carol, oscar
+  // simultaneously:
+  //   - alice excludes oscar
+  //   - bob exlcudes carol, oscar
+  // everyone agrees on the preferred epoch (the one bob made)
 
   t.end()
 })
