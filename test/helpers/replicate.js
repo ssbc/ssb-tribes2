@@ -12,6 +12,11 @@ const TIMEOUT = 100
 const TRIES = 150
 
 // Fully replicates between two or more peers
+/*
+Known bug: order of peers passed in seems to matter. We think this is
+a bug in EBT replication.
+Recommend making the first peer listed the creator of the group?
+*/
 module.exports = async function replicate(...peers) {
   if (peers.length === 1 && Array.isArray(peers[0])) peers = peers[0]
 
@@ -29,7 +34,7 @@ module.exports = async function replicate(...peers) {
     pull.values(peers),
     pull.asyncMap((person1, cb) => {
       pull(
-        pull.values([...peers, ...peers]),
+        pull.values(peers),
         pull.asyncMap((person2, cb) => {
           if (person1.id === person2.id) return cb(null, true)
 
@@ -50,7 +55,7 @@ module.exports = async function replicate(...peers) {
   )
 }
 
-const runTimer = true
+const runTimer = false
 async function replicatePair(person1, person2) {
   let ID = [person1, person2].map(getName).join('-')
   while (ID.length < 12) ID += ' '
