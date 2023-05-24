@@ -6,11 +6,7 @@ const { promisify: p } = require('util')
 const pull = require('pull-stream')
 const pullMany = require('pull-many')
 
-/**
- * Fully replicates between two or more peers
- *
- * Known bug: If you're e.g. created a group and posted in it but not invited anyone before replicating, then the group creator has to be the first peer listed. This is because we use branchStream (which only lists feeds you can decrypt the metafeed tree reference to) to figure out what to replicate, but we use getVectorClock (which lists *every* feed you have) to figure out when replication is done. So doing bob<->alice (where alice created the group) then bob<->carol fails, because bob can't pass along the group feed that alice posted on.
- */
+// Fully replicates between two or more peers
 module.exports = async function replicate(...peers) {
   if (peers.length === 1 && Array.isArray(peers[0])) peers = peers[0]
   if (peers.length === 2) return replicatePair(...peers)
@@ -34,10 +30,14 @@ module.exports = async function replicate(...peers) {
   )
 }
 
+const runTimer = false
 async function replicatePair(person1, person2) {
-  // const start = Date.now()
-  // let ID = [person1, person2].map((p) => p.name || p.id.slice(0, 10)).join('-')
-  // while (ID.length < 12) ID += ' '
+  let start, ID
+  if (runTimer) {
+    start = Date.now()
+    ID = [person1, person2].map((p) => p.name || p.id.slice(0, 10)).join('-')
+    while (ID.length < 12) ID += ' '
+  }
 
   // Establish a network connection
   const conn = await p(person1.connect)(person2.getAddress())
@@ -53,9 +53,11 @@ async function replicatePair(person1, person2) {
 
   await p(conn.close)(true).catch(console.error)
 
-  // const time = Date.now() - start
-  // const length = Math.max(Math.round(time / 100), 1)
-  // console.log(ID, Array(length).fill('▨').join(''), time + 'ms')
+  if (runTimer) {
+    const time = Date.now() - start
+    const length = Math.max(Math.round(time / 100), 1)
+    console.log(ID, Array(length).fill('▨').join(''), time + 'ms')
+  }
 }
 
 async function ebtReplicate(person1, person2) {

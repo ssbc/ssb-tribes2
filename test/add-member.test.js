@@ -289,7 +289,7 @@ test('addMembers adds to all the tip epochs and gives keys to all the old epochs
 
   async function replicateAll(msg = 'replicated all') {
     await p(setTimeout)(2000)
-    await run(msg, replicate(alice, bob, carol, david))
+    await run(msg, replicate(bob, carol, alice, david))
     await p(setTimeout)(2000)
   }
 
