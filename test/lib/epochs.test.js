@@ -86,7 +86,6 @@ test('lib/epochs (getEpochs, getMembers)', async (t) => {
     'epoch 0 members: alice, bob, oscar (live)'
   )
 
-  // alice removes oscar
   await run(
     'alice excludes oscar',
     alice.tribes2.excludeMembers(group.id, [oscarId], {})
@@ -255,6 +254,7 @@ test('lib/epochs (getPreferredEpoch - 4.4. same membership)', async (t) => {
   // there is a forked state, bob + oscar agree on which one to use
   const run = Run(t)
 
+  // <setup>
   const peers = [
     Server({ name: 'alice' }),
     Server({ name: 'bob' }),
@@ -287,6 +287,7 @@ test('lib/epochs (getPreferredEpoch - 4.4. same membership)', async (t) => {
       oscar.tribes2.acceptInvite(group.id),
     ])
   )
+  // </setup>
 
   const livePreferredEpochs = []
   let testsRunning = true
@@ -370,6 +371,71 @@ test('lib/epochs (getPreferredEpoch - 4.5. subset membership)', async (t) => {
   //   - alice excludes oscar
   //   - bob exlcudes carol, oscar
   // everyone agrees on the preferred epoch (the one bob made)
+
+  const run = Run(t)
+
+  // <setup>
+  const peers = [
+    Server({ name: 'alice' }),
+    Server({ name: 'bob' }),
+    Server({ name: 'carol' }),
+    Server({ name: 'oscar' }),
+  ]
+  t.teardown(() => peers.forEach((peer) => peer.close(true)))
+
+  const [alice, bob, carol, oscar] = peers
+  const [bobId, carolId, oscarId] = await getRootIds([bob, carol, oscar])
+  await run(
+    'start tribes',
+    Promise.all(peers.map((peer) => peer.tribes2.start()))
+  )
+
+  const group = await run('alice creates a group', alice.tribes2.create({}))
+
+  await run('(sync dm feeds)', replicate(alice, bob, carol, oscar))
+
+  await run(
+    'alice invites bob, carol, oscar',
+    alice.tribes2.addMembers(group.id, [bobId, carolId, oscarId], {})
+  )
+
+  await run('(sync dm feeds)', replicate(alice, bob, carol, oscar))
+
+  await run(
+    'others accept invites',
+    Promise.all([
+      bob.tribes2.acceptInvite(group.id),
+      oscar.tribes2.acceptInvite(group.id),
+    ])
+  )
+  // </setup>
+
+  await run(
+    'alice excludes oscar',
+    alice.tribes2.excludeMembers(group.id, [oscarId], {})
+  )
+  await run(
+    'bob excludes carol, oscar',
+    bob.tribes2.excludeMembers(group.id, [carolId, oscarId], {})
+  )
+
+  await run('(sync exclusions)', replicate(alice, bob))
+
+  const expectedEpoch = await Epochs(alice)
+    .getTipEpochs(group.id)
+    .then((tips) => tips.find((tip) => tip.author === bobId))
+
+  t.deepEqual(
+    await Epochs(alice).getPreferredEpoch(group.id),
+    expectedEpoch,
+    'getPreferredEpoch correct'
+  )
+
+  t.deepEqual(
+    await Epochs(alice).getPreferredEpoch(group.id),
+    await Epochs(bob).getPreferredEpoch(group.id),
+    'alice and bob agree'
+  )
 
   t.end()
 })
