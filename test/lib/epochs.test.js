@@ -440,10 +440,78 @@ test('lib/epochs (getPreferredEpoch - 4.5. subset membership)', async (t) => {
   t.end()
 })
 
-test.skip('lib/epochs (getPreferredEpoch - 4.6. overlapping membership)', async (t) => {
-  // there is no preferred epoch, you will need to choose choose a winner
-  // and exclude some members
-  // (not sure what the API should be here)
+test.only('lib/epochs (getPreferredEpoch - 4.6. overlapping membership)', async (t) => {
+  // alice starts a group, adds bob, carol, oscar
+  // simultaneously:
+  //   - alice excludes oscar
+  //   - bob exlcudes carol
+  //
+  // there is no preferred epoch, you will need to exclude members down to intersection
+
+  const run = Run(t)
+
+  // <setup>
+  const peers = [
+    Server({ name: 'alice' }),
+    Server({ name: 'bob' }),
+    Server({ name: 'carol' }),
+    Server({ name: 'oscar' }),
+  ]
+  t.teardown(() => peers.forEach((peer) => peer.close(true)))
+
+  const [alice, bob, carol, oscar] = peers
+  const [bobId, carolId, oscarId] = await getRootIds([bob, carol, oscar])
+  await run(
+    'start tribes',
+    Promise.all(peers.map((peer) => peer.tribes2.start()))
+  )
+
+  const group = await run('alice creates a group', alice.tribes2.create({}))
+
+  await run('(sync dm feeds)', replicate(alice, bob, carol, oscar))
+
+  await run(
+    'alice invites bob, carol, oscar',
+    alice.tribes2.addMembers(group.id, [bobId, carolId, oscarId], {})
+  )
+
+  await run('(sync dm feeds)', replicate(alice, bob, carol, oscar))
+
+  await run(
+    'others accept invites',
+    Promise.all([
+      bob.tribes2.acceptInvite(group.id),
+      oscar.tribes2.acceptInvite(group.id),
+    ])
+  )
+  // </setup>
+
+  await run(
+    'alice excludes oscar',
+    alice.tribes2.excludeMembers(group.id, [oscarId], {})
+  )
+  await run(
+    'bob excludes carol',
+    bob.tribes2.excludeMembers(group.id, [carolId], {})
+  )
+
+  await run('(sync exclusions)', replicate(alice, bob))
+
+  await p(setTimeout)(5000)
+
+  await run('(sync conflict resolution)', replicate(alice, bob))
+
+  t.equal(
+    (await Epochs(alice).getTipEpochs(group.id)).length,
+    1,
+    'there is only 1 tip'
+  )
+
+  t.deepEqual(
+    await Epochs(alice).getPreferredEpoch(group.id),
+    await Epochs(bob).getPreferredEpoch(group.id),
+    'alice and bob agree'
+  )
 
   t.end()
 })
