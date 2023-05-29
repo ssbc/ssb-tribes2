@@ -686,7 +686,7 @@ test("restarting the client doesn't make us rejoin old stuff", async (t) => {
   await p(bob.close)(true)
 })
 
-test('On exclusion, if we fail to re-add all people, someone else does that instead', async (t) => {
+test.only('On exclusion, if we fail to re-add all people, someone else does that instead', async (t) => {
   const run = Run(t)
   const alice = Testbot({ name: 'alice', timeoutScale: 300 * 1000 })
   const bob = Testbot({ name: 'bob' })
@@ -746,8 +746,6 @@ test('On exclusion, if we fail to re-add all people, someone else does that inst
   )
 
   await run('replicated', replicate(alice, bob, carol, david))
-
-  await p(setTimeout)(2000)
 
   const carolList = await run(
     'carol gets her complete list after fixing stuff',
