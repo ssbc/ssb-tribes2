@@ -26,6 +26,7 @@ const pull = require('pull-stream')
 const paraMap = require('pull-paramap')
 const clarify = require('clarify-error')
 const Epochs = require('./lib/epochs')
+const { reAddMembers } = require('./lib/exclude')
 
 module.exports = function startListeners(ssb, onError) {
   const { getTipEpochs, getPreferredEpoch } = Epochs(ssb)
@@ -196,20 +197,28 @@ module.exports = function startListeners(ssb, onError) {
     // re-add missing people to a new epoch if the epoch creator didn't
     // we're only doing this for the preferred epoch atm
     pull(
-      ssb.db.query(
-        where(type('group/init')),
-        live({ old: true }),
-        toPullStream()
+      ssb.tribes2.list({ live: true }),
+      pull.map((group) =>
+        pull(
+          getPreferredEpoch.stream(group.id, { live: true }),
+          pull.drain(
+            () => {
+              // TODO: add random timeout
+
+              reAddMembers(ssb, group.id, null, (err) => {
+                // prettier-ignore
+                if (err && !isClosed) return onError(clarify(err, 'todo'))
+              })
+            },
+            (err) => {
+              // prettier-ignore
+              if (err && !isClosed) return onError(clarify(err, 'todo'))
+            }
+          )
+        )
       ),
-      pull.filter((msg) => isInitEpoch(msg)),
       pull.drain(
-        (msg) => {
-          // TODO: add random timeout
-
-          // TODO: check if it's the preferred epoch. maybe do that live instead of the query?
-
-          console.log("TODO: re-add people if they're missing")
-        },
+        () => {},
         (err) => {
           // prettier-ignore
           if (err && !isClosed) return onError(clarify(err, 'todo'))
