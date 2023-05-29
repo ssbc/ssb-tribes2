@@ -273,7 +273,12 @@ module.exports = {
                 // prettier-ignore
                 if (err) return cb(clarify(err, "Couldn't post init msg on new epoch when excluding members"))
 
-                reAddMembers(ssb, groupId, cb)
+                reAddMembers(
+                  ssb,
+                  groupId,
+                  { _reAddSkipMember: opts?._reAddSkipMember },
+                  cb
+                )
               })
             })
           })

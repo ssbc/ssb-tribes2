@@ -11,6 +11,7 @@ const { fromMessageSigil } = require('ssb-uri2')
 const Testbot = require('./helpers/testbot')
 const replicate = require('./helpers/replicate')
 const countGroupFeeds = require('./helpers/count-group-feeds')
+const Run = require('./helpers/run')
 
 async function getRootIds(peers, t) {
   return Promise.all(peers.map((peer) => p(peer.metafeeds.findOrCreate)()))
@@ -683,4 +684,95 @@ test("restarting the client doesn't make us rejoin old stuff", async (t) => {
 
   await p(alice.close)(true)
   await p(bob.close)(true)
+})
+
+test('On exclusion, if we fail to re-add all people, someone else does that instead', async (t) => {
+  const run = Run(t)
+  const alice = Testbot({ name: 'alice' })
+  const bob = Testbot({ name: 'bob' })
+  const carol = Testbot({ name: 'carol' })
+  const david = Testbot({ name: 'david' })
+
+  await run(
+    'tribes2 started for everyone',
+    Promise.all([
+      alice.tribes2.start(),
+      bob.tribes2.start(),
+      carol.tribes2.start(),
+      david.tribes2.start(),
+    ])
+  )
+
+  const [aliceId, bobId, carolId, davidId] = await getRootIds(
+    [alice, bob, carol, david],
+    t
+  )
+
+  await run(
+    'everyone replicates their trees',
+    replicate(alice, bob, carol, david)
+  )
+
+  const { id: groupId } = await run(
+    'alice created the group',
+    alice.tribes2.create()
+  )
+
+  await run(
+    'alice adds the others to the group',
+    alice.tribes2.addMembers(groupId, [bobId, carolId, davidId])
+  )
+
+  await run('replicated', replicate(alice, bob, carol, david))
+
+  await run(
+    "alice excludes bob but intentionally doesn't manage to re-add david",
+    alice.tribes2.excludeMembers(groupId, [bobId], {
+      _reAddSkipMember: davidId,
+    })
+  )
+
+  const aliceList = await run(
+    'alice gets her incomplete list',
+    pull(alice.tribes2.listMembers(groupId), pull.collectAsPromise())
+  )
+
+  t.deepEqual(
+    aliceList[0].added.sort(),
+    [aliceId, carolId].sort(),
+    'only alice and carol got readded to the group (just checking that things "failed")'
+  )
+
+  await run('replicated', replicate(alice, bob, carol, david))
+
+  await p(setTimeout)(2000)
+
+  const carolList = await run(
+    'carol gets her complete list after fixing stuff',
+    pull(carol.tribes2.listMembers(groupId), pull.collectAsPromise())
+  )
+
+  t.deepEqual(
+    carolList[0].added.sort(),
+    [aliceId, carolId, davidId].sort(),
+    'carol fixed the group by adding david back'
+  )
+
+  const aliceNewList = await run(
+    'alice gets her complete list',
+    pull(alice.tribes2.listMembers(groupId), pull.collectAsPromise())
+  )
+
+  t.deepEqual(
+    aliceNewList[0].added.sort(),
+    [aliceId, carolId, davidId].sort(),
+    'group is also fixed for alice'
+  )
+
+  await Promise.all([
+    p(alice.close)(true),
+    p(bob.close)(true),
+    p(carol.close)(true),
+    p(david.close)(true),
+  ])
 })
