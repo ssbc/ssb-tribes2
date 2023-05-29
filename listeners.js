@@ -28,13 +28,18 @@ const clarify = require('clarify-error')
 const Epochs = require('./lib/epochs')
 const { reAddMembers } = require('./lib/exclude')
 
-module.exports = function startListeners(ssb, onError) {
+// push a function to this list to have it called when the client is closing
+const closeCalls = []
+
+module.exports = function startListeners(ssb, config, onError) {
   const { getTipEpochs, getPreferredEpoch } = Epochs(ssb)
 
   let isClosed = false
   ssb.close.hook((close, args) => {
     isClosed = true
     close.apply(ssb, args)
+
+    closeCalls.forEach((fn) => fn())
   })
 
   ssb.metafeeds.findOrCreate((err, myRoot) => {
@@ -203,12 +208,18 @@ module.exports = function startListeners(ssb, onError) {
           getPreferredEpoch.stream(group.id, { live: true }),
           pull.drain(
             () => {
-              // TODO: add random timeout
+              const timeoutScale = config.tribes2?.timeoutScale ?? 1000
+              const timeoutRandom = Math.random() * 30 + 1
+              const randomTimeout = timeoutScale * timeoutRandom
 
-              reAddMembers(ssb, group.id, null, (err) => {
-                // prettier-ignore
-                if (err && !isClosed) return onError(clarify(err, 'todo'))
-              })
+              const timeoutId = setTimeout(() => {
+                reAddMembers(ssb, group.id, null, (err) => {
+                  // prettier-ignore
+                  if (err && !isClosed) return onError(clarify(err, 'todo'))
+                })
+              }, randomTimeout)
+
+              closeCalls.push(() => clearTimeout(timeoutId))
             },
             (err) => {
               // prettier-ignore

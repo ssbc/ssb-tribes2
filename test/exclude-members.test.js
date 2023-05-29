@@ -688,9 +688,9 @@ test("restarting the client doesn't make us rejoin old stuff", async (t) => {
 
 test('On exclusion, if we fail to re-add all people, someone else does that instead', async (t) => {
   const run = Run(t)
-  const alice = Testbot({ name: 'alice' })
+  const alice = Testbot({ name: 'alice', timeoutScale: 300 * 1000 })
   const bob = Testbot({ name: 'bob' })
-  const carol = Testbot({ name: 'carol' })
+  const carol = Testbot({ name: 'carol', timeoutScale: 0 })
   const david = Testbot({ name: 'david' })
 
   await run(

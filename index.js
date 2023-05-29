@@ -578,7 +578,7 @@ module.exports = {
         // prettier-ignore
         if (err) return cb(clarify(err, 'Error finding or creating additions feed when starting ssb-tribes2'))
         cb(null)
-        startListeners(ssb, console.error)
+        startListeners(ssb, config, console.error)
       })
     }
 
