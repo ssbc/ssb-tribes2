@@ -199,7 +199,7 @@ module.exports = function startListeners(ssb, config, onError) {
       )
     )
 
-    // re-add missing people to a new epoch if the epoch creator didn't
+    // re-add missing people to a new epoch if the epoch creator didn't add everyone but they added us.
     // we're only doing this for the preferred epoch atm
     pull(
       ssb.tribes2.list({ live: true }),
