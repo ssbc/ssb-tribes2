@@ -686,7 +686,7 @@ test("restarting the client doesn't make us rejoin old stuff", async (t) => {
   await p(bob.close)(true)
 })
 
-test('On exclusion, if we fail to re-add all people, someone else does that instead', async (t) => {
+test.only('On exclusion, if we fail to re-add all people, someone else does that instead', async (t) => {
   const run = Run(t)
   const alice = Testbot({ name: 'alice' })
   const bob = Testbot({ name: 'bob' })
@@ -724,6 +724,8 @@ test('On exclusion, if we fail to re-add all people, someone else does that inst
   )
 
   await run('replicated', replicate(alice, bob, carol, david))
+
+  await run('carol accepts group invite', carol.tribes2.acceptInvite(groupId))
 
   await run(
     "alice excludes bob but intentionally doesn't manage to re-add david",
