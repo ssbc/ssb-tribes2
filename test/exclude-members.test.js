@@ -12,6 +12,7 @@ const Testbot = require('./helpers/testbot')
 const replicate = require('./helpers/replicate')
 const countGroupFeeds = require('./helpers/count-group-feeds')
 const Run = require('./helpers/run')
+const Epochs = require('../lib/epochs')
 
 async function getRootIds(peers, t) {
   return Promise.all(peers.map((peer) => p(peer.metafeeds.findOrCreate)()))
@@ -903,7 +904,7 @@ test('On exclusion, recover if we fail to re-add anyone at all', async (t) => {
   ])
 })
 
-test('On exclusion, if we crash before creating a new epoch, someone else does that instead', async (t) => {
+test.only('On exclusion, if we crash before creating a new epoch, someone else does that instead', async (t) => {
   const run = Run(t)
   const alice = Testbot({ name: 'alice', timeoutScale: 300 * 1000 })
   const bob = Testbot({ name: 'bob' })
@@ -933,17 +934,6 @@ test('On exclusion, if we crash before creating a new epoch, someone else does t
     alice.tribes2.addMembers(groupId, [bobId, carolId])
   )
 
-  const {
-    value: { author: initialEpochFeedId },
-  } = await run(
-    'alice posts to the initial epoch',
-    alice.tribes2.publish({
-      type: 'test',
-      text: 'first post',
-      recps: [groupId],
-    })
-  )
-
   await run('replicated', replicate(alice, bob, carol))
 
   await run('carol accepts group invite', carol.tribes2.acceptInvite(groupId))
@@ -956,41 +946,35 @@ test('On exclusion, if we crash before creating a new epoch, someone else does t
     .catch((err) =>
       t.equal(
         err.message,
-        'todo',
+        'Intentional crash before creating new epoch',
         'alice excludes bob but crashes before creating the new epoch'
       )
     )
 
   await run('replicated', replicate(alice, bob, carol))
 
+  // the magic happens
   await p(setTimeout)(500)
 
-  // TODO: check that alice finds a new epoch and that its creator is carol
-  //const carolGotNewMsg = await p(carol.db.get)(newEpochPostId)
-  //t.notEquals(
-  //  typeof carolGotNewMsg.content,
-  //  'string',
-  //  'carol got access to the new epoch'
-  //)
+  await run('replicate after hopeful recovery', replicate(alice, bob, carol))
 
-  const {
-    value: { author: newEpochFeedId },
-  } = await run(
-    'alice posts new post',
-    alice.tribes2.publish({
-      type: 'test',
-      text: 'new post',
-      recps: [groupId],
-    })
+  const preferredEpoch = await run(
+    'alice gets her preferred epoch',
+    Epochs(alice).getPreferredEpoch(groupId)
+  )
+  t.equal(
+    preferredEpoch.author,
+    carolId,
+    "the creator of the new epoch is carol and it's alice's preferred epoch"
   )
 
-  t.notEqual(
-    newEpochFeedId,
-    initialEpochFeedId,
-    'Alice was able to post to a new epoch'
-  )
+  const newGroupInfo = await alice.tribes2.get(groupId)
 
-  // TODO: verify that alice posted to carol's epoch
+  t.equal(
+    newGroupInfo.writeKey.key,
+    preferredEpoch.secret,
+    "alice's preferred epoch is the one carol posted and it's alice's current writeKey"
+  )
 
   await run('replicated', replicate(alice, bob, carol))
 
@@ -1002,10 +986,19 @@ test('On exclusion, if we crash before creating a new epoch, someone else does t
   t.deepEqual(
     aliceNewList[0].added.sort(),
     [aliceId, carolId].sort(),
-    'group is whole'
+    'alice has correct member list'
   )
 
-  // TODO: get carol member list
+  const carolNewList = await run(
+    'carol gets her list of members',
+    pull(carol.tribes2.listMembers(groupId), pull.collectAsPromise())
+  )
+
+  t.deepEqual(
+    carolNewList[0].added.sort(),
+    [aliceId, carolId].sort(),
+    'carol has correct member list'
+  )
 
   await Promise.all([
     p(alice.close)(true),

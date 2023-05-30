@@ -269,6 +269,10 @@ module.exports = {
                 tangles: ['epoch'],
                 isValid: isInitEpoch,
               }
+
+              // prettier-ignore
+              if (opts?._newEpochCrash) return cb(new Error('Intentional crash before creating new epoch'))
+
               publish(newEpochContent, newTangleOpts, (err) => {
                 // prettier-ignore
                 if (err) return cb(clarify(err, "Couldn't post init msg on new epoch when excluding members"))
