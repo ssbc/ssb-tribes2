@@ -827,8 +827,10 @@ test.only('On exclusion, recover if we fail to re-add anyone at all', async (t) 
       _reAddCrash: true,
     })
     .then(() => t.fail("didn't crash on intentional failing exclude"))
-    .catch(() =>
-      t.pass(
+    .catch((err) =>
+      t.equal(
+        err.message,
+        'Intentional crash before re-adding members',
         'alice excludes bob but crashes before re-adding herself and carol'
       )
     )

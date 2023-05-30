@@ -213,9 +213,11 @@ module.exports = function startListeners(ssb, config, onError) {
               const randomTimeout = timeoutScale * timeoutRandom
 
               const timeoutId = setTimeout(() => {
-                reAddMembers(ssb, group.id, null, (err) => {
+                reAddMembers(ssb, group.id, null, (err, readded) => {
                   // prettier-ignore
                   if (err && !isClosed) return onError(clarify(err, 'Failed re-adding members to epoch that missed some'))
+
+                  console.log('recover readd', readded)
                 })
               }, randomTimeout)
 
