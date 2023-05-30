@@ -904,7 +904,7 @@ test('On exclusion, recover if we fail to re-add anyone at all', async (t) => {
   ])
 })
 
-test.only('On exclusion, if we crash before creating a new epoch, someone else does that instead', async (t) => {
+test('On exclusion, if we crash before creating a new epoch, someone else does that instead', async (t) => {
   const run = Run(t)
   const alice = Testbot({ name: 'alice', timeoutScale: 300 * 1000 })
   const bob = Testbot({ name: 'bob' })
