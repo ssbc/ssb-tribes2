@@ -215,7 +215,7 @@ module.exports = function startListeners(ssb, config, onError) {
               const timeoutId = setTimeout(() => {
                 reAddMembers(ssb, group.id, null, (err) => {
                   // prettier-ignore
-                  if (err && !isClosed) return onError(clarify(err, 'todo'))
+                  if (err && !isClosed) return onError(clarify(err, 'Failed re-adding members to epoch that missed some'))
                 })
               }, randomTimeout)
 
@@ -223,7 +223,7 @@ module.exports = function startListeners(ssb, config, onError) {
             },
             (err) => {
               // prettier-ignore
-              if (err && !isClosed) return onError(clarify(err, 'todo'))
+              if (err && !isClosed) return onError(clarify(err, "Failed finding new preferred epochs when looking for them to add missing members to"))
             }
           )
         )
@@ -232,7 +232,7 @@ module.exports = function startListeners(ssb, config, onError) {
         () => {},
         (err) => {
           // prettier-ignore
-          if (err && !isClosed) return onError(clarify(err, 'todo'))
+          if (err && !isClosed) return onError(clarify(err, 'Failed listing groups when trying to find epochs to re-add members to'))
         }
       )
     )
