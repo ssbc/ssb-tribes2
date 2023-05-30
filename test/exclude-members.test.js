@@ -6,7 +6,7 @@ const test = require('tape')
 const pull = require('pull-stream')
 const { promisify: p } = require('util')
 const ssbKeys = require('ssb-keys')
-const { where, author, toPromise } = require('ssb-db2/operators')
+const { where, author, count, toPromise } = require('ssb-db2/operators')
 const { fromMessageSigil } = require('ssb-uri2')
 const Testbot = require('./helpers/testbot')
 const replicate = require('./helpers/replicate')
@@ -777,7 +777,7 @@ test('On exclusion, if we fail to re-add all people, someone else does that inst
   ])
 })
 
-test.only('On exclusion, recover if we fail to re-add anyone at all', async (t) => {
+test('On exclusion, recover if we fail to re-add anyone at all', async (t) => {
   const run = Run(t)
   const alice = Testbot({ name: 'alice', timeoutScale: 0 })
   // only alice can recover in this way because the others haven't been given the new key. but since bob and carol will think a new epoch wasn't made, and they'll have other recovery methods for that (tested in another test) we'll tell them not to try recovery here
@@ -822,6 +822,16 @@ test.only('On exclusion, recover if we fail to re-add anyone at all', async (t) 
 
   await run('carol accepts group invite', carol.tribes2.acceptInvite(groupId))
 
+  const additionsFeed = await run(
+    'get number of additions before exclude',
+    p(alice.metafeeds.findOrCreate)({ purpose: 'group/additions' })
+  )
+
+  const additionCountBefore = await run(
+    'got num of additions before exclude',
+    alice.db.query(where(author(additionsFeed.id)), count(), toPromise())
+  )
+
   await alice.tribes2
     .excludeMembers(groupId, [bobId], {
       _reAddCrash: true,
@@ -834,6 +844,19 @@ test.only('On exclusion, recover if we fail to re-add anyone at all', async (t) 
         'alice excludes bob but crashes before re-adding herself and carol'
       )
     )
+
+  await p(setTimeout)(500)
+
+  const additionCountAfter = await run(
+    'got num of additions after exclude',
+    alice.db.query(where(author(additionsFeed.id)), count(), toPromise())
+  )
+
+  t.equal(
+    additionCountAfter - additionCountBefore,
+    1,
+    'There was only 1 re-addition message from alice'
+  )
 
   const {
     key: newEpochPostId,
