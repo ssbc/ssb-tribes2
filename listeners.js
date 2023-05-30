@@ -203,6 +203,7 @@ module.exports = function startListeners(ssb, config, onError) {
     // we're only doing this for the preferred epoch atm
     pull(
       ssb.tribes2.list({ live: true }),
+      pull.unique('id'),
       pull.map((group) =>
         pull(
           getPreferredEpoch.stream(group.id, { live: true }),
@@ -213,11 +214,9 @@ module.exports = function startListeners(ssb, config, onError) {
               const randomTimeout = timeoutScale * timeoutRandom
 
               const timeoutId = setTimeout(() => {
-                reAddMembers(ssb, group.id, null, (err, readded) => {
+                reAddMembers(ssb, group.id, null, (err) => {
                   // prettier-ignore
                   if (err && !isClosed) return onError(clarify(err, 'Failed re-adding members to epoch that missed some'))
-
-                  console.log('recover readd', readded)
                 })
               }, randomTimeout)
 
