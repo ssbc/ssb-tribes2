@@ -689,6 +689,7 @@ test("restarting the client doesn't make us rejoin old stuff", async (t) => {
 
 test('On exclusion, if we fail to re-add all people, someone else does that instead', async (t) => {
   const run = Run(t)
+  // set alice to be slow to fix mistakes, to allow carol time to do it
   const alice = Testbot({ name: 'alice', timeoutScale: 300 * 1000 })
   const bob = Testbot({ name: 'bob' })
   const carol = Testbot({ name: 'carol', timeoutScale: 0 })
@@ -824,7 +825,7 @@ test('On exclusion, recover if we fail to re-add anyone at all', async (t) => {
   await run('carol accepts group invite', carol.tribes2.acceptInvite(groupId))
 
   const additionsFeed = await run(
-    'get number of additions before exclude',
+    'get additions feed',
     p(alice.metafeeds.findOrCreate)({ purpose: 'group/additions' })
   )
 
