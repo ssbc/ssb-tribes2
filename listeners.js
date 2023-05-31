@@ -209,7 +209,7 @@ module.exports = function startListeners(ssb, config, onError) {
           pull.drain(
             () => {
               const timeoutScale = config.tribes2?.timeoutScale ?? 1000
-              const timeoutRandom = Math.random() * 30 + 1
+              const timeoutRandom = Math.random() * 25 + 5
               const randomTimeout = timeoutScale * timeoutRandom
 
               const timeoutId = setTimeout(() => {
