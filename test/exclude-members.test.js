@@ -823,7 +823,7 @@ test('On exclusion, recover if we fail to re-add anyone at all', async (t) => {
   await run('carol accepts group invite', carol.tribes2.acceptInvite(groupId))
 
   const additionsFeed = await run(
-    'get number of additions before exclude',
+    'get additions feed',
     p(alice.metafeeds.findOrCreate)({ purpose: 'group/additions' })
   )
 
