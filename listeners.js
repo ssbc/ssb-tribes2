@@ -7,7 +7,7 @@ const {
   where,
   and,
   or,
-  live,
+  live: dbLive,
   isDecrypted,
   type,
   toPullStream,
@@ -31,6 +31,13 @@ const { reAddMembers } = require('./lib/exclude')
 // push a function to this list to have it called when the client is closing
 const closeCalls = []
 
+function randomTimeout(config) {
+  if (!config) throw new Error('Please give config')
+  const timeoutScale = config.tribes2?.timeoutScale ?? 1000
+  const timeoutRandom = Math.random() * 25 + 5
+  return timeoutScale * timeoutRandom
+}
+
 module.exports = function startListeners(ssb, config, onError) {
   const { getTipEpochs, getPreferredEpoch } = Epochs(ssb)
 
@@ -50,7 +57,7 @@ module.exports = function startListeners(ssb, config, onError) {
     pull(
       ssb.db.query(
         where(and(isDecrypted('box2'), type('group/exclude-member'))),
-        live({ old: true }),
+        dbLive({ old: true }),
         toPullStream()
       ),
       pull.filter(isExcludeMember),
@@ -91,7 +98,7 @@ module.exports = function startListeners(ssb, config, onError) {
     pull(
       ssb.db.query(
         where(and(isDecrypted('box2'), type('group/add-member'))),
-        live({ old: true }),
+        dbLive({ old: true }),
         toPullStream()
       ),
       pull.filter(isAddMember),
@@ -149,7 +156,7 @@ module.exports = function startListeners(ssb, config, onError) {
     pull(
       ssb.db.query(
         where(or(type('group/init'), type('group/add-member'))),
-        live({ old: true }),
+        dbLive({ old: true }),
         toPullStream()
       ),
       pull.filter((msg) => isInitEpoch(msg) || isAddMember(msg)),
@@ -209,16 +216,14 @@ module.exports = function startListeners(ssb, config, onError) {
           getPreferredEpoch.stream(group.id, { live: true }),
           pull.drain(
             () => {
-              const timeoutScale = config.tribes2?.timeoutScale ?? 1000
-              const timeoutRandom = Math.random() * 25 + 5
-              const randomTimeout = timeoutScale * timeoutRandom
+              const timeout = randomTimeout(config)
 
               const timeoutId = setTimeout(() => {
                 reAddMembers(ssb, group.id, null, (err) => {
                   // prettier-ignore
                   if (err && !isClosed) return onError(clarify(err, 'Failed re-adding members to epoch that missed some'))
                 })
-              }, randomTimeout)
+              }, timeout)
 
               closeCalls.push(() => clearTimeout(timeoutId))
             },
@@ -236,6 +241,20 @@ module.exports = function startListeners(ssb, config, onError) {
           if (err && !isClosed) return onError(clarify(err, 'Failed listing groups when trying to find epochs to re-add members to'))
         }
       )
+    )
+
+    // if we find an exclude and it's not excluding us but we don't find a new epoch, even after a while, then create a new epoch, since we assume that the excluder crashed or something
+    pull(
+      ssb.db.query(
+        where(and(isDecrypted('box2'), type('group/exclude-member'))),
+        dbLive({ old: true }),
+        toPullStream()
+      ),
+      pull.filter(isExcludeMember),
+      pull.map((msg) => msg.value.content),
+      pull.filter((content) => !content.excluded.includes(myRoot.id))
+      // TODO: the rest
+      // the listener at the top of this file is pretty similar, could we combine the two?
     )
   })
 }
