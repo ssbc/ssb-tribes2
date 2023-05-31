@@ -273,6 +273,9 @@ module.exports = {
                 // prettier-ignore
                 if (err) return cb(clarify(err, "Couldn't post init msg on new epoch when excluding members"))
 
+                // prettier-ignore
+                if (opts?._reAddCrash) return cb(new Error('Intentional crash before re-adding members'))
+
                 reAddMembers(
                   ssb,
                   groupId,

@@ -203,6 +203,7 @@ module.exports = function startListeners(ssb, config, onError) {
     // we're only doing this for the preferred epoch atm
     pull(
       ssb.tribes2.list({ live: true }),
+      pull.unique('id'),
       pull.map((group) =>
         pull(
           getPreferredEpoch.stream(group.id, { live: true }),
