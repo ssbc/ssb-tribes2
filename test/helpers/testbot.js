@@ -56,6 +56,9 @@ module.exports = function createSbot(opts = {}) {
     metafeeds: {
       seed: opts.mfSeed || mfSeedFromName(opts.name),
     },
+    tribes2: {
+      timeoutScale: opts.timeoutScale,
+    },
   })
 
   sbot.name = opts.name

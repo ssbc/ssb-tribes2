@@ -9,7 +9,6 @@ const pullMany = require('pull-many')
 const pullFlatMerge = require('pull-flat-merge')
 const pullAbortable = require('pull-abortable')
 const pullDefer = require('pull-defer')
-const chunk = require('lodash.chunk')
 const clarify = require('clarify-error')
 const {
   where,
@@ -40,6 +39,7 @@ const publishAndPrune = require('./lib/prune-publish')
 const MetaFeedHelpers = require('./lib/meta-feed-helpers')
 const Epochs = require('./lib/epochs')
 const { groupRecp } = require('./lib/operators')
+const { reAddMembers } = require('./lib/exclude')
 
 module.exports = {
   name: 'tribes2',
@@ -241,70 +241,47 @@ module.exports = {
           // prettier-ignore
           if (err) return cb(clarify(err, 'Failed to publish exclude msg'))
 
-          pull(
-            listMembers(groupId),
-            pull.map((info) => info.added),
-            pull.flatten(),
-            pull.collect((err, beforeMembers) => {
+          const newSecret = new SecretKey()
+          const addInfo = { key: newSecret.toBuffer() }
+
+          ssb.box2.addGroupInfo(groupId, addInfo, (err) => {
+            // prettier-ignore
+            if (err) return cb(clarify(err, "Couldn't store new key when excluding members"))
+
+            const newKey = {
+              key: newSecret.toBuffer(),
+              scheme: keySchemes.private_group,
+            }
+            ssb.box2.pickGroupWriteKey(groupId, newKey, (err) => {
               // prettier-ignore
-              if (err) return cb(clarify(err, "Couldn't get old member list when excluding members"))
+              if (err) return cb(clarify(err, "Couldn't switch to new key for writing when excluding members"))
 
-              const remainingMembers = beforeMembers.filter(
-                (member) => !feedIds.includes(member)
-              )
-              const newSecret = new SecretKey()
-              const addInfo = { key: newSecret.toBuffer() }
-
-              ssb.box2.addGroupInfo(groupId, addInfo, (err) => {
+              const newEpochContent = {
+                type: 'group/init',
+                version: 'v2',
+                secret: newSecret.toString('base64'),
+                tangles: {
+                  members: { root: null, previous: null },
+                },
+                recps: [groupId, myRoot.id],
+              }
+              const newTangleOpts = {
+                tangles: ['epoch'],
+                isValid: isInitEpoch,
+              }
+              publish(newEpochContent, newTangleOpts, (err) => {
                 // prettier-ignore
-                if (err) return cb(clarify(err, "Couldn't store new key when excluding members"))
+                if (err) return cb(clarify(err, "Couldn't post init msg on new epoch when excluding members"))
 
-                const newKey = {
-                  key: newSecret.toBuffer(),
-                  scheme: keySchemes.private_group,
-                }
-                ssb.box2.pickGroupWriteKey(groupId, newKey, (err) => {
-                  // prettier-ignore
-                  if (err) return cb(clarify(err, "Couldn't switch to new key for writing when excluding members"))
-
-                  const newEpochContent = {
-                    type: 'group/init',
-                    version: 'v2',
-                    secret: newSecret.toString('base64'),
-                    tangles: {
-                      members: { root: null, previous: null },
-                    },
-                    recps: [groupId, myRoot.id],
-                  }
-                  const newTangleOpts = {
-                    tangles: ['epoch'],
-                    isValid: isInitEpoch,
-                  }
-                  publish(newEpochContent, newTangleOpts, (err) => {
-                    // prettier-ignore
-                    if (err) return cb(clarify(err, "Couldn't post init msg on new epoch when excluding members"))
-
-                    pull(
-                      pull.values(chunk(remainingMembers, 15)),
-                      pull.asyncMap((membersToAdd, cb) =>
-                        addMembers(
-                          groupId,
-                          membersToAdd,
-                          { oldSecrets: false },
-                          cb
-                        )
-                      ),
-                      pull.collect((err) => {
-                        // prettier-ignore
-                        if (err) return cb(clarify(err, "Couldn't re-add remaining members when excluding members"))
-                        cb(null)
-                      })
-                    )
-                  })
-                })
+                reAddMembers(
+                  ssb,
+                  groupId,
+                  { _reAddSkipMember: opts?._reAddSkipMember },
+                  cb
+                )
               })
             })
-          )
+          })
         })
       })
     }
@@ -601,7 +578,7 @@ module.exports = {
         // prettier-ignore
         if (err) return cb(clarify(err, 'Error finding or creating additions feed when starting ssb-tribes2'))
         cb(null)
-        startListeners(ssb, console.error)
+        startListeners(ssb, config, console.error)
       })
     }
 

@@ -194,6 +194,10 @@ Makes sure that you're set up to send and receive group invites, by creating an 
 
 - `cb` _Function_ - a callback of signature `(err)`
 
+## Config
+
+You can set the secret stack config `config.tribes2.timeoutScale` to control how slowly the client should try to fix a conflicting state, where other clients might be trying to fix the same conflict at the same time. By default `1000`, which gives a timeout between 5s-30s. A higher value reduces the risk of creating new conflicts since other clients don't do the same conflict resolution at the same time, but increase the time that the group is in an unstable state. A lower number corrects things faster but increases the risk of ending up in new conflicts.
+
 ## License
 
 LGPL-3.0-only
