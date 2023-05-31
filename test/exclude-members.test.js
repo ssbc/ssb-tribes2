@@ -971,7 +971,7 @@ test.only('On exclusion, if we crash before creating a new epoch, someone else d
 
   const newGroupInfo = await alice.tribes2.get(groupId)
 
-  t.equal(
+  t.deepEqual(
     newGroupInfo.writeKey.key,
     preferredEpoch.secret,
     "alice's preferred epoch is the one carol posted and it's alice's current writeKey"

@@ -252,11 +252,12 @@ module.exports = function startListeners(ssb, config, onError) {
         (group) => {
           pull(
             getPreferredEpoch.stream(group.id, { live: true }),
+            pull.unique('id'),
             pull.drain(
               (preferredEpoch) => {
                 pull(
-                  getMembers.stream(preferredEpoch.id),
-                  pull.filter((members) => !members.toExclude.length),
+                  getMembers.stream(preferredEpoch.id, { live: true }),
+                  pull.filter((members) => members.toExclude.length),
                   pull.take(1),
                   pull.drain(
                     () => {
@@ -277,7 +278,7 @@ module.exports = function startListeners(ssb, config, onError) {
                               if (err && !isClosed) return onError(clarify(err, 'todo'))
 
                               // if we've found a new epoch then we don't need to create one ourselves
-                              if (preferredEpoch.id !== newPreferredEpoch)
+                              if (preferredEpoch.id !== newPreferredEpoch.id)
                                 return
 
                               createNewEpoch(ssb, group.id, (err) => {
