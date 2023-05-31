@@ -26,7 +26,7 @@ const pull = require('pull-stream')
 const paraMap = require('pull-paramap')
 const clarify = require('clarify-error')
 const Epochs = require('./lib/epochs')
-const { reAddMembers } = require('./lib/exclude')
+const { reAddMembers, createNewEpoch } = require('./lib/exclude')
 
 // push a function to this list to have it called when the client is closing
 const closeCalls = []
@@ -39,7 +39,7 @@ function randomTimeout(config) {
 }
 
 module.exports = function startListeners(ssb, config, onError) {
-  const { getTipEpochs, getPreferredEpoch } = Epochs(ssb)
+  const { getTipEpochs, getPreferredEpoch, getMembers } = Epochs(ssb)
 
   let isClosed = false
   ssb.close.hook((close, args) => {
@@ -244,17 +244,72 @@ module.exports = function startListeners(ssb, config, onError) {
     )
 
     // if we find an exclude and it's not excluding us but we don't find a new epoch, even after a while, then create a new epoch, since we assume that the excluder crashed or something
+    // TODO: combine with the above listener?
     pull(
-      ssb.db.query(
-        where(and(isDecrypted('box2'), type('group/exclude-member'))),
-        dbLive({ old: true }),
-        toPullStream()
-      ),
-      pull.filter(isExcludeMember),
-      pull.map((msg) => msg.value.content),
-      pull.filter((content) => !content.excluded.includes(myRoot.id))
-      // TODO: the rest
-      // the listener at the top of this file is pretty similar, could we combine the two?
+      ssb.tribes2.list({ live: true }),
+      pull.unique('id'),
+      pull.drain(
+        (group) => {
+          pull(
+            getPreferredEpoch.stream(group.id, { live: true }),
+            pull.drain(
+              (preferredEpoch) => {
+                pull(
+                  getMembers.stream(preferredEpoch.id),
+                  pull.filter((members) => !members.toExclude.length),
+                  pull.take(1),
+                  pull.drain(
+                    () => {
+                      const timeout = randomTimeout(config)
+
+                      const timeoutId = setTimeout(() => {
+                        ssb.tribes2.get(group.id, (err, group) => {
+                          // prettier-ignore
+                          if (err && !isClosed) return onError(clarify(err, 'todo'))
+
+                          // checking if we were one of the members who got excluded now, in that case we ignore this
+                          if (group.excluded) return
+
+                          getPreferredEpoch(
+                            group.id,
+                            (err, newPreferredEpoch) => {
+                              // prettier-ignore
+                              if (err && !isClosed) return onError(clarify(err, 'todo'))
+
+                              // if we've found a new epoch then we don't need to create one ourselves
+                              if (preferredEpoch.id !== newPreferredEpoch)
+                                return
+
+                              createNewEpoch(ssb, group.id, (err) => {
+                                // prettier-ignore
+                                if (err && !isClosed) return onError(clarify(err, 'todo'))
+                              })
+                            }
+                          )
+                        })
+                      }, timeout)
+
+                      closeCalls.push(() => clearTimeout(timeoutId))
+                    },
+                    (err) => {
+                      // prettier-ignore
+                      if (err && !isClosed) return onError(clarify(err, 'todo'))
+                    }
+                  )
+                )
+              },
+              (err) => {
+                // prettier-ignore
+                if (err && !isClosed) return onError(clarify(err, 'todo'))
+              }
+            )
+          )
+        },
+        (err) => {
+          // prettier-ignore
+          if (err && !isClosed) return onError(clarify(err, 'todo'))
+        }
+      )
     )
   })
 }
