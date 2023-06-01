@@ -206,26 +206,70 @@ module.exports = function startListeners(ssb, config, onError) {
       )
     )
 
-    // re-add missing people to a new epoch if the epoch creator didn't add everyone but they added us.
-    // we're only doing this for the preferred epoch atm
+    // recover from half-finished excludeMembers() calls
     pull(
       ssb.tribes2.list({ live: true }),
       pull.unique('id'),
       pull.map((group) =>
         pull(
           getPreferredEpoch.stream(group.id, { live: true }),
+          pull.unique('id'),
           pull.drain(
-            () => {
+            (preferredEpoch) => {
+              // re-add missing people to a new epoch if the epoch creator didn't add everyone but they added us.
+              // we're only doing this for the preferred epoch atm
               const timeout = randomTimeout(config)
-
               const timeoutId = setTimeout(() => {
                 reAddMembers(ssb, group.id, null, (err) => {
                   // prettier-ignore
                   if (err && !isClosed) return onError(clarify(err, 'Failed re-adding members to epoch that missed some'))
                 })
               }, timeout)
-
               closeCalls.push(() => clearTimeout(timeoutId))
+
+              // if we find an exclude and it's not excluding us but we don't find a new epoch, even after a while, then create a new epoch, since we assume that the excluder crashed or something
+              pull(
+                getMembers.stream(preferredEpoch.id, { live: true }),
+                pull.filter((members) => members.toExclude.length),
+                pull.take(1),
+                pull.drain(
+                  () => {
+                    const timeout = randomTimeout(config)
+                    const timeoutId = setTimeout(() => {
+                      ssb.tribes2.get(group.id, (err, group) => {
+                        // prettier-ignore
+                        if (err && !isClosed) return onError(clarify(err, 'todo'))
+
+                        // checking if we were one of the members who got excluded now, in that case we ignore this
+                        if (group.excluded) return
+
+                        getPreferredEpoch(
+                          group.id,
+                          (err, newPreferredEpoch) => {
+                            // prettier-ignore
+                            if (err && !isClosed) return onError(clarify(err, 'todo'))
+
+                            // if we've found a new epoch then we don't need to create one ourselves
+                            if (preferredEpoch.id !== newPreferredEpoch.id)
+                              return
+
+                            createNewEpoch(ssb, group.id, (err) => {
+                              // prettier-ignore
+                              if (err && !isClosed) return onError(clarify(err, 'todo'))
+                            })
+                          }
+                        )
+                      })
+                    }, timeout)
+
+                    closeCalls.push(() => clearTimeout(timeoutId))
+                  },
+                  (err) => {
+                    // prettier-ignore
+                    if (err && !isClosed) return onError(clarify(err, 'todo'))
+                  }
+                )
+              )
             },
             (err) => {
               // prettier-ignore
@@ -239,76 +283,6 @@ module.exports = function startListeners(ssb, config, onError) {
         (err) => {
           // prettier-ignore
           if (err && !isClosed) return onError(clarify(err, 'Failed listing groups when trying to find epochs to re-add members to'))
-        }
-      )
-    )
-
-    // if we find an exclude and it's not excluding us but we don't find a new epoch, even after a while, then create a new epoch, since we assume that the excluder crashed or something
-    // TODO: combine with the above listener?
-    pull(
-      ssb.tribes2.list({ live: true }),
-      pull.unique('id'),
-      pull.drain(
-        (group) => {
-          pull(
-            getPreferredEpoch.stream(group.id, { live: true }),
-            pull.unique('id'),
-            pull.drain(
-              (preferredEpoch) => {
-                pull(
-                  getMembers.stream(preferredEpoch.id, { live: true }),
-                  pull.filter((members) => members.toExclude.length),
-                  pull.take(1),
-                  pull.drain(
-                    () => {
-                      const timeout = randomTimeout(config)
-
-                      const timeoutId = setTimeout(() => {
-                        ssb.tribes2.get(group.id, (err, group) => {
-                          // prettier-ignore
-                          if (err && !isClosed) return onError(clarify(err, 'todo'))
-
-                          // checking if we were one of the members who got excluded now, in that case we ignore this
-                          if (group.excluded) return
-
-                          getPreferredEpoch(
-                            group.id,
-                            (err, newPreferredEpoch) => {
-                              // prettier-ignore
-                              if (err && !isClosed) return onError(clarify(err, 'todo'))
-
-                              // if we've found a new epoch then we don't need to create one ourselves
-                              if (preferredEpoch.id !== newPreferredEpoch.id)
-                                return
-
-                              createNewEpoch(ssb, group.id, (err) => {
-                                // prettier-ignore
-                                if (err && !isClosed) return onError(clarify(err, 'todo'))
-                              })
-                            }
-                          )
-                        })
-                      }, timeout)
-
-                      closeCalls.push(() => clearTimeout(timeoutId))
-                    },
-                    (err) => {
-                      // prettier-ignore
-                      if (err && !isClosed) return onError(clarify(err, 'todo'))
-                    }
-                  )
-                )
-              },
-              (err) => {
-                // prettier-ignore
-                if (err && !isClosed) return onError(clarify(err, 'todo'))
-              }
-            )
-          )
-        },
-        (err) => {
-          // prettier-ignore
-          if (err && !isClosed) return onError(clarify(err, 'todo'))
         }
       )
     )
