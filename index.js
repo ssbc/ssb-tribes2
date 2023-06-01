@@ -37,7 +37,7 @@ const publishAndPrune = require('./lib/prune-publish')
 const MetaFeedHelpers = require('./lib/meta-feed-helpers')
 const Epochs = require('./lib/epochs')
 const { groupRecp } = require('./lib/operators')
-const { createNewEpoch, reAddMembers } = require('./lib/exclude')
+const { createNewEpoch } = require('./lib/exclude')
 
 module.exports = {
   name: 'tribes2',
@@ -238,20 +238,19 @@ module.exports = {
         // prettier-ignore
         if (opts?._newEpochCrash) return cb(new Error('Intentional crash before creating new epoch'))
 
-        createNewEpoch(ssb, groupId, (err) => {
-          // prettier-ignore
-          if (err) return cb(clarify(err, "Couldn't create new epoch when excluding members"))
-
-          // prettier-ignore
-          if (opts?._reAddCrash) return cb(new Error('Intentional crash before re-adding members'))
-
-          reAddMembers(
-            ssb,
-            groupId,
-            { _reAddSkipMember: opts?._reAddSkipMember },
-            cb
-          )
-        })
+        createNewEpoch(
+          ssb,
+          groupId,
+          {
+            _reAddCrash: opts?._reAddCrash,
+            _reAddSkipMember: opts?._reAddSkipMember,
+          },
+          (err) => {
+            // prettier-ignore
+            if (err) return cb(clarify(err, "Couldn't create new epoch and/or re-add members when excluding members"))
+            cb()
+          }
+        )
       })
     }
 
