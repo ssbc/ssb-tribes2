@@ -781,10 +781,10 @@ test('On exclusion, if we fail to re-add all people, someone else does that inst
 
 test('On exclusion, recover if we fail to re-add anyone at all', async (t) => {
   const run = Run(t)
-  const alice = Testbot({ name: 'alice', timeoutScale: 0 })
+  const alice = Testbot({ name: 'alice' })
   // only alice can recover in this way because the others haven't been given the new key. but since bob and carol will think a new epoch wasn't made, and they'll have other recovery methods for that (tested in another test) we'll tell them not to try recovery here
-  const bob = Testbot({ name: 'bob', timeoutScale: 300 * 1000 })
-  const carol = Testbot({ name: 'carol', timeoutScale: 300 * 1000 })
+  const bob = Testbot({ name: 'bob', timeoutLow: 300, timeoutHigh: 300 })
+  const carol = Testbot({ name: 'carol', timeoutLow: 300, timeoutHigh: 300 })
 
   await run(
     'tribes2 started for everyone',
@@ -907,10 +907,10 @@ test('On exclusion, recover if we fail to re-add anyone at all', async (t) => {
 
 test('On exclusion, if we crash before creating a new epoch, someone else does that instead', async (t) => {
   const run = Run(t)
-  const alice = Testbot({ name: 'alice', timeoutScale: 300 * 1000 })
+  const alice = Testbot({ name: 'alice', timeoutLow: 300, timeoutHigh: 300 })
   const bob = Testbot({ name: 'bob' })
   // carol gets recovery responsibility
-  const carol = Testbot({ name: 'carol', timeoutScale: 0 })
+  const carol = Testbot({ name: 'carol' })
 
   await run(
     'tribes2 started for everyone',

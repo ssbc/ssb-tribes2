@@ -33,9 +33,10 @@ const closeCalls = []
 
 function randomTimeout(config) {
   if (!config) throw new Error('Please give config')
-  const timeoutScale = config.tribes2?.timeoutScale ?? 1000
-  const timeoutRandom = Math.random() * 25 + 5
-  return timeoutScale * timeoutRandom
+  const timeoutLow = config.tribes2?.timeoutLow ?? 5
+  const timeoutHigh = config.tribes2?.timeoutHigh ?? 30
+  const timeoutRandom = Math.random() * (timeoutHigh - timeoutLow) + timeoutLow
+  return timeoutRandom * 1000
 }
 
 module.exports = function startListeners(ssb, config, onError) {
