@@ -539,7 +539,11 @@ test('Get added to an old epoch but still find newer epochs', async (t) => {
 test('Can exclude a person in a group with a lot of members', async (t) => {
   // NOTE: taking db2 debounces/timeouts out breaks this test, so run default
   // db2 config for stability
-  const _Testbot = (opts) => Testbot({ ...opts, db2: {} })
+  const _Testbot = (opts) =>
+    Testbot({
+      ...opts,
+      db2: {},
+    })
   const alice = _Testbot({
     keys: ssbKeys.generate(null, 'alice'),
     mfSeed: Buffer.from(
@@ -609,14 +613,15 @@ test('Can exclude a person in a group with a lot of members', async (t) => {
         const otherGroup = await other.tribes2.get(groupId)
 
         if (otherGroup.excluded) throw Error('got excluded')
-        if (otherGroup.readKeys.length !== 2) throw Error('not enough readkeys')
+        if (otherGroup.readKeys.length !== 2)
+          throw Error('not enough readkeys, got ' + otherGroup.readKeys.length)
 
         return otherGroup
       })()
     })
   )
     .then(() => t.pass("Others didn't get excluded from the group"))
-    .catch(() => t.fail('Others got excluded from the group'))
+    .catch((err) => t.fail('Others got excluded from the group:' + err.message))
 
   await Promise.all(all.map((peer) => p(peer.close)(true)))
 })
