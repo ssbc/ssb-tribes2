@@ -239,7 +239,7 @@ module.exports = function startListeners(ssb, config, onError) {
                     const timeoutId = setTimeout(() => {
                       ssb.tribes2.get(group.id, (err, group) => {
                         // prettier-ignore
-                        if (err && !isClosed) return onError(clarify(err, 'todo'))
+                        if (err && !isClosed) return onError(clarify(err, "Couldn't get group info when checking for missing epochs to recover"))
 
                         // checking if we were one of the members who got excluded now, in that case we ignore this
                         if (group.excluded) return
@@ -248,7 +248,7 @@ module.exports = function startListeners(ssb, config, onError) {
                           group.id,
                           (err, newPreferredEpoch) => {
                             // prettier-ignore
-                            if (err && !isClosed) return onError(clarify(err, 'todo'))
+                            if (err && !isClosed) return onError(clarify(err, "Couldn't get preferred epoch when checking for missing epochs to recover"))
 
                             // if we've found a new epoch then we don't need to create one ourselves
                             if (preferredEpoch.id !== newPreferredEpoch.id)
@@ -256,7 +256,7 @@ module.exports = function startListeners(ssb, config, onError) {
 
                             createNewEpoch(ssb, group.id, (err) => {
                               // prettier-ignore
-                              if (err && !isClosed) return onError(clarify(err, 'todo'))
+                              if (err && !isClosed) return onError(clarify(err, "Couldn't create new epoch to recover from a missing one"))
                             })
                           }
                         )
@@ -267,14 +267,14 @@ module.exports = function startListeners(ssb, config, onError) {
                   },
                   (err) => {
                     // prettier-ignore
-                    if (err && !isClosed) return onError(clarify(err, 'todo'))
+                    if (err && !isClosed) return onError(clarify(err, "Couldn't get info on exclusion events when looking for epochs that fail to get created"))
                   }
                 )
               )
             },
             (err) => {
               // prettier-ignore
-              if (err && !isClosed) return onError(clarify(err, "Failed finding new preferred epochs when looking for them to add missing members to"))
+              if (err && !isClosed) return onError(clarify(err, "Failed finding new preferred epochs when looking for them to add missing members to or when checking if an epoch is missing"))
             }
           )
         )
@@ -283,7 +283,7 @@ module.exports = function startListeners(ssb, config, onError) {
         () => {},
         (err) => {
           // prettier-ignore
-          if (err && !isClosed) return onError(clarify(err, 'Failed listing groups when trying to find epochs to re-add members to'))
+          if (err && !isClosed) return onError(clarify(err, 'Failed listing groups when trying to find missing epochs or epochs with missing members'))
         }
       )
     )
