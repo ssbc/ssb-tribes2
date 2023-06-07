@@ -19,6 +19,7 @@ let count = 0
 /** opts.path    (optional)
  *  opts.name    (optional) - convenience method for deterministic opts.path
  *  opts.keys    (optional)
+ *  opts.log     (optional) - log our messages as they're added to log
  *  opts.rimraf  (optional) - clear the directory before start (default: true)
  */
 module.exports = function createSbot(opts = {}) {
@@ -57,10 +58,30 @@ module.exports = function createSbot(opts = {}) {
       seed: opts.mfSeed || mfSeedFromName(opts.name),
     },
     tribes2: {
-      timeoutLow: opts.timeoutLow ?? 0.05,
-      timeoutHigh: opts.timeoutHigh ?? 0.2,
+      timeoutLow: opts.timeoutLow,
+      timeoutHigh: opts.timeoutHigh,
     },
   })
+
+  if (opts.log) {
+    function log(kvt) {
+      const { author, sequence, content } = kvt.value
+      const name = author === sbot.id ? sbot.name : author
+      console.log(`
+---
+${name} ${sequence}
+${kvt.key}
+${stringify(content)}
+      `)
+    }
+    sbot.db.onMsgAdded((ev) => {
+      if (typeof ev.kvt.value.content === 'string') {
+        return sbot.db.getMsg(ev.kvt.key, (err, data) => log(err || data))
+      }
+
+      log(ev.kvt)
+    })
+  }
 
   sbot.name = opts.name
   sbot.ebt.registerFormat(bendyButtFormat)
@@ -101,4 +122,16 @@ function mfSeedFromName(name) {
     default:
       throw new Error('no mfSeed set up for ' + name)
   }
+}
+
+function stringify(obj) {
+  return JSON.stringify(
+    obj,
+    (key, value) => {
+      if (value?.type === 'Buffer')
+        return Buffer.from(value.data).toString('base64')
+      return value
+    },
+    2
+  )
 }

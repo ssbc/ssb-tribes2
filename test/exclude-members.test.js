@@ -692,12 +692,12 @@ test("restarting the client doesn't make us rejoin old stuff", async (t) => {
   await p(bob.close)(true)
 })
 
-test('On exclusion, if we fail to re-add all people, someone else does that instead', async (t) => {
+test.only('On exclusion, if we fail to re-add all people, someone else does that instead', async (t) => {
   const run = Run(t)
   // set alice to be slow to fix mistakes, to allow carol time to do it
-  const alice = Testbot({ name: 'alice', timeoutScale: 300 * 1000 })
+  const alice = Testbot({ name: 'alice', timeoutLow: 300, timeoutHigh: 300 })
   const bob = Testbot({ name: 'bob' })
-  const carol = Testbot({ name: 'carol', timeoutScale: 0 })
+  const carol = Testbot({ name: 'carol', timeoutLow: 1, timeoutHigh: 1 })
   const david = Testbot({ name: 'david' })
 
   await run(
@@ -736,6 +736,7 @@ test('On exclusion, if we fail to re-add all people, someone else does that inst
 
   await run(
     "alice excludes bob but intentionally doesn't manage to re-add david",
+    // so alice should re-add: alice, carol (no david)
     alice.tribes2.excludeMembers(groupId, [bobId], {
       _reAddSkipMember: davidId,
     })
@@ -752,7 +753,18 @@ test('On exclusion, if we fail to re-add all people, someone else does that inst
     'only alice and carol got readded to the group (just checking that things "failed")'
   )
 
-  await run('replicated', replicate(alice, bob, carol, david))
+  // TEMP
+  carol.db.onMsgAdded((ev) => {
+    carol.db.get(ev.kvt.key, (err, value) => {
+      const name = value.author === carol.id ? carol.name : value.author
+      console.log(name, value.sequence, JSON.stringify(value.content, null, 2))
+    })
+  })
+
+  await run('replicated', replicate(alice, carol))
+
+  console.time('wait')
+  await p(setTimeout)(5000).then(() => console.timeEnd('wait'))
 
   const carolList = await run(
     'carol gets her complete list after fixing stuff',
@@ -769,6 +781,8 @@ test('On exclusion, if we fail to re-add all people, someone else does that inst
     'alice gets her complete list',
     pull(alice.tribes2.listMembers(groupId), pull.collectAsPromise())
   )
+
+  await run('replicated', replicate(alice, carol))
 
   t.deepEqual(
     aliceNewList[0].added.sort(),
