@@ -543,6 +543,8 @@ test('Can exclude a person in a group with a lot of members', async (t) => {
     Testbot({
       ...opts,
       db2: {},
+      timeoutLow: 300,
+      timeoutHigh: 300,
     })
   const alice = _Testbot({
     keys: ssbKeys.generate(null, 'alice'),
