@@ -14,6 +14,8 @@ const countGroupFeeds = require('./helpers/count-group-feeds')
 const Run = require('./helpers/run')
 const Epochs = require('../lib/epochs')
 
+const lowTimeouts = { timeoutLow: 0.1, timeoutHigh: 0.2 }
+
 async function getRootIds(peers, t) {
   return Promise.all(peers.map((peer) => p(peer.metafeeds.findOrCreate)()))
     .then((peerRoots) => peerRoots.map((root) => root.id))
@@ -543,8 +545,6 @@ test('Can exclude a person in a group with a lot of members', async (t) => {
     Testbot({
       ...opts,
       db2: {},
-      timeoutLow: 300,
-      timeoutHigh: 300,
     })
   const alice = _Testbot({
     keys: ssbKeys.generate(null, 'alice'),
@@ -788,10 +788,10 @@ test('On exclusion, if we fail to re-add all people, someone else does that inst
 
 test('On exclusion, recover if we fail to re-add anyone at all', async (t) => {
   const run = Run(t)
-  const alice = Testbot({ name: 'alice' })
+  const alice = Testbot({ name: 'alice', ...lowTimeouts })
   // only alice can recover in this way because the others haven't been given the new key. but since bob and carol will think a new epoch wasn't made, and they'll have other recovery methods for that (tested in another test) we'll tell them not to try recovery here
-  const bob = Testbot({ name: 'bob', timeoutLow: 300, timeoutHigh: 300 })
-  const carol = Testbot({ name: 'carol', timeoutLow: 300, timeoutHigh: 300 })
+  const bob = Testbot({ name: 'bob' })
+  const carol = Testbot({ name: 'carol' })
 
   await run(
     'tribes2 started for everyone',
@@ -914,10 +914,10 @@ test('On exclusion, recover if we fail to re-add anyone at all', async (t) => {
 
 test('On exclusion, if we crash before creating a new epoch, someone else does that instead', async (t) => {
   const run = Run(t)
-  const alice = Testbot({ name: 'alice', timeoutLow: 300, timeoutHigh: 300 })
-  const bob = Testbot({ name: 'bob' })
+  const alice = Testbot({ name: 'alice' })
+  const bob = Testbot({ name: 'bob', ...lowTimeouts })
   // carol gets recovery responsibility
-  const carol = Testbot({ name: 'carol' })
+  const carol = Testbot({ name: 'carol', ...lowTimeouts })
 
   await run(
     'tribes2 started for everyone',
