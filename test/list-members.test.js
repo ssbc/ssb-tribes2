@@ -162,6 +162,8 @@ test('listMembers works with exclusion', async (t) => {
       '00000000000000000000000000000000000000000000000000000000000ca201',
       'hex'
     ),
+    timeoutLow: 0.5,
+    timeoutHigh: 0.7,
   })
   const david = Testbot({
     keys: ssbKeys.generate(null, 'david'),
@@ -184,6 +186,12 @@ test('listMembers works with exclusion', async (t) => {
     p(carol.metafeeds.findOrCreate)(),
     p(david.metafeeds.findOrCreate)(),
   ])
+  console.log({
+    alice: aliceRoot.id,
+    bob: bobRoot.id,
+    carol: carolRoot.id,
+    david: davidRoot.id,
+  })
 
   await Promise.all([
     replicate(alice, bob),
@@ -243,6 +251,7 @@ test('listMembers works with exclusion', async (t) => {
 
   await Promise.all([replicate(alice, bob), replicate(alice, carol)])
 
+  t.pass('replicate done')
   await p(setTimeout)(500)
   t.deepEquals(
     liveMembers.sort(),
