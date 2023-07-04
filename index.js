@@ -24,12 +24,10 @@ const {
       addMember: isAddMember,
       content: isContent,
       excludeMember: isExcludeMember,
-      initEpoch: isInitEpoch,
     },
   },
   keySchemes,
 } = require('private-group-spec')
-const { SecretKey } = require('ssb-private-group-keys')
 const { fromMessageSigil, isBendyButtV1FeedSSBURI } = require('ssb-uri2')
 
 const startListeners = require('./listeners')
@@ -39,7 +37,7 @@ const publishAndPrune = require('./lib/prune-publish')
 const MetaFeedHelpers = require('./lib/meta-feed-helpers')
 const Epochs = require('./lib/epochs')
 const { groupRecp } = require('./lib/operators')
-const { reAddMembers } = require('./lib/exclude')
+const { createNewEpoch } = require('./lib/exclude')
 
 module.exports = {
   name: 'tribes2',
@@ -224,68 +222,35 @@ module.exports = {
       if (cb === undefined)
         return promisify(excludeMembers)(groupId, feedIds, opts)
 
-      ssb.metafeeds.findOrCreate(function gotRoot(err, myRoot) {
+      const excludeContent = {
+        type: 'group/exclude-member',
+        excludes: feedIds,
+        recps: [groupId],
+      }
+      const excludeOpts = {
+        tangles: ['members'],
+        isValid: isExcludeMember,
+      }
+      publish(excludeContent, excludeOpts, (err) => {
         // prettier-ignore
-        if (err) return cb(clarify(err, "Couldn't get own root when excluding members"))
+        if (err) return cb(clarify(err, 'Failed to publish exclude msg'))
 
-        const excludeContent = {
-          type: 'group/exclude-member',
-          excludes: feedIds,
-          recps: [groupId],
-        }
-        const excludeOpts = {
-          tangles: ['members'],
-          isValid: isExcludeMember,
-        }
-        publish(excludeContent, excludeOpts, (err) => {
-          // prettier-ignore
-          if (err) return cb(clarify(err, 'Failed to publish exclude msg'))
+        // prettier-ignore
+        if (opts?._newEpochCrash) return cb(new Error('Intentional crash before creating new epoch'))
 
-          const newSecret = new SecretKey()
-          const addInfo = { key: newSecret.toBuffer() }
-
-          ssb.box2.addGroupInfo(groupId, addInfo, (err) => {
+        createNewEpoch(
+          ssb,
+          groupId,
+          {
+            _reAddCrash: opts?._reAddCrash,
+            _reAddSkipMember: opts?._reAddSkipMember,
+          },
+          (err) => {
             // prettier-ignore
-            if (err) return cb(clarify(err, "Couldn't store new key when excluding members"))
-
-            const newKey = {
-              key: newSecret.toBuffer(),
-              scheme: keySchemes.private_group,
-            }
-            ssb.box2.pickGroupWriteKey(groupId, newKey, (err) => {
-              // prettier-ignore
-              if (err) return cb(clarify(err, "Couldn't switch to new key for writing when excluding members"))
-
-              const newEpochContent = {
-                type: 'group/init',
-                version: 'v2',
-                secret: newSecret.toString('base64'),
-                tangles: {
-                  members: { root: null, previous: null },
-                },
-                recps: [groupId, myRoot.id],
-              }
-              const newTangleOpts = {
-                tangles: ['epoch'],
-                isValid: isInitEpoch,
-              }
-              publish(newEpochContent, newTangleOpts, (err) => {
-                // prettier-ignore
-                if (err) return cb(clarify(err, "Couldn't post init msg on new epoch when excluding members"))
-
-                // prettier-ignore
-                if (opts?._reAddCrash) return cb(new Error('Intentional crash before re-adding members'))
-
-                reAddMembers(
-                  ssb,
-                  groupId,
-                  { _reAddSkipMember: opts?._reAddSkipMember },
-                  cb
-                )
-              })
-            })
-          })
-        })
+            if (err) return cb(clarify(err, "Couldn't create new epoch and/or re-add members when excluding members"))
+            cb()
+          }
+        )
       })
     }
 
