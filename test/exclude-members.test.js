@@ -847,7 +847,7 @@ test('On exclusion, recover if we fail to re-add anyone at all', async (t) => {
     .catch((err) =>
       t.equal(
         err.message,
-        'Intentional crash before re-adding members',
+        "Couldn't create new epoch and/or re-add members when excluding members",
         'alice excludes bob but crashes before re-adding herself and carol'
       )
     )
