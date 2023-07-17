@@ -12,6 +12,9 @@ const Testbot = require('./helpers/testbot')
 const replicate = require('./helpers/replicate')
 const countGroupFeeds = require('./helpers/count-group-feeds')
 const Run = require('./helpers/run')
+const Epochs = require('../lib/epochs')
+
+const lowTimeouts = { timeoutLow: 0.1, timeoutHigh: 0.2 }
 
 async function getRootIds(peers, t) {
   return Promise.all(peers.map((peer) => p(peer.metafeeds.findOrCreate)()))
@@ -538,7 +541,11 @@ test('Get added to an old epoch but still find newer epochs', async (t) => {
 test('Can exclude a person in a group with a lot of members', async (t) => {
   // NOTE: taking db2 debounces/timeouts out breaks this test, so run default
   // db2 config for stability
-  const _Testbot = (opts) => Testbot({ ...opts, db2: {} })
+  const _Testbot = (opts) =>
+    Testbot({
+      ...opts,
+      db2: {},
+    })
   const alice = _Testbot({
     keys: ssbKeys.generate(null, 'alice'),
     mfSeed: Buffer.from(
@@ -608,14 +615,15 @@ test('Can exclude a person in a group with a lot of members', async (t) => {
         const otherGroup = await other.tribes2.get(groupId)
 
         if (otherGroup.excluded) throw Error('got excluded')
-        if (otherGroup.readKeys.length !== 2) throw Error('not enough readkeys')
+        if (otherGroup.readKeys.length !== 2)
+          throw Error('not enough readkeys, got ' + otherGroup.readKeys.length)
 
         return otherGroup
       })()
     })
   )
     .then(() => t.pass("Others didn't get excluded from the group"))
-    .catch(() => t.fail('Others got excluded from the group'))
+    .catch((err) => t.fail('Others got excluded from the group:' + err.message))
 
   await Promise.all(all.map((peer) => p(peer.close)(true)))
 })
@@ -780,10 +788,10 @@ test('On exclusion, if we fail to re-add all people, someone else does that inst
 
 test('On exclusion, recover if we fail to re-add anyone at all', async (t) => {
   const run = Run(t)
-  const alice = Testbot({ name: 'alice', timeoutScale: 0 })
+  const alice = Testbot({ name: 'alice', ...lowTimeouts })
   // only alice can recover in this way because the others haven't been given the new key. but since bob and carol will think a new epoch wasn't made, and they'll have other recovery methods for that (tested in another test) we'll tell them not to try recovery here
-  const bob = Testbot({ name: 'bob', timeoutScale: 300 * 1000 })
-  const carol = Testbot({ name: 'carol', timeoutScale: 300 * 1000 })
+  const bob = Testbot({ name: 'bob' })
+  const carol = Testbot({ name: 'carol' })
 
   await run(
     'tribes2 started for everyone',
@@ -895,6 +903,109 @@ test('On exclusion, recover if we fail to re-add anyone at all', async (t) => {
     aliceNewList[0].added.sort(),
     [aliceId, carolId].sort(),
     'group is whole'
+  )
+
+  await Promise.all([
+    p(alice.close)(true),
+    p(bob.close)(true),
+    p(carol.close)(true),
+  ])
+})
+
+test('On exclusion, if we crash before creating a new epoch, someone else does that instead', async (t) => {
+  const run = Run(t)
+  const alice = Testbot({ name: 'alice' })
+  const bob = Testbot({ name: 'bob', ...lowTimeouts })
+  // carol gets recovery responsibility
+  const carol = Testbot({ name: 'carol', ...lowTimeouts })
+
+  await run(
+    'tribes2 started for everyone',
+    Promise.all([
+      alice.tribes2.start(),
+      bob.tribes2.start(),
+      carol.tribes2.start(),
+    ])
+  )
+
+  const [aliceId, bobId, carolId] = await getRootIds([alice, bob, carol], t)
+
+  await run('everyone replicates their trees', replicate(alice, bob, carol))
+
+  const { id: groupId } = await run(
+    'alice created the group',
+    alice.tribes2.create()
+  )
+
+  await run(
+    'alice adds the others to the group',
+    alice.tribes2.addMembers(groupId, [bobId, carolId])
+  )
+
+  await run('replicated', replicate(alice, bob, carol))
+
+  await run('carol accepts group invite', carol.tribes2.acceptInvite(groupId))
+
+  await alice.tribes2
+    .excludeMembers(groupId, [bobId], {
+      _newEpochCrash: true,
+    })
+    .then(() => t.fail("didn't crash on intentional failing exclude"))
+    .catch((err) =>
+      t.equal(
+        err.message,
+        'Intentional crash before creating new epoch',
+        'alice excludes bob but crashes before creating the new epoch'
+      )
+    )
+
+  await run('replicated', replicate(alice, bob, carol))
+
+  // the magic happens
+  await p(setTimeout)(500)
+
+  await run('replicate after hopeful recovery', replicate(alice, bob, carol))
+
+  const preferredEpoch = await run(
+    'alice gets her preferred epoch',
+    Epochs(alice).getPreferredEpoch(groupId)
+  )
+  t.equal(
+    preferredEpoch.author,
+    carolId,
+    "the creator of the new epoch is carol and it's alice's preferred epoch"
+  )
+
+  const newGroupInfo = await alice.tribes2.get(groupId)
+
+  t.deepEqual(
+    newGroupInfo.writeKey.key,
+    preferredEpoch.secret,
+    "alice's preferred epoch is the one carol posted and it's alice's current writeKey"
+  )
+
+  await run('replicated', replicate(alice, bob, carol))
+
+  const aliceNewList = await run(
+    'alice gets her list of members',
+    pull(alice.tribes2.listMembers(groupId), pull.collectAsPromise())
+  )
+
+  t.deepEqual(
+    aliceNewList[0].added.sort(),
+    [aliceId, carolId].sort(),
+    'alice has correct member list'
+  )
+
+  const carolNewList = await run(
+    'carol gets her list of members',
+    pull(carol.tribes2.listMembers(groupId), pull.collectAsPromise())
+  )
+
+  t.deepEqual(
+    carolNewList[0].added.sort(),
+    [aliceId, carolId].sort(),
+    'carol has correct member list'
   )
 
   await Promise.all([
