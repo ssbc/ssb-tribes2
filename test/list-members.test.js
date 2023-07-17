@@ -186,12 +186,6 @@ test('listMembers works with exclusion', async (t) => {
     p(carol.metafeeds.findOrCreate)(),
     p(david.metafeeds.findOrCreate)(),
   ])
-  console.log({
-    alice: aliceRoot.id,
-    bob: bobRoot.id,
-    carol: carolRoot.id,
-    david: davidRoot.id,
-  })
 
   await Promise.all([
     replicate(alice, bob),

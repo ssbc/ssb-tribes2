@@ -254,12 +254,6 @@ module.exports = function startListeners(ssb, config, onError) {
                             if (preferredEpoch.id !== newPreferredEpoch.id)
                               return
 
-                            console.log(
-                              'i am',
-                              myRoot.id,
-                              'about to create new epoch'
-                            )
-
                             createNewEpoch(ssb, group.id, null, (err) => {
                               // prettier-ignore
                               if (err && !isClosed) return onError(clarify(err, "Couldn't create new epoch to recover from a missing one"))
