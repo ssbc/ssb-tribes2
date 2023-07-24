@@ -57,7 +57,8 @@ module.exports = function createSbot(opts = {}) {
       seed: opts.mfSeed || mfSeedFromName(opts.name),
     },
     tribes2: {
-      timeoutScale: opts.timeoutScale,
+      timeoutLow: opts.timeoutLow,
+      timeoutHigh: opts.timeoutHigh,
     },
   })
 

@@ -243,6 +243,7 @@ test('listMembers works with exclusion', async (t) => {
 
   await Promise.all([replicate(alice, bob), replicate(alice, carol)])
 
+  t.pass('replicate done')
   await p(setTimeout)(500)
   t.deepEquals(
     liveMembers.sort(),
