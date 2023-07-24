@@ -200,7 +200,7 @@ You can set the secret stack config `config.tribes2.timeoutScale` to control how
 
 ## Security considerations
 
-While we have tried our best to create a secure end-to-end encrypted communication protocol, this module is not fit for use in safety critical situations. Neither the code nor the specification has been vetted by an independent party. Even assuming a solid implementation, and a bugfree spec, we have intentionally left out several security features that are considered state of the art in other apps such as Signal.
+While we have tried our best to create a secure end-to-end encrypted communication protocol, this module is not fit for use in safety critical situations. Neither the code nor the specification has been vetted by an independent party. Even assuming a solid implementation, and a bug-free spec, we have intentionally left out several security features that are considered state of the art in other apps such as Signal, such as "forward secrecy".
 
 Because of this, we advise that anyone that uses this module in an app, includes prominent UI that warns the user about possible risks.
 
