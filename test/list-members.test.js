@@ -162,8 +162,6 @@ test('listMembers works with exclusion', async (t) => {
       '00000000000000000000000000000000000000000000000000000000000ca201',
       'hex'
     ),
-    //timeoutLow: 0.5,
-    //timeoutHigh: 0.7,
   })
   const david = Testbot({
     keys: ssbKeys.generate(null, 'david'),
