@@ -204,6 +204,12 @@ While we have tried our best to create a secure end-to-end encrypted communicati
 
 Because of this, we advise that anyone that uses this module in an app, includes prominent UI that warns the user about possible risks.
 
+## Links
+
+- [ssb-tribes2-demo](https://github.com/ssbc/ssb-tribes2-demo) - A demo electron app that shows off the features of `ssb-tribes2`
+- [private-group-spec](https://github.com/ssbc/private-group-spec) - The spec that `ssb-tribes2` is based on
+- [ssb-group-exclusion-spec](https://github.com/ssbc/ssb-group-exclusion-spec) - The spec that defines exclusion from a private group
+
 ## License
 
 LGPL-3.0-only
