@@ -198,6 +198,8 @@ Makes sure that you're set up to send and receive group invites, by creating an 
 
 You can set the secret stack config `config.tribes2.timeoutLow` and `config.tribes2.timeoutHigh` to control how slowly the client should try to fix a conflicting state, where other clients might be trying to fix the same conflict at the same time. The defaults are `5` and `30` respectively, which gives a random timeout between 5s-30s. A higher value reduces the risk of creating new conflicts since other clients don't do the same conflict resolution at the same time, but increase the time that the group is in an unstable state. A lower number corrects things faster but increases the risk of ending up in new conflicts. Should not be `0` or close to it.
 
+You need to set `config.tribes2.recoverExclude` to true (default false) for the above mentioned conflict recovery to happen at all. The recovery is a bit unreliable but might sometimes be needed to repair broken state.
+
 ## Security considerations
 
 While we have tried our best to create a secure end-to-end encrypted communication protocol, this module is not fit for use in safety critical situations. Neither the code nor the specification has been vetted by an independent party. Even assuming a solid implementation, and a bug-free spec, we have intentionally left out several security features that are considered state of the art in other apps such as Signal, such as "forward secrecy".

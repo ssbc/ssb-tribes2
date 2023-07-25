@@ -59,6 +59,7 @@ module.exports = function createSbot(opts = {}) {
     tribes2: {
       timeoutLow: opts.timeoutLow,
       timeoutHigh: opts.timeoutHigh,
+      recoverExclude: opts.recoverExclude,
     },
   })
 
