@@ -453,7 +453,7 @@ test.only('lib/epochs (getPreferredEpoch - 4.6. overlapping membership)', async 
   // <setup>
   const peers = [
     Server({ name: 'alice' }),
-    Server({ name: 'bob' }),
+    Server({ name: 'bob', disjointResloveDelay: 0 }),
     Server({ name: 'carol' }),
     Server({ name: 'oscar' }),
   ]
@@ -486,18 +486,22 @@ test.only('lib/epochs (getPreferredEpoch - 4.6. overlapping membership)', async 
   )
   // </setup>
 
-  await run(
-    'alice excludes oscar',
-    alice.tribes2.excludeMembers(group.id, [oscarId], {})
-  )
-  await run(
-    'bob excludes carol',
-    bob.tribes2.excludeMembers(group.id, [carolId], {})
-  )
+  await Promise.all([
+    run(
+      'alice excludes oscar',
+      alice.tribes2.excludeMembers(group.id, [oscarId], {})
+    ),
+    run(
+      'bob excludes carol',
+      bob.tribes2.excludeMembers(group.id, [carolId], {})
+    ),
+  ])
 
   await run('(sync exclusions)', replicate(alice, bob))
 
-  await p(setTimeout)(5000)
+  const DELAY = 5000
+  console.log('sleep', DELAY)
+  await p(setTimeout)(DELAY)
 
   await run('(sync conflict resolution)', replicate(alice, bob))
 
