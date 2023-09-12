@@ -500,7 +500,7 @@ test('lib/epochs (getPreferredEpoch - 4.6. overlapping membership)', async (t) =
   await run('(sync exclusions)', replicate(alice, bob))
 
   const DELAY = 5000
-  console.log('sleep', DELAY)
+  console.log('sleep', DELAY) // eslint-disable-line
   await p(setTimeout)(DELAY)
 
   await run('(sync conflict resolution)', replicate(alice, bob))
