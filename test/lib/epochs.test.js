@@ -440,7 +440,7 @@ test('lib/epochs (getPreferredEpoch - 4.5. subset membership)', async (t) => {
   t.end()
 })
 
-test.only('lib/epochs (getPreferredEpoch - 4.6. overlapping membership)', async (t) => {
+test('lib/epochs (getPreferredEpoch - 4.6. overlapping membership)', async (t) => {
   // alice starts a group, adds bob, carol, oscar
   // simultaneously:
   //   - alice excludes oscar
@@ -453,7 +453,7 @@ test.only('lib/epochs (getPreferredEpoch - 4.6. overlapping membership)', async 
   // <setup>
   const peers = [
     Server({ name: 'alice' }),
-    Server({ name: 'bob', disjointResloveDelay: 0 }),
+    Server({ name: 'bob', disjointResloveDelay: 1000 }),
     Server({ name: 'carol' }),
     Server({ name: 'oscar' }),
   ]
