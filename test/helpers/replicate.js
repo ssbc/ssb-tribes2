@@ -55,7 +55,7 @@ module.exports = async function replicate(...peers) {
   )
 }
 
-const runTimer = !false
+const runTimer = false
 async function replicatePair(person1, person2) {
   let ID = [person1, person2].map(getName).join('-')
   while (ID.length < 12) ID += ' '
