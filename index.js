@@ -48,7 +48,7 @@ module.exports = {
     addMembers: 'async',
     excludeMembers: 'async',
     publish: 'async',
-    listMemebers: 'source',
+    listMembers: 'source',
     listInvites: 'source',
     acceptInvite: 'async',
     start: 'async',

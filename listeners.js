@@ -208,84 +208,88 @@ module.exports = function startListeners(ssb, config, onError) {
     )
 
     // recover from half-finished excludeMembers() calls
-    pull(
-      ssb.tribes2.list({ live: true }),
-      pull.unique('id'),
-      pull.map((group) =>
-        pull(
-          getPreferredEpoch.stream(group.id, { live: true }),
-          pull.unique('id'),
-          pull.drain(
-            (preferredEpoch) => {
-              // re-add missing people to a new epoch if the epoch creator didn't add everyone but they added us.
-              // we're only doing this for the preferred epoch atm
-              const timeout = randomTimeout(config)
-              const timeoutId = setTimeout(() => {
-                reAddMembers(ssb, group.id, null, (err) => {
-                  // prettier-ignore
-                  if (err && !isClosed) return onError(clarify(err, 'Failed re-adding members to epoch that missed some'))
-                })
-              }, timeout)
-              closeCalls.push(() => clearTimeout(timeoutId))
 
-              // if we find an exclude and it's not excluding us but we don't find a new epoch, even after a while, then create a new epoch, since we assume that the excluder crashed or something
-              pull(
-                getMembers.stream(preferredEpoch.id, { live: true }),
-                pull.filter((members) => members.toExclude.length),
-                pull.take(1),
-                pull.drain(
-                  () => {
-                    const timeout = randomTimeout(config)
-                    const timeoutId = setTimeout(() => {
-                      ssb.tribes2.get(group.id, (err, group) => {
-                        // prettier-ignore
-                        if (err && !isClosed) return onError(clarify(err, "Couldn't get group info when checking for missing epochs to recover"))
-
-                        // checking if we were one of the members who got excluded now, in that case we ignore this
-                        if (group.excluded) return
-
-                        getPreferredEpoch(
-                          group.id,
-                          (err, newPreferredEpoch) => {
-                            // prettier-ignore
-                            if (err && !isClosed) return onError(clarify(err, "Couldn't get preferred epoch when checking for missing epochs to recover"))
-
-                            // if we've found a new epoch then we don't need to create one ourselves
-                            if (preferredEpoch.id !== newPreferredEpoch.id)
-                              return
-
-                            createNewEpoch(ssb, group.id, null, (err) => {
-                              // prettier-ignore
-                              if (err && !isClosed) return onError(clarify(err, "Couldn't create new epoch to recover from a missing one"))
-                            })
-                          }
-                        )
-                      })
-                    }, timeout)
-
-                    closeCalls.push(() => clearTimeout(timeoutId))
-                  },
-                  (err) => {
+    const recoverExclude = config.tribes2?.recoverExclude ?? false
+    if (recoverExclude) {
+      pull(
+        ssb.tribes2.list({ live: true }),
+        pull.unique('id'),
+        pull.map((group) =>
+          pull(
+            getPreferredEpoch.stream(group.id, { live: true }),
+            pull.unique('id'),
+            pull.drain(
+              (preferredEpoch) => {
+                // re-add missing people to a new epoch if the epoch creator didn't add everyone but they added us.
+                // we're only doing this for the preferred epoch atm
+                const timeout = randomTimeout(config)
+                const timeoutId = setTimeout(() => {
+                  reAddMembers(ssb, group.id, null, (err) => {
                     // prettier-ignore
-                    if (err && !isClosed) return onError(clarify(err, "Couldn't get info on exclusion events when looking for epochs that fail to get created"))
-                  }
+                    if (err && !isClosed) return onError(clarify(err, 'Failed re-adding members to epoch that missed some'))
+                  })
+                }, timeout)
+                closeCalls.push(() => clearTimeout(timeoutId))
+
+                // if we find an exclude and it's not excluding us but we don't find a new epoch, even after a while, then create a new epoch, since we assume that the excluder crashed or something
+                pull(
+                  getMembers.stream(preferredEpoch.id, { live: true }),
+                  pull.filter((members) => members.toExclude.length),
+                  pull.take(1),
+                  pull.drain(
+                    () => {
+                      const timeout = randomTimeout(config)
+                      const timeoutId = setTimeout(() => {
+                        ssb.tribes2.get(group.id, (err, group) => {
+                          // prettier-ignore
+                          if (err && !isClosed) return onError(clarify(err, "Couldn't get group info when checking for missing epochs to recover"))
+
+                          // checking if we were one of the members who got excluded now, in that case we ignore this
+                          if (group.excluded) return
+
+                          getPreferredEpoch(
+                            group.id,
+                            (err, newPreferredEpoch) => {
+                              // prettier-ignore
+                              if (err && !isClosed) return onError(clarify(err, "Couldn't get preferred epoch when checking for missing epochs to recover"))
+
+                              // if we've found a new epoch then we don't need to create one ourselves
+                              if (preferredEpoch.id !== newPreferredEpoch.id)
+                                return
+
+                              createNewEpoch(ssb, group.id, null, (err) => {
+                                // prettier-ignore
+                                if (err && !isClosed) return onError(clarify(err, "Couldn't create new epoch to recover from a missing one"))
+                              })
+                            }
+                          )
+                        })
+                      }, timeout)
+
+                      closeCalls.push(() => clearTimeout(timeoutId))
+                    },
+                    (err) => {
+                      // prettier-ignore
+                      if (err && !isClosed) return onError(clarify(err, "Couldn't get info on exclusion events when looking for epochs that fail to get created"))
+                    }
+                  )
                 )
-              )
-            },
-            (err) => {
-              // prettier-ignore
-              if (err && !isClosed) return onError(clarify(err, "Failed finding new preferred epochs when looking for them to add missing members to or when checking if an epoch is missing"))
-            }
+              },
+              (err) => {
+                // prettier-ignore
+                if (err && !isClosed) return onError(clarify(err, "Failed finding new preferred epochs when looking for them to add missing members to or when checking if an epoch is missing"))
+              }
+            )
           )
+        ),
+        pull.drain(
+          () => {},
+          (err) => {
+            // prettier-ignore
+            if (err && !isClosed) return onError(clarify(err, 'Failed listing groups when trying to find missing epochs or epochs with missing members'))
+          }
         )
-      ),
-      pull.drain(
-        () => {},
-        (err) => {
-          // prettier-ignore
-          if (err && !isClosed) return onError(clarify(err, 'Failed listing groups when trying to find missing epochs or epochs with missing members'))
-        }
       )
-    )
+    }
   })
 }

@@ -14,7 +14,7 @@ const countGroupFeeds = require('./helpers/count-group-feeds')
 const Run = require('./helpers/run')
 const Epochs = require('../lib/epochs')
 
-const lowTimeouts = { timeoutLow: 0.1, timeoutHigh: 0.2 }
+const lowTimeouts = { timeoutLow: 0.1, timeoutHigh: 0.2, recoverExclude: true }
 
 async function getRootIds(peers, t) {
   return Promise.all(peers.map((peer) => p(peer.metafeeds.findOrCreate)()))
@@ -697,9 +697,9 @@ test("restarting the client doesn't make us rejoin old stuff", async (t) => {
 test('On exclusion, if we fail to re-add all people, someone else does that instead', async (t) => {
   const run = Run(t)
   // set alice to be slow to fix mistakes, to allow carol time to do it
-  const alice = Testbot({ name: 'alice', timeoutScale: 300 * 1000 })
+  const alice = Testbot({ name: 'alice' })
   const bob = Testbot({ name: 'bob' })
-  const carol = Testbot({ name: 'carol', timeoutScale: 0 })
+  const carol = Testbot({ name: 'carol', ...lowTimeouts })
   const david = Testbot({ name: 'david' })
 
   await run(
