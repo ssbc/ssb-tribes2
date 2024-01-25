@@ -16,6 +16,9 @@ function getRootIds(peers) {
     peers.map((peer) => p(peer.metafeeds.findOrCreate)())
   ).then((feeds) => feeds.map((feed) => feed.id))
 }
+function closeAll(peers) {
+  return Promise.all(peers.map((peer) => p(peer.close)(true)))
+}
 
 test('lib/epochs (getEpochs, getMembers)', async (t) => {
   const run = Run(t)
@@ -26,7 +29,7 @@ test('lib/epochs (getEpochs, getMembers)', async (t) => {
   async function sync(label) {
     return run(`(sync ${label})`, replicate(peers), { isTest: false })
   }
-  t.teardown(() => Promise.all(peers.map((peer) => p(peer.close)(true))))
+  t.teardown(async () => await closeAll(peers))
 
   const [aliceId, bobId, oscarId] = await getRootIds(peers)
   await run(
@@ -153,7 +156,7 @@ test('lib/epochs (getMissingMembers)', async (t) => {
       { isTest: false }
     )
   }
-  t.teardown(() => Promise.all(peers.map((peer) => p(peer.close)(true))))
+  t.teardown(async () => await closeAll(peers))
 
   await run(
     'start tribes',
@@ -260,7 +263,7 @@ test('lib/epochs (getPreferredEpoch - 4.4. same membership)', async (t) => {
     Server({ name: 'bob' }),
     Server({ name: 'oscar' }),
   ]
-  t.teardown(() => Promise.all(peers.map((peer) => p(peer.close)(true))))
+  t.teardown(async () => await closeAll(peers))
 
   const [alice, bob, oscar] = peers
   const [bobId, oscarId] = await getRootIds([bob, oscar])
@@ -381,7 +384,7 @@ test('lib/epochs (getPreferredEpoch - 4.5. subset membership)', async (t) => {
     Server({ name: 'carol' }),
     Server({ name: 'oscar' }),
   ]
-  t.teardown(() => Promise.all(peers.map((peer) => p(peer.close)(true))))
+  t.teardown(async () => await closeAll(peers))
 
   const [alice, bob, carol, oscar] = peers
   const [bobId, carolId, oscarId] = await getRootIds([bob, carol, oscar])
@@ -440,16 +443,178 @@ test('lib/epochs (getPreferredEpoch - 4.5. subset membership)', async (t) => {
   t.end()
 })
 
-test.skip('lib/epochs (getPreferredEpoch - 4.6. overlapping membership)', async (t) => {
-  // there is no preferred epoch, you will need to choose choose a winner
-  // and exclude some members
-  // (not sure what the API should be here)
+test('lib/epochs (getPreferredEpoch - 4.6. overlapping membership)', async (t) => {
+  // alice starts a group, adds bob, carol, oscar
+  // simultaneously:
+  //   - alice excludes oscar
+  //   - bob exlcudes carol
+  //
+  // there is no preferred epoch, you will need to exclude members down to intersection
+
+  const run = Run(t)
+
+  // <setup>
+  const peers = [
+    Server({ name: 'alice' }),
+    Server({ name: 'bob', disjointResolveDelay: 1000 }),
+    Server({ name: 'carol' }),
+    Server({ name: 'oscar' }),
+  ]
+  t.teardown(async () => await closeAll(peers))
+
+  const [alice, bob, carol, oscar] = peers
+  const [bobId, carolId, oscarId] = await getRootIds([bob, carol, oscar])
+  await run(
+    'start tribes',
+    Promise.all(peers.map((peer) => peer.tribes2.start()))
+  )
+
+  const group = await run('alice creates a group', alice.tribes2.create({}))
+
+  await run('(sync dm feeds)', replicate(alice, bob, carol, oscar))
+
+  await run(
+    'alice invites bob, carol, oscar',
+    alice.tribes2.addMembers(group.id, [bobId, carolId, oscarId], {})
+  )
+
+  await run('(sync dm feeds)', replicate(alice, bob, carol, oscar))
+
+  await run(
+    'others accept invites',
+    Promise.all([
+      bob.tribes2.acceptInvite(group.id),
+      carol.tribes2.acceptInvite(group.id),
+      oscar.tribes2.acceptInvite(group.id),
+    ])
+  )
+  // </setup>
+
+  await Promise.all([
+    run(
+      'alice excludes oscar',
+      alice.tribes2.excludeMembers(group.id, [oscarId], {})
+    ),
+    run(
+      'bob excludes carol',
+      bob.tribes2.excludeMembers(group.id, [carolId], {})
+    ),
+  ])
+
+  await run('(sync exclusions)', replicate(alice, bob))
+
+  const DELAY = 5000
+  console.log('sleep', DELAY) // eslint-disable-line
+  await p(setTimeout)(DELAY)
+
+  await run('(sync conflict resolution)', replicate(alice, bob))
+
+  t.equal(
+    (await Epochs(alice).getTipEpochs(group.id)).length,
+    1,
+    'there is only 1 tip'
+  )
+
+  t.deepEqual(
+    await Epochs(alice).getPreferredEpoch(group.id),
+    await Epochs(bob).getPreferredEpoch(group.id),
+    'alice and bob agree'
+  )
 
   t.end()
 })
 
-test.skip('lib/epochs (getPreferredEpoch - 4.7. disjoint membership)', async (t) => {
+test('lib/epochs (getPreferredEpoch - 4.7. disjoint membership)', async (t) => {
   // there is no conflict in this case (doesn't need testing?)
+
+  // alice starts a group, adds bob, carol, oscar
+  // simultaneously:
+  //   - alice excludes carol, oscar
+  //   - oscar excludes alice, bob
+  //
+  // the group split!
+
+  const run = Run(t)
+
+  // <setup>
+  const peers = [
+    Server({ name: 'alice' }),
+    Server({ name: 'bob' }),
+    Server({ name: 'carol' }),
+    Server({ name: 'oscar' }),
+  ]
+  t.teardown(async () => await closeAll(peers))
+
+  const [alice, bob, carol, oscar] = peers
+  const [aliceId, bobId, carolId, oscarId] = await getRootIds([
+    alice,
+    bob,
+    carol,
+    oscar,
+  ])
+  await run(
+    'start tribes',
+    Promise.all(peers.map((peer) => peer.tribes2.start()))
+  )
+
+  const group = await run('alice creates a group', alice.tribes2.create({}))
+
+  await run('(sync dm feeds)', replicate(alice, bob, carol, oscar))
+
+  await run(
+    'alice invites bob, carol, oscar',
+    alice.tribes2.addMembers(group.id, [bobId, carolId, oscarId], {})
+  )
+
+  await run('(sync dm feeds)', replicate(alice, bob, carol, oscar))
+
+  await run(
+    'others accept invites',
+    Promise.all([
+      bob.tribes2.acceptInvite(group.id),
+      carol.tribes2.acceptInvite(group.id),
+      oscar.tribes2.acceptInvite(group.id),
+    ])
+  )
+  // </setup>
+
+  await Promise.all([
+    run(
+      'alice excludes carol, oscar',
+      alice.tribes2.excludeMembers(group.id, [carolId, oscarId], {})
+    ),
+    run(
+      'oscar excludes alice, bob',
+      oscar.tribes2.excludeMembers(group.id, [aliceId, bobId], {})
+    ),
+  ])
+
+  await run(
+    '(sync exclusions)',
+    Promise.all([
+      replicate(alice, bob),
+      replicate(oscar, carol),
+      replicate(alice, oscar),
+    ])
+  )
+
+  const DELAY = 1000
+  console.log('sleep', DELAY) // eslint-disable-line
+  await p(setTimeout)(DELAY)
+
+  const aliceTips = await Epochs(alice).getTipEpochs(group.id)
+  const oscarTips = await Epochs(oscar).getTipEpochs(group.id)
+  t.equal(aliceTips.length, 1, 'alice sees only one tip')
+  t.equal(oscarTips.length, 1, 'oscar sees only one tip')
+
+  const [alicePreferred, bobPreferred, carolPreferred, oscarPreferred] =
+    await Promise.all(
+      peers.map((peer) => Epochs(peer).getPreferredEpoch(group.id))
+    )
+
+  t.deepEqual(alicePreferred, bobPreferred, 'alice and bob agree epoch')
+  t.deepEqual(carolPreferred, oscarPreferred, 'carol and oscar agree epoch')
+  t.notDeepEqual(alicePreferred, oscarPreferred, 'the group is split')
 
   t.end()
 })

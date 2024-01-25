@@ -1,7 +1,6 @@
 // SPDX-FileCopyrightText: 2023 Mix Irving <mix@protozoa.nz>
 //
 // SPDX-License-Identifier: LGPL-3.0-only
-//
 
 const {
   where,
@@ -25,11 +24,10 @@ const {
 const pull = require('pull-stream')
 const paraMap = require('pull-paramap')
 const clarify = require('clarify-error')
+
 const Epochs = require('./lib/epochs')
 const { reAddMembers, createNewEpoch } = require('./lib/exclude')
-
-// push a function to this list to have it called when the client is closing
-const closeCalls = []
+const hookClose = require('./lib/hook-close')
 
 function randomTimeout(config) {
   if (!config) throw new Error('Please give config')
@@ -40,15 +38,11 @@ function randomTimeout(config) {
 }
 
 module.exports = function startListeners(ssb, config, onError) {
-  const { getTipEpochs, getPreferredEpoch, getMembers } = Epochs(ssb)
-
+  hookClose(ssb)
   let isClosed = false
-  ssb.close.hook((close, args) => {
-    isClosed = true
-    close.apply(ssb, args)
+  hookClose.onClose(() => { isClosed = true })
 
-    closeCalls.forEach((fn) => fn())
-  })
+  const { getTipEpochs, getPreferredEpoch, getMembers } = Epochs(ssb)
 
   ssb.metafeeds.findOrCreate((err, myRoot) => {
     // prettier-ignore
@@ -229,7 +223,7 @@ module.exports = function startListeners(ssb, config, onError) {
                     if (err && !isClosed) return onError(clarify(err, 'Failed re-adding members to epoch that missed some'))
                   })
                 }, timeout)
-                closeCalls.push(() => clearTimeout(timeoutId))
+                hookClose.onClose(() => clearTimeout(timeoutId))
 
                 // if we find an exclude and it's not excluding us but we don't find a new epoch, even after a while, then create a new epoch, since we assume that the excluder crashed or something
                 pull(
@@ -266,7 +260,7 @@ module.exports = function startListeners(ssb, config, onError) {
                         })
                       }, timeout)
 
-                      closeCalls.push(() => clearTimeout(timeoutId))
+                      hookClose.onClose(() => clearTimeout(timeoutId))
                     },
                     (err) => {
                       // prettier-ignore
