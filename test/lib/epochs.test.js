@@ -26,7 +26,7 @@ test('lib/epochs (getEpochs, getMembers)', async (t) => {
   async function sync(label) {
     return run(`(sync ${label})`, replicate(peers), { isTest: false })
   }
-  t.teardown(() => peers.forEach((peer) => peer.close(true)))
+  t.teardown(() => Promise.all(peers.map((peer) => p(peer.close)(true))))
 
   const [aliceId, bobId, oscarId] = await getRootIds(peers)
   await run(
@@ -153,7 +153,7 @@ test('lib/epochs (getMissingMembers)', async (t) => {
       { isTest: false }
     )
   }
-  t.teardown(() => peers.forEach((peer) => peer.close(true)))
+  t.teardown(() => Promise.all(peers.map((peer) => p(peer.close)(true))))
 
   await run(
     'start tribes',
@@ -260,7 +260,7 @@ test('lib/epochs (getPreferredEpoch - 4.4. same membership)', async (t) => {
     Server({ name: 'bob' }),
     Server({ name: 'oscar' }),
   ]
-  t.teardown(() => peers.forEach((peer) => peer.close(true)))
+  t.teardown(() => Promise.all(peers.map((peer) => p(peer.close)(true))))
 
   const [alice, bob, oscar] = peers
   const [bobId, oscarId] = await getRootIds([bob, oscar])
@@ -381,7 +381,7 @@ test('lib/epochs (getPreferredEpoch - 4.5. subset membership)', async (t) => {
     Server({ name: 'carol' }),
     Server({ name: 'oscar' }),
   ]
-  t.teardown(() => peers.forEach((peer) => peer.close(true)))
+  t.teardown(() => Promise.all(peers.map((peer) => p(peer.close)(true))))
 
   const [alice, bob, carol, oscar] = peers
   const [bobId, carolId, oscarId] = await getRootIds([bob, carol, oscar])
