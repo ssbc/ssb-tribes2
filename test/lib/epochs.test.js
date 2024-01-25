@@ -453,7 +453,7 @@ test('lib/epochs (getPreferredEpoch - 4.6. overlapping membership)', async (t) =
   // <setup>
   const peers = [
     Server({ name: 'alice' }),
-    Server({ name: 'bob', disjointResloveDelay: 1000 }),
+    Server({ name: 'bob', disjointResolveDelay: 1000 }),
     Server({ name: 'carol' }),
     Server({ name: 'oscar' }),
   ]

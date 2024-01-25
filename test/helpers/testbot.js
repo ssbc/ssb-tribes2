@@ -60,7 +60,7 @@ module.exports = function createSbot(opts = {}) {
       timeoutLow: opts.timeoutLow,
       timeoutHigh: opts.timeoutHigh,
       recoverExclude: opts.recoverExclude,
-      disjointResloveDelay: opts.disjointResloveDelay,
+      disjointResolveDelay: opts.disjointResolveDelay,
     },
   })
 
